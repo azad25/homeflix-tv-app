@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    
+    <!-- Netflix Red background with rounded corners -->
+    <path
+        android:fillColor="#E50914"
+        android:pathData="M8,8 L88,8 A8,8 0 0,1 96,16 L96,80 A8,8 0 0,1 88,88 L8,88 A8,8 0 0,1 0,80 L0,16 A8,8 0 0,1 8,8 Z" />
+    
+    <!-- White HOMEFLIX text - larger and bolder for TV -->
+    <group android:translateX="48" android:translateY="35">
+        <!-- H -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M-35,-12 L-30,-12 L-30,12 L-35,12 Z M-35,-3 L-22,-3 L-22,3 L-35,3 Z M-27,-12 L-22,-12 L-22,12 L-27,12 Z" />
+        
+        <!-- O -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M-17,-12 L-7,-12 L-7,-7 L-17,-7 Z M-17,-7 L-12,-7 L-12,7 L-17,7 Z M-12,7 L-7,7 L-7,12 L-12,12 Z M-17,7 L-7,7 L-7,12 L-17,12 Z M-12,-7 L-7,-7 L-7,7 L-12,7 Z" />
+        
+        <!-- M -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M-2,-12 L3,-12 L3,12 L-2,12 Z M3,-12 L8,-12 L8,0 L3,0 Z M8,-12 L13,-12 L13,0 L8,0 Z M13,-12 L18,-12 L18,12 L13,12 Z" />
+        
+        <!-- E -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M23,-12 L28,-12 L28,12 L23,12 Z M23,-12 L40,-12 L40,-7 L23,-7 Z M23,-3 L37,-3 L37,3 L23,3 Z M23,7 L40,7 L40,12 L23,12 Z" />
+    </group>
+    
+    <!-- TV text -->
+    <group android:translateX="48" android:translateY="65">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M-12,-5 L12,-5 L12,-2 L4,-2 L4,5 L-4,5 L-4,-2 L-12,-2 Z M15,-5 L20,-5 L20,5 L15,5 Z M20,-5 L25,-5 L25,-2 L20,-2 Z M20,2 L25,2 L25,5 L20,5 Z" />
+    </group>
+</vector>

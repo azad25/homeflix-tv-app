@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- TODO: Add any files you want to include in the backup here -->
+    <exclude domain="external" />
+</full-backup-content>

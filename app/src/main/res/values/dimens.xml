@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TV-specific dimensions for 10-foot UI -->
+    
+    <!-- Padding and Margins -->
+    <dimen name="tv_padding_small">8dp</dimen>
+    <dimen name="tv_padding_medium">16dp</dimen>
+    <dimen name="tv_padding_large">24dp</dimen>
+    <dimen name="tv_padding_xlarge">48dp</dimen>
+    
+    <dimen name="tv_margin_small">8dp</dimen>
+    <dimen name="tv_margin_medium">16dp</dimen>
+    <dimen name="tv_margin_large">24dp</dimen>
+    <dimen name="tv_margin_xlarge">48dp</dimen>
+    
+    <!-- Card Dimensions -->
+    <dimen name="media_card_width">200dp</dimen>
+    <dimen name="media_card_height">300dp</dimen>
+    <dimen name="media_card_corner_radius">8dp</dimen>
+    
+    <!-- Focus Border -->
+    <dimen name="focus_border_width">3dp</dimen>
+    
+    <!-- Text Sizes (TV optimized) -->
+    <dimen name="text_size_hero_title">48sp</dimen>
+    <dimen name="text_size_section_title">24sp</dimen>
+    <dimen name="text_size_card_title">16sp</dimen>
+    <dimen name="text_size_body">14sp</dimen>
+    <dimen name="text_size_caption">12sp</dimen>
+    
+    <!-- Button Dimensions -->
+    <dimen name="button_height">48dp</dimen>
+    <dimen name="button_corner_radius">4dp</dimen>
+    
+    <!-- Hero Section -->
+    <dimen name="hero_section_height">400dp</dimen>
+    
+    <!-- Navigation Bar -->
+    <dimen name="nav_bar_height">80dp</dimen>
+    
+    <!-- Spacing -->
+    <dimen name="section_spacing">24dp</dimen>
+    <dimen name="item_spacing">12dp</dimen>
+</resources>

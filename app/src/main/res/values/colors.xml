@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Netflix Brand Colors -->
+    <color name="netflix_red">#E50914</color>
+    <color name="netflix_black">#000000</color>
+    <color name="netflix_dark_gray">#141414</color>
+    <color name="netflix_medium_gray">#2F2F2F</color>
+    <color name="netflix_light_gray">#564D4D</color>
+    <color name="netflix_white">#FFFFFF</color>
+    
+    <!-- UI Colors -->
+    <color name="focused_border">#FFFFFF</color>
+    <color name="unfocused_border">#333333</color>
+    <color name="overlay_background">#80000000</color>
+    <color name="card_background">#1A1A1A</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#B3B3B3</color>
+    <color name="text_tertiary">#808080</color>
+    
+    <!-- Status Colors -->
+    <color name="success_green">#46D369</color>
+    <color name="warning_yellow">#FFC107</color>
+    <color name="error_red">#DC3545</color>
+    <color name="info_blue">#17A2B8</color>
+    
+    <!-- Material Design Colors -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

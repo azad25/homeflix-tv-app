@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme for TV -->
+    <style name="Theme.HomeFlixTV" parent="Theme.Leanback">
+        <item name="colorPrimary">@color/netflix_red</item>
+        <item name="android:colorBackground">@color/netflix_black</item>
+        <item name="colorError">@color/error_red</item>
+    </style>
+    
+    <!-- Theme without action bar -->
+    <style name="Theme.HomeFlixTV.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+    
+    <!-- Fullscreen theme for video player -->
+    <style name="Theme.HomeFlixTV.Fullscreen">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@color/netflix_black</item>
+    </style>
+</resources>

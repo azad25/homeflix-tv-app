@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HomeFlix TV</string>
+    <string name="app_description">Your personal Netflix experience on Android TV</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_movies">Movies</string>
+    <string name="nav_tv_shows">TV Shows</string>
+    <string name="nav_my_list">My List</string>
+    <string name="nav_search">Search</string>
+    
+    <!-- Actions -->
+    <string name="action_play">Play</string>
+    <string name="action_more_info">More Info</string>
+    <string name="action_add_to_list">+ My List</string>
+    <string name="action_remove_from_list">✓ My List</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_go_back">Go Back</string>
+    
+    <!-- Content -->
+    <string name="content_featured">Featured</string>
+    <string name="content_continue_watching">Continue Watching</string>
+    <string name="content_trending">Trending Now</string>
+    <string name="content_popular_movies">Popular Movies</string>
+    <string name="content_popular_tv_shows">Popular TV Shows</string>
+    <string name="content_recently_added">Recently Added</string>
+    
+    <!-- Search -->
+    <string name="search_hint">Search movies and TV shows...</string>
+    <string name="search_no_results">No results found</string>
+    <string name="search_try_different">Try searching with different keywords</string>
+    <string name="search_initial_message">Search for your favorite movies and TV shows</string>
+    
+    <!-- Errors -->
+    <string name="error_loading_content">Error loading content</string>
+    <string name="error_loading_details">Error loading details</string>
+    <string name="error_no_content">No content available</string>
+    <string name="error_network">Network error. Please check your connection.</string>
+    <string name="error_unknown">Unknown error occurred</string>
+    
+    <!-- Loading -->
+    <string name="loading">Loading...</string>
+    
+    <!-- Media Info -->
+    <string name="info_cast_crew">Cast &amp; Crew</string>
+    <string name="info_director">Director: %s</string>
+    <string name="info_cast">Cast: %s</string>
+    <string name="info_details">Details</string>
+    <string name="info_quality">Quality: %s</string>
+    <string name="info_language">Language: %s</string>
+    <string name="info_runtime">%d min</string>
+    <string name="info_rating">★ %.1f</string>
+</resources>

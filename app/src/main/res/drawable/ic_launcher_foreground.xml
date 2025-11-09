@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Netflix Red background with rounded corners -->
+    <path
+        android:fillColor="#E50914"
+        android:pathData="M8,8 L100,8 A8,8 0 0,1 108,16 L108,92 A8,8 0 0,1 100,100 L8,100 A8,8 0 0,1 0,92 L0,16 A8,8 0 0,1 8,8 Z" />
+    
+    <!-- White HOMEFLIX text - simplified and bold -->
+    <group android:translateX="54" android:translateY="54">
+        <!-- H -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M-40,-12 L-36,-12 L-36,12 L-40,12 Z M-40,-2 L-30,-2 L-30,2 L-40,2 Z M-34,-12 L-30,-12 L-30,12 L-34,12 Z" />
+        
+        <!-- O -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M-26,-12 L-18,-12 L-18,-8 L-26,-8 Z M-26,-8 L-22,-8 L-22,8 L-26,8 Z M-22,8 L-18,8 L-18,12 L-22,12 Z M-26,8 L-18,8 L-18,12 L-26,12 Z M-22,-8 L-18,-8 L-18,8 L-22,8 Z" />
+        
+        <!-- M -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M-14,-12 L-10,-12 L-10,12 L-14,12 Z M-10,-12 L-6,-12 L-6,0 L-10,0 Z M-6,-12 L-2,-12 L-2,0 L-6,0 Z M-2,-12 L2,-12 L2,12 L-2,12 Z" />
+        
+        <!-- E -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M6,-12 L10,-12 L10,12 L6,12 Z M6,-12 L18,-12 L18,-8 L6,-8 Z M6,-2 L16,-2 L16,2 L6,2 Z M6,8 L18,8 L18,12 L6,12 Z" />
+        
+        <!-- F -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M22,-12 L26,-12 L26,12 L22,12 Z M22,-12 L34,-12 L34,-8 L22,-8 Z M22,-2 L32,-2 L32,2 L22,2 Z" />
+        
+        <!-- L -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M38,-12 L42,-12 L42,12 L38,12 Z M38,8 L50,8 L50,12 L38,12 Z" />
+    </group>
+    
+    <!-- Smaller "TV" text below -->
+    <group android:translateX="54" android:translateY="75">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M-8,-4 L8,-4 L8,-2 L2,-2 L2,4 L-2,4 L-2,-2 L-8,-2 Z M10,-4 L14,-4 L14,4 L10,4 Z M14,-4 L18,-4 L18,-2 L14,-2 Z M14,2 L18,2 L18,4 L14,4 Z" />
+    </group>
+</vector>
