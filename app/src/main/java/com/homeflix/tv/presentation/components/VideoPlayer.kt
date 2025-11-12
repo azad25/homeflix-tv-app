@@ -457,6 +457,27 @@ fun VideoPlayer(
                         setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                         // Set background to black to prevent white flash
                         setBackgroundColor(android.graphics.Color.BLACK)
+                        
+                        // Configure subtitle styling
+                        subtitleView?.apply {
+                            // Reduce subtitle text size
+                            setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f) // Smaller text
+                            
+                            // Remove black background and set transparent
+                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                            
+                            // Set white text with subtle shadow for better readability
+                            setStyle(
+                                androidx.media3.ui.CaptionStyleCompat(
+                                    android.graphics.Color.WHITE, // Foreground color (text)
+                                    android.graphics.Color.TRANSPARENT, // Background color (transparent)
+                                    android.graphics.Color.TRANSPARENT, // Window color (transparent)
+                                    androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW, // Edge type
+                                    android.graphics.Color.BLACK, // Edge color (shadow)
+                                    android.graphics.Typeface.DEFAULT // Typeface
+                                )
+                            )
+                        }
                     }
                 },
                 update = { playerView ->
