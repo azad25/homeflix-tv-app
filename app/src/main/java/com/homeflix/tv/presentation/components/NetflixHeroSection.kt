@@ -59,15 +59,22 @@ fun NetflixHeroSection(
     val infoButtonFocusRequester = remember { FocusRequester() }
     var isUserInteracting by remember { mutableStateOf(false) }
     
-    // DISABLED: Auto-slide to prevent focus interference
-    // Auto-slide can interfere with D-pad navigation focus
-    // LaunchedEffect(currentIndex, isUserInteracting) {
-    //     if (!isUserInteracting && mediaList.size > 1) {
-    //         delay(5000)
-    //         val nextIndex = (currentIndex + 1) % mediaList.size
-    //         onIndexChange(nextIndex)
-    //     }
-    // }
+    // Auto-slide functionality - Netflix style (re-enabled)
+    LaunchedEffect(currentIndex, isUserInteracting) {
+        if (!isUserInteracting && mediaList.size > 1) {
+            delay(5000) // 5 seconds per slide
+            val nextIndex = (currentIndex + 1) % mediaList.size
+            onIndexChange(nextIndex)
+        }
+    }
+    
+    // Reset user interaction after delay
+    LaunchedEffect(isUserInteracting) {
+        if (isUserInteracting) {
+            delay(10000) // Resume auto-slide after 10 seconds of no interaction
+            isUserInteracting = false
+        }
+    }
     
     // REMOVED: Auto-focus to prevent scroll issues
     // Focus is managed by parent NetflixHomeScreen

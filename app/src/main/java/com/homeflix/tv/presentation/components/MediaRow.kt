@@ -70,6 +70,13 @@ fun MediaRow(
                                 }
                             }
                         }
+                        .onKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionUp) {
+                                // Navigate up from any card in the row
+                                onNavigateUp?.invoke()
+                                true
+                            } else false
+                        }
                 )
             }
         }

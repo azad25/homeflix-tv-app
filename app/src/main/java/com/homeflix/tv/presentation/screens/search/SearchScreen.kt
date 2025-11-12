@@ -272,7 +272,7 @@ fun SearchScreen(
                             TopSearchCard(
                                 media = media,
                                 onClick = {
-                                    navController.navigate(Screen.Details.createRoute(media.uuid))
+                                    navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                 }
                             )
                         }
@@ -336,7 +336,7 @@ fun SearchScreen(
                                         NetflixMovieCard(
                                             media = media,
                                             onClick = {
-                                                navController.navigate(Screen.Details.createRoute(media.uuid))
+                                                navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                             }
                                         )
                                     }
@@ -418,23 +418,7 @@ private fun GenreItem(
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Genre icon (you can customize these)
-        Text(
-            text = when (genre) {
-                "Celebrate Pride" -> "🏳️‍🌈"
-                "Comedies" -> "😂"
-                "Action" -> "💥"
-                "Children & Family" -> "👨‍👩‍👧‍👦"
-                "Horror" -> "👻"
-                "Documentaries" -> "📽️"
-                "Anime" -> "🎌"
-                "Crime" -> "🔍"
-                else -> "🎬"
-            },
-            fontSize = 16.sp,
-            modifier = Modifier.padding(end = 12.dp)
-        )
-        
+        // Removed genre icons for cleaner look
         Text(
             text = genre,
             color = Color.White,

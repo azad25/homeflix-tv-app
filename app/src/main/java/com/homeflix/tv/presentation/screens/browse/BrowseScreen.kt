@@ -205,7 +205,7 @@ fun BrowseScreen(
                             NetflixMovieCard(
                                 media = media,
                                 onClick = {
-                                    navController.navigate(Screen.Details.createRoute(media.uuid))
+                                    navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                 }
                             )
                         }
