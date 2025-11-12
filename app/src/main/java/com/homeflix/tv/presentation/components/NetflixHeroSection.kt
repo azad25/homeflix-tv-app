@@ -59,43 +59,63 @@ fun NetflixHeroSection(
     val infoButtonFocusRequester = remember { FocusRequester() }
     var isUserInteracting by remember { mutableStateOf(false) }
     
-    // Auto-slide functionality - Netflix style
-    LaunchedEffect(currentIndex, isUserInteracting) {
-        if (!isUserInteracting && mediaList.size > 1) {
-            delay(5000) // 5 seconds per slide
-            val nextIndex = (currentIndex + 1) % mediaList.size
-            onIndexChange(nextIndex)
-        }
-    }
-    
-    // Reset user interaction after delay
-    LaunchedEffect(isUserInteracting) {
-        if (isUserInteracting) {
-            delay(10000) // Resume auto-slide after 10 seconds of no interaction
-            isUserInteracting = false
-        }
-    }
+    // DISABLED: Auto-slide to prevent focus interference
+    // Auto-slide can interfere with D-pad navigation focus
+    // LaunchedEffect(currentIndex, isUserInteracting) {
+    //     if (!isUserInteracting && mediaList.size > 1) {
+    //         delay(5000)
+    //         val nextIndex = (currentIndex + 1) % mediaList.size
+    //         onIndexChange(nextIndex)
+    //     }
+    // }
     
     // REMOVED: Auto-focus to prevent scroll issues
     // Focus is managed by parent NetflixHomeScreen
     
+    // Loading state for smooth transitions
+    var isLoading by remember { mutableStateOf(true) }
+    
+    // Reset loading state when media changes
+    LaunchedEffect(currentMedia.id) {
+        isLoading = true
+        delay(300) // Brief loading state for smooth transition
+        isLoading = false
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(480.dp) // Reduced height for better scaling
+            .height(480.dp)
     ) {
-        // Background banner image with caching (Netflix/Prime style)
-        AsyncImage(
-            model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                .data(ApiUtils.getBannerUrl(currentMedia))
-                .memoryCacheKey("banner_${currentMedia.id}")
-                .diskCacheKey("banner_${currentMedia.id}")
-                .crossfade(true)
-                .build(),
-            contentDescription = currentMedia.title,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
+        // Animated background banner with enhanced fade transitions
+        AnimatedContent(
+            targetState = currentMedia.id,
+            transitionSpec = {
+                fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 1000,
+                        delayMillis = 200
+                    )
+                ) togetherWith fadeOut(
+                    animationSpec = tween(
+                        durationMillis = 600
+                    )
+                )
+            },
+            label = "hero_background"
+        ) { mediaId ->
+            AsyncImage(
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(ApiUtils.getBannerUrl(currentMedia))
+                    .memoryCacheKey("banner_${mediaId}")
+                    .diskCacheKey("banner_${mediaId}")
+                    .crossfade(true)
+                    .build(),
+                contentDescription = currentMedia.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
         
         // Netflix-style gradient overlays
         Box(
@@ -128,39 +148,98 @@ fun NetflixHeroSection(
                 )
         )
         
-        // Content
+        // Loading overlay with fade animation
+        androidx.compose.animation.AnimatedVisibility(
+            visible = isLoading,
+            enter = fadeIn(animationSpec = tween(300)),
+            exit = fadeOut(animationSpec = tween(500))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = NetflixRed,
+                    modifier = Modifier.size(48.dp),
+                    strokeWidth = 4.dp
+                )
+            }
+        }
+
+        // Enhanced content animation with staggered timing
         AnimatedContent(
             targetState = currentMedia,
             transitionSpec = {
-                fadeIn(animationSpec = tween(800)) togetherWith 
-                fadeOut(animationSpec = tween(400))
+                fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 1200,
+                        delayMillis = 400
+                    )
+                ) togetherWith fadeOut(
+                    animationSpec = tween(
+                        durationMillis = 600
+                    )
+                )
             },
             label = "hero_content"
         ) { media ->
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 48.dp, top = 80.dp, end = 300.dp, bottom = 60.dp) // ADDED TOP PADDING
+                    .padding(start = 48.dp, top = 80.dp, end = 300.dp, bottom = 60.dp)
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Netflix-style title - REDUCED SIZE for TV
-                Text(
-                    text = media.title,
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Black,
-                        color = TextPrimary
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(0.8f)
-                )
-                
-                // Metadata row
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Animated title with staggered entrance
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isLoading,
+                    enter = fadeIn(
+                        animationSpec = tween(
+                            durationMillis = 800,
+                            delayMillis = 600
+                        )
+                    ) + androidx.compose.animation.slideInVertically(
+                        animationSpec = tween(
+                            durationMillis = 800,
+                            delayMillis = 600
+                        ),
+                        initialOffsetY = { it / 4 }
+                    )
                 ) {
+                    Text(
+                        text = media.title,
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Black,
+                            color = TextPrimary
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(0.8f)
+                    )
+                }
+                
+                // Animated metadata row
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isLoading,
+                    enter = fadeIn(
+                        animationSpec = tween(
+                            durationMillis = 800,
+                            delayMillis = 800
+                        )
+                    ) + androidx.compose.animation.slideInVertically(
+                        animationSpec = tween(
+                            durationMillis = 800,
+                            delayMillis = 800
+                        ),
+                        initialOffsetY = { it / 4 }
+                    )
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                     // Netflix match percentage (simulated)
                     Text(
                         text = "${(85..99).random()}% Match",
@@ -219,37 +298,72 @@ fun NetflixHeroSection(
                             )
                         )
                     }
+                    }
                 }
                 
-                // Genres
-                if (media.genreNames.isNotEmpty()) {
-                    Text(
-                        text = media.genreNames.take(3).joinToString(" • "),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            color = TextSecondary
+                // Animated genres and description
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isLoading,
+                    enter = fadeIn(
+                        animationSpec = tween(
+                            durationMillis = 800,
+                            delayMillis = 1000
                         )
-                    )
-                }
-                
-                // Description
-                media.description?.let { description ->
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = TextPrimary.copy(alpha = 0.9f),
-                            lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2
+                    ) + androidx.compose.animation.slideInVertically(
+                        animationSpec = tween(
+                            durationMillis = 800,
+                            delayMillis = 1000
                         ),
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth(0.7f)
+                        initialOffsetY = { it / 4 }
                     )
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        // Genres
+                        if (media.genreNames.isNotEmpty()) {
+                            Text(
+                                text = media.genreNames.take(3).joinToString(" • "),
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    color = TextSecondary
+                                )
+                            )
+                        }
+                        
+                        // Description
+                        media.description?.let { description ->
+                            Text(
+                                text = description,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    color = TextPrimary.copy(alpha = 0.9f),
+                                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2
+                                ),
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth(0.7f)
+                            )
+                        }
+                    }
                 }
                 
-                // Netflix-style action buttons
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(top = 8.dp)
+                // Animated action buttons with final staggered entrance
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isLoading,
+                    enter = fadeIn(
+                        animationSpec = tween(
+                            durationMillis = 800,
+                            delayMillis = 1200
+                        )
+                    ) + androidx.compose.animation.slideInVertically(
+                        animationSpec = tween(
+                            durationMillis = 800,
+                            delayMillis = 1200
+                        ),
+                        initialOffsetY = { it / 4 }
+                    )
                 ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) {
                     // Play Button - RESTORED NAVIGATION
                     Button(
                         onClick = { onPlayClick(media) },
@@ -267,32 +381,7 @@ fun NetflixHeroSection(
                                     Modifier
                                 }
                             )
-                            .onFocusChanged { playButtonFocused = it.isFocused }
-                            .onKeyEvent { keyEvent ->
-                                if (keyEvent.type == KeyEventType.KeyDown) {
-                                    when (keyEvent.key) {
-                                        Key.DirectionRight -> {
-                                            try {
-                                                infoButtonFocusRequester.requestFocus()
-                                            } catch (e: Exception) {
-                                                // Ignore focus errors
-                                            }
-                                            true
-                                        }
-                                        Key.DirectionLeft -> {
-                                            isUserInteracting = true
-                                            val newIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
-                                            onIndexChange(newIndex)
-                                            true
-                                        }
-                                        Key.DirectionDown -> {
-                                            onNavigateDown?.invoke()
-                                            true
-                                        }
-                                        else -> false
-                                    }
-                                } else false
-                            },
+                            .onFocusChanged { playButtonFocused = it.isFocused },
                         elevation = ButtonDefaults.buttonElevation(
                             defaultElevation = if (playButtonFocused) 6.dp else 2.dp
                         )
@@ -336,31 +425,6 @@ fun NetflixHeroSection(
                             .height(44.dp)
                             .focusRequester(infoButtonFocusRequester)
                             .onFocusChanged { infoButtonFocused = it.isFocused }
-                            .onKeyEvent { keyEvent ->
-                                if (keyEvent.type == KeyEventType.KeyDown) {
-                                    when (keyEvent.key) {
-                                        Key.DirectionLeft -> {
-                                            try {
-                                                playButtonFocusRequester?.requestFocus()
-                                            } catch (e: Exception) {
-                                                // Ignore focus errors
-                                            }
-                                            true
-                                        }
-                                        Key.DirectionRight -> {
-                                            isUserInteracting = true
-                                            val newIndex = (currentIndex + 1) % mediaList.size
-                                            onIndexChange(newIndex)
-                                            true
-                                        }
-                                        Key.DirectionDown -> {
-                                            onNavigateDown?.invoke()
-                                            true
-                                        }
-                                        else -> false
-                                    }
-                                } else false
-                            }
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -378,8 +442,8 @@ fun NetflixHeroSection(
                             )
                         }
                     }
+                    }
                 }
-                
 
             }
         }

@@ -107,27 +107,13 @@ fun SearchScreen(
         Row(
             modifier = Modifier.fillMaxSize()
         ) {
-            // LEFT PANEL - Virtual Keyboard & Genres with RIGHT arrow navigation
+            // LEFT PANEL - Virtual Keyboard & Genres - NETFLIX PRINCIPLE: No container focus
             Column(
                 modifier = Modifier
                     .width(400.dp)
                     .fillMaxHeight()
                     .background(Color.Black.copy(alpha = 0.9f))
                     .padding(24.dp)
-                    .onKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionRight) {
-                            // Move focus to content panel on RIGHT arrow
-                            currentFocusArea = FocusArea.CONTENT
-                            try {
-                                contentFocusRequester.requestFocus()
-                            } catch (e: Exception) {
-                                // Ignore focus errors
-                            }
-                            true
-                        } else {
-                            false
-                        }
-                    }
             ) {
                 // Search Input Display
                 Card(
@@ -264,15 +250,6 @@ fun SearchScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(24.dp)
-                    .onKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
-                            // Move focus back to virtual keyboard/genres on LEFT arrow
-                            currentFocusArea = FocusArea.KEYBOARD
-                            true
-                        } else {
-                            false
-                        }
-                    }
             ) {
                 if (searchQuery.isEmpty()) {
                     // Top Searches Section
@@ -289,9 +266,7 @@ fun SearchScreen(
                         columns = GridCells.Fixed(4),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .focusRequester(contentFocusRequester)
+                        modifier = Modifier.fillMaxSize()
                     ) {
                         items(topSearches.take(8)) { media ->
                             TopSearchCard(

@@ -30,7 +30,7 @@ data class NavItem(
 
 /**
  * NETFLIX-LEVEL Android TV Side Navigation
- * Professional focus management with proper state handling
+ * COMPLETELY PASSIVE - Only responds to direct focus, never steals it
  */
 @Composable
 fun NetflixSideNavigation(
@@ -45,112 +45,40 @@ fun NetflixSideNavigation(
         NavItem(Icons.Default.List, "browse", "Browse Movies")
     )
     
-    // Professional focus state management
-    var focusedIndex by remember { mutableStateOf(navItems.indexOfFirst { it.route == selectedRoute }.takeIf { it >= 0 } ?: 1) }
-    val focusRequesters = remember(navItems.size) { List(navItems.size) { FocusRequester() } }
-    var isInitialized by remember { mutableStateOf(false) }
-    
-    // COMPLETELY REMOVE AUTO-FOCUS - Let D-pad control everything
-    LaunchedEffect(selectedRoute) {
-        if (!isInitialized) {
-            val targetIndex = navItems.indexOfFirst { it.route == selectedRoute }.takeIf { it >= 0 } ?: 1
-            focusedIndex = targetIndex
-            isInitialized = true
-            // NO auto-focus whatsoever
-        }
-    }
-    
-    // Professional D-pad navigation with MIDDLE positioning
+    // NETFLIX PRINCIPLE: Each icon is independently focusable
+    // NO container focus management, NO auto-focus, NO key interception
     Column(
         modifier = modifier
             .width(48.dp)
             .fillMaxHeight()
-            .background(Color.Black.copy(alpha = 0.9f))
-            .focusable(false) // CRITICAL: Make container non-focusable
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown) {
-                    when (keyEvent.key) {
-                        Key.DirectionUp -> {
-                            val newIndex = (focusedIndex - 1).coerceAtLeast(0)
-                            if (newIndex != focusedIndex) {
-                                focusedIndex = newIndex
-                                try {
-                                    focusRequesters[newIndex].requestFocus()
-                                } catch (e: Exception) {
-                                    // Ignore focus errors
-                                }
-                            }
-                            true
-                        }
-                        Key.DirectionDown -> {
-                            val newIndex = (focusedIndex + 1).coerceAtMost(navItems.size - 1)
-                            if (newIndex != focusedIndex) {
-                                focusedIndex = newIndex
-                                try {
-                                    focusRequesters[newIndex].requestFocus()
-                                } catch (e: Exception) {
-                                    // Ignore focus errors
-                                }
-                            }
-                            true
-                        }
-                        Key.DirectionRight -> {
-                            // IMMEDIATELY exit sidebar and go to content
-                            onNavigateToContent?.invoke()
-                            true
-                        }
-                        Key.DirectionCenter, Key.Enter -> {
-                            onNavigate(navItems[focusedIndex].route)
-                            true
-                        }
-                        else -> false
-                    }
-                } else false
-            },
-        verticalArrangement = Arrangement.Center, // CENTER the icons vertically
+            .background(Color.Black.copy(alpha = 0.9f)),
+        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        
-        // Add spacer to push icons to center
-        Spacer(modifier = Modifier.weight(1f))
-        // Navigation icons in the center
-        Column(
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            navItems.forEachIndexed { index, item ->
-                NavIconButton(
-                    item = item,
-                    isSelected = selectedRoute == item.route,
-                    isFocused = focusedIndex == index,
-                    onClick = { 
-                        focusedIndex = index
-                        onNavigate(item.route) 
-                    },
-                    focusRequester = focusRequesters[index],
-                    onFocusChanged = { focused ->
-                        if (focused && focusedIndex != index) {
-                            focusedIndex = index
-                        }
-                    }
-                )
-            }
+        navItems.forEach { item ->
+            NetflixNavIcon(
+                item = item,
+                isSelected = selectedRoute == item.route,
+                onClick = { onNavigate(item.route) },
+                onNavigateRight = onNavigateToContent
+            )
+            Spacer(modifier = Modifier.height(16.dp))
         }
-        
-        // Add spacer to keep icons centered
-        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
+/**
+ * Individual Netflix-style navigation icon - COMPLETELY INDEPENDENT
+ */
 @Composable
-private fun NavIconButton(
+private fun NetflixNavIcon(
     item: NavItem,
     isSelected: Boolean,
-    isFocused: Boolean,
     onClick: () -> Unit,
-    focusRequester: FocusRequester,
-    onFocusChanged: (Boolean) -> Unit
+    onNavigateRight: (() -> Unit)? = null
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+    
     Box(
         modifier = Modifier
             .size(36.dp)
@@ -167,10 +95,16 @@ private fun NavIconButton(
                 color = if (isFocused) Color.White else Color.Transparent,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
             )
-            .focusRequester(focusRequester)
             .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
             .clickable(onClick = onClick)
-            .onFocusChanged { onFocusChanged(it.isFocused) },
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionRight) {
+                    // Only handle RIGHT arrow to exit sidebar
+                    onNavigateRight?.invoke()
+                    true
+                } else false
+            },
         contentAlignment = Alignment.Center
     ) {
         Icon(

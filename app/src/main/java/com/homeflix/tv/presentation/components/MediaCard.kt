@@ -27,8 +27,12 @@ import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
 
+/**
+ * NETFLIX-STYLE TV Media Card
+ * Handles its own focus, scaling, and visual feedback
+ */
 @Composable
-fun MediaCard(
+fun NetflixMediaCard(
     media: Media,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -37,14 +41,14 @@ fun MediaCard(
     
     // Netflix-style scale animation on focus
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.03f else 1.0f,
-        animationSpec = tween(durationMillis = 150),
-        label = "card_scale"
+        targetValue = if (isFocused) 1.05f else 1.0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "netflix_card_scale"
     )
     
     Card(
         modifier = modifier
-            .aspectRatio(2f / 3f) // Standard poster aspect ratio
+            .aspectRatio(2f / 3f)
             .scale(scale)
             .focusable()
             .onFocusChanged { isFocused = it.isFocused }
@@ -52,8 +56,8 @@ fun MediaCard(
             .then(
                 if (isFocused) {
                     Modifier.border(
-                        width = 2.dp, // Smaller border
-                        color = FocusedBorder,
+                        width = 3.dp,
+                        color = Color.White,
                         shape = RoundedCornerShape(8.dp)
                     )
                 } else {
@@ -65,7 +69,7 @@ fun MediaCard(
             containerColor = Color.Transparent
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isFocused) 8.dp else 2.dp
+            defaultElevation = if (isFocused) 12.dp else 4.dp
         )
     ) {
         Box {
@@ -153,4 +157,16 @@ fun MediaCard(
             }
         }
     }
+}
+/**
+
+ * Legacy MediaCard - kept for compatibility
+ */
+@Composable
+fun MediaCard(
+    media: Media,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    NetflixMediaCard(media = media, onClick = onClick, modifier = modifier)
 }

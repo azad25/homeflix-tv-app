@@ -749,7 +749,7 @@ fun VideoPlayer(
                                 // Control hints
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Text(
-                                    text = "Press S for subtitles • M for mute",
+                                    text = "HOMEFLIX",
                                     color = Color.White.copy(alpha = 0.7f),
                                     fontSize = 12.sp
                                 )

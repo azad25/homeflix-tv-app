@@ -109,25 +109,9 @@ fun DetailsScreen(
             // LaunchedEffect removed to prevent interference with D-pad navigation
             
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .focusable()
-                    .onKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyDown) {
-                            when (keyEvent.key) {
-                                Key.DirectionLeft -> {
-                                    // Navigate back to home screen
-                                    navController.popBackStack()
-                                    true
-                                }
-                                else -> false
-                            }
-                        } else {
-                            false
-                        }
-                    },
                 state = scrollState,
-                userScrollEnabled = true
+                userScrollEnabled = true,
+                modifier = Modifier.fillMaxSize()
             ) {
                 item {
                     // Hero Section with Backdrop (Netflix/Prime style)

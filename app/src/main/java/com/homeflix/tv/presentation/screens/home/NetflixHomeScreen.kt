@@ -55,12 +55,24 @@ fun NetflixHomeScreen(
     var currentFocusArea by remember { mutableStateOf(FocusArea.HERO) }
     var isInitialized by remember { mutableStateOf(false) }
     
-    // NO AUTO-FOCUS - Let user control navigation naturally
+    // CRITICAL: Android TV requires explicit initial focus
     LaunchedEffect(uiState) {
         if (uiState is HomeUiState.Success && !isInitialized) {
-            currentFocusArea = FocusArea.HERO
             isInitialized = true
-            // NO automatic focus - let system handle it naturally
+            delay(1000) // Longer delay to ensure UI is fully rendered
+            currentFocusArea = FocusArea.HERO
+            try {
+                android.util.Log.d("HomeScreen", "Requesting focus on hero play button")
+                heroPlayButtonFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                android.util.Log.e("HomeScreen", "Hero focus failed, trying first row", e)
+                // If hero focus fails, try first row
+                try {
+                    firstRowFocusRequester.requestFocus()
+                } catch (e2: Exception) {
+                    android.util.Log.e("HomeScreen", "All focus requests failed", e2)
+                }
+            }
         }
     }
     
@@ -102,26 +114,12 @@ fun NetflixHomeScreen(
                 modifier = Modifier.focusRequester(sideNavFocusRequester)
             )
             
-            // Main content area with LEFT arrow navigation to sidebar
+            // Main content area - NETFLIX PRINCIPLE: No container focus management
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
                     .background(Color.Black)
-                    .onKeyEvent { keyEvent ->
-                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
-                            // Move to sidebar when LEFT is pressed from content
-                            currentFocusArea = FocusArea.SIDEBAR
-                            try {
-                                sideNavFocusRequester.requestFocus()
-                            } catch (e: Exception) {
-                                // Ignore focus errors
-                            }
-                            true
-                        } else {
-                            false
-                        }
-                    }
             ) {
                 // Wrap everything in a safe try-catch to prevent crashes
                 val currentState = uiState
@@ -135,8 +133,8 @@ fun NetflixHomeScreen(
                             state = listState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black)
-                                .focusable(false)
+                                .background(Color.Black),
+                            userScrollEnabled = true
                         ) {
                         // HERO SECTION as LazyColumn item
                         if (currentState.featuredMedia.isNotEmpty()) {

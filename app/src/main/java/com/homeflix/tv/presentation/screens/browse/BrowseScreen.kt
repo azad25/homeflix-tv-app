@@ -80,24 +80,9 @@ fun BrowseScreen(
             }
         )
         
-        // Main Content - Netflix-style movie grid with LEFT arrow navigation
+        // Main Content - NETFLIX PRINCIPLE: No container focus management
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .onKeyEvent { keyEvent ->
-                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
-                        // Move to sidebar when LEFT is pressed from content
-                        currentFocusArea = FocusArea.SIDEBAR
-                        try {
-                            sideNavFocusRequester.requestFocus()
-                        } catch (e: Exception) {
-                            // Ignore focus errors
-                        }
-                        true
-                    } else {
-                        false
-                    }
-                }
+            modifier = Modifier.fillMaxSize()
         ) {
             // Header with latest content indication
             Column(
@@ -209,8 +194,8 @@ fun BrowseScreen(
                         contentPadding = PaddingValues(24.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.fillMaxSize(),
-                        userScrollEnabled = true
+                        userScrollEnabled = true,
+                        modifier = Modifier.fillMaxSize()
                     ) {
                         // Show paginated movies (already sorted by latest in ViewModel)
                         items(

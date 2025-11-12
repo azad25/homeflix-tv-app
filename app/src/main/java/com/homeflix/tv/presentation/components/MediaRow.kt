@@ -48,88 +48,23 @@ fun MediaRow(
             modifier = Modifier.padding(start = 24.dp, bottom = 8.dp)
         )
         
-        // FIXED: Enable proper scrolling and focus management
+        // NETFLIX PRINCIPLE: Let individual cards handle focus, LazyRow handles scrolling
         LazyRow(
             state = listState,
             contentPadding = PaddingValues(horizontal = 24.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            userScrollEnabled = true, // ENABLE scrolling
-            modifier = Modifier
-                .fillMaxWidth()
-                .onKeyEvent { keyEvent ->
-                    if (keyEvent.type == KeyEventType.KeyDown) {
-                        when (keyEvent.key) {
-                            Key.DirectionLeft -> {
-                                // Handle left navigation within row
-                                if (currentFocusedIndex > 0) {
-                                    currentFocusedIndex--
-                                    coroutineScope.launch {
-                                        listState.animateScrollToItem(currentFocusedIndex)
-                                    }
-                                    if (currentFocusedIndex < itemFocusRequesters.size) {
-                                        try {
-                                            itemFocusRequesters[currentFocusedIndex].requestFocus()
-                                        } catch (e: Exception) {
-                                            // Ignore focus errors
-                                        }
-                                    }
-                                    true
-                                } else false
-                            }
-                            Key.DirectionRight -> {
-                                // Handle right navigation within row
-                                if (currentFocusedIndex < mediaList.size - 1) {
-                                    currentFocusedIndex++
-                                    coroutineScope.launch {
-                                        listState.animateScrollToItem(currentFocusedIndex)
-                                    }
-                                    if (currentFocusedIndex < itemFocusRequesters.size) {
-                                        try {
-                                            itemFocusRequesters[currentFocusedIndex].requestFocus()
-                                        } catch (e: Exception) {
-                                            // Ignore focus errors
-                                        }
-                                    }
-                                    true
-                                } else false
-                            }
-                            Key.DirectionUp -> {
-                                // Navigate to previous row
-                                onNavigateUp?.invoke()
-                                true
-                            }
-                            Key.DirectionDown -> {
-                                // Navigate to next row
-                                onNavigateDown?.invoke()
-                                true
-                            }
-                            else -> false
-                        }
-                    } else false
-                }
+            userScrollEnabled = true,
+            modifier = Modifier.fillMaxWidth()
         ) {
             itemsIndexed(mediaList) { index, media ->
-                MediaCard(
+                NetflixMediaCard(
                     media = media,
-                    onClick = { 
-                        currentFocusedIndex = index
-                        onMediaClick(media) 
-                    },
+                    onClick = { onMediaClick(media) },
                     modifier = Modifier
                         .width(160.dp)
-                        .then(
-                            if (index == 0 && focusRequester != null) {
-                                Modifier.focusRequester(focusRequester)
-                            } else if (index < itemFocusRequesters.size) {
-                                Modifier.focusRequester(itemFocusRequesters[index])
-                            } else {
-                                Modifier
-                            }
-                        )
                         .onFocusChanged { focusState ->
                             if (focusState.isFocused) {
-                                currentFocusedIndex = index
-                                // Auto-scroll to focused item
+                                // Auto-scroll to focused item - Netflix behavior
                                 coroutineScope.launch {
                                     listState.animateScrollToItem(index)
                                 }
