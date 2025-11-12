@@ -54,7 +54,12 @@ fun BrowseScreen(
     val sideNavFocusRequester = remember { FocusRequester() }
     var currentFocusArea by remember { mutableStateOf(FocusArea.CONTENT) }
     
-    // Professional initialization - let content be naturally focusable
+    // FIXED: Start with grid focus, not sidebar
+    LaunchedEffect(Unit) {
+        delay(300) // Allow UI to settle
+        currentFocusArea = FocusArea.CONTENT
+        // Let the grid handle focus naturally - don't force it
+    }
     
     // NETFLIX-LEVEL Layout with professional navigation
     Row(

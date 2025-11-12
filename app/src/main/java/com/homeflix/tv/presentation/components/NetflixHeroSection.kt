@@ -124,7 +124,7 @@ fun NetflixHeroSection(
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 48.dp, end = 300.dp, bottom = 60.dp)
+                    .padding(start = 48.dp, top = 80.dp, end = 300.dp, bottom = 60.dp) // ADDED TOP PADDING
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {

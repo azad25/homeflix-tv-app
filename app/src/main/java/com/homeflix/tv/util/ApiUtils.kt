@@ -35,24 +35,22 @@ object ApiUtils {
     
     fun getBannerUrl(media: Media): String {
         return when {
-            // Full HTTP URL (TMDB backdrop - highest priority)
-            !media.bannerPath.isNullOrEmpty() && media.bannerPath.startsWith("http") -> {
-                media.bannerPath
+            // TMDB backdrop URL (highest priority) - EXACTLY like web app
+            !media.tmdbBackdropUrl.isNullOrEmpty() && media.tmdbBackdropUrl.trim().isNotEmpty() -> {
+                media.tmdbBackdropUrl
             }
-            // Relative banner path from server
-            !media.bannerPath.isNullOrEmpty() -> {
-                "${getBaseUrl()}/banners/${media.id}"
+            // Local banner path - use server endpoint like web app
+            !media.bannerPath.isNullOrEmpty() && media.bannerPath.trim().isNotEmpty() -> {
+                val fileName = media.bannerPath.split("/").lastOrNull()
+                if (!fileName.isNullOrEmpty() && fileName.trim().isNotEmpty()) {
+                    "${getBaseUrl()}/api/admin/assets/$fileName"
+                } else {
+                    "${getBaseUrl()}/api/backdrops/${media.id}"
+                }
             }
-            // Fallback to thumbnail if available
-            !media.thumbnailPath.isNullOrEmpty() && media.thumbnailPath.startsWith("http") -> {
-                media.thumbnailPath
-            }
-            !media.thumbnailPath.isNullOrEmpty() -> {
-                "${getBaseUrl()}/thumbnails/${media.id}"
-            }
-            // Final fallback to poster
+            // Fallback to server thumbnail endpoint (not poster for backdrop)
             else -> {
-                getPosterUrl(media)
+                "${getBaseUrl()}/api/thumbnails/${media.id}"
             }
         }
     }

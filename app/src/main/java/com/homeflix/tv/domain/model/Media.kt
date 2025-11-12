@@ -68,6 +68,11 @@ data class Media(
     val bannerPath: String? = null,
     val trailerPath: String? = null,
     
+    // TMDB assets - exactly like web app
+    val tmdbBackdropUrl: String? = null,
+    val tmdbPosterUrl: String? = null,
+    val tmdbTrailerUrl: String? = null,
+    
 
     
     // Subtitles

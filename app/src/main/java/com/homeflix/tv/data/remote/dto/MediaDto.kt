@@ -84,6 +84,14 @@ data class MediaDto(
     @SerializedName("trailer_path")
     val trailerPath: String? = null,
     
+    // TMDB assets - exactly like web app
+    @SerializedName("tmdb_backdrop_url")
+    val tmdbBackdropUrl: String? = null,
+    @SerializedName("tmdb_poster_url")
+    val tmdbPosterUrl: String? = null,
+    @SerializedName("tmdb_trailer_url")
+    val tmdbTrailerUrl: String? = null,
+    
 
     
     // Subtitles
@@ -176,6 +184,11 @@ fun MediaDto.toDomain(): Media {
         posterPath = posterPath,
         bannerPath = bannerPath,
         trailerPath = trailerPath,
+        
+        // TMDB assets - exactly like web app
+        tmdbBackdropUrl = tmdbBackdropUrl,
+        tmdbPosterUrl = tmdbPosterUrl,
+        tmdbTrailerUrl = tmdbTrailerUrl,
 
         subtitles = subtitles?.map { it.toDomain() } ?: emptyList(),
         viewCount = viewCount,

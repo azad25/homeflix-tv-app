@@ -50,19 +50,13 @@ fun NetflixSideNavigation(
     val focusRequesters = remember(navItems.size) { List(navItems.size) { FocusRequester() } }
     var isInitialized by remember { mutableStateOf(false) }
     
-    // Netflix-style initialization with proper timing
+    // CRITICAL FIX: NEVER auto-focus sidebar - only focus when LEFT arrow pressed
     LaunchedEffect(selectedRoute) {
         if (!isInitialized) {
-            delay(100) // Short delay for UI stability
             val targetIndex = navItems.indexOfFirst { it.route == selectedRoute }.takeIf { it >= 0 } ?: 1
             focusedIndex = targetIndex
-            try {
-                focusRequesters[targetIndex].requestFocus()
-                isInitialized = true
-            } catch (e: Exception) {
-                // Graceful fallback
-                isInitialized = true
-            }
+            // ABSOLUTELY NO auto-focus - let content have focus
+            isInitialized = true
         }
     }
     

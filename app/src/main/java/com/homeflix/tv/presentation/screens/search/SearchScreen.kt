@@ -57,14 +57,14 @@ fun SearchScreen(
     val searchFieldFocusRequester = remember { FocusRequester() }
     var currentFocusArea by remember { mutableStateOf(FocusArea.CONTENT) }
     
-    // Professional initialization
+    // FIXED: Start with search field focus, not sidebar
     LaunchedEffect(Unit) {
-        delay(150)
+        delay(300) // Allow UI to settle
         currentFocusArea = FocusArea.CONTENT
         try {
             searchFieldFocusRequester.requestFocus()
         } catch (e: Exception) {
-            // Graceful fallback
+            // Let system handle focus naturally
         }
     }
     

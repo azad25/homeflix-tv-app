@@ -54,23 +54,29 @@ fun NetflixHomeScreen(
     var currentFocusArea by remember { mutableStateOf(FocusArea.HERO) }
     var isInitialized by remember { mutableStateOf(false) }
     
-    // Netflix-style initialization with proper state management
+    // CRITICAL FIX: Aggressive focus management to prevent nav focus trap
     LaunchedEffect(uiState) {
-        if (uiState is HomeUiState.Success && !isInitialized) {
-            delay(200) // Professional timing for UI stability
-            currentFocusArea = FocusArea.HERO
-            try {
-                heroPlayButtonFocusRequester.requestFocus()
-            } catch (e: Exception) {
-                // Graceful fallback
-                currentFocusArea = FocusArea.CONTENT
+        if (uiState is HomeUiState.Success) {
+            // Multiple attempts to force focus to hero
+            repeat(3) { attempt ->
+                delay(200L * (attempt + 1)) // 200ms, 400ms, 600ms
+                currentFocusArea = FocusArea.HERO
                 try {
-                    firstRowFocusRequester.requestFocus()
-                } catch (e2: Exception) {
-                    // Final fallback - let system handle
+                    heroPlayButtonFocusRequester.requestFocus()
+                    if (attempt == 2) isInitialized = true // Mark as initialized on final attempt
+                } catch (e: Exception) {
+                    if (attempt == 2) {
+                        // Final attempt - try content
+                        currentFocusArea = FocusArea.CONTENT
+                        try {
+                            firstRowFocusRequester.requestFocus()
+                        } catch (e2: Exception) {
+                            // Give up gracefully
+                        }
+                        isInitialized = true
+                    }
                 }
             }
-            isInitialized = true
         }
     }
     
@@ -247,6 +253,19 @@ fun NetflixHomeScreen(
                                         }
                                     }
                                 )
+                                
+                                // FORCE FOCUS TO HERO AFTER RENDER
+                                LaunchedEffect(Unit) {
+                                    delay(200)
+                                    if (currentFocusArea != FocusArea.HERO) {
+                                        currentFocusArea = FocusArea.HERO
+                                        try {
+                                            heroPlayButtonFocusRequester.requestFocus()
+                                        } catch (e: Exception) {
+                                            // Ignore
+                                        }
+                                    }
+                                }
                             }
                         }
                         

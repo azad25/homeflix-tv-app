@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +28,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -36,6 +38,7 @@ import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import com.homeflix.tv.BuildConfig
 
 /**
  * ULTRA-INSTANT LAN VIDEO PLAYER for Android TV
@@ -57,6 +60,10 @@ import kotlin.math.roundToInt
  * - Supports instant seeking through backend transcoding
  * - Optimized for unlimited LAN bandwidth
  */
+private fun getBaseUrl(): String {
+    return BuildConfig.BASE_URL.removeSuffix("/")
+}
+
 @UnstableApi
 @Composable
 fun VideoPlayer(
@@ -78,12 +85,62 @@ fun VideoPlayer(
     var bufferPercentage by remember { mutableStateOf(0) }
     var volume by remember { mutableStateOf(1f) }
     var isMuted by remember { mutableStateOf(false) }
+    
+    // Subtitle state
+    var subtitlesEnabled by remember { mutableStateOf(false) }
+    var availableSubtitleTracks by remember { mutableStateOf<List<Tracks.Group>>(emptyList()) }
+    var currentSubtitleTrack by remember { mutableStateOf<Int?>(null) }
+    var trackSelector by remember { mutableStateOf<DefaultTrackSelector?>(null) }
+    var showSubtitleToast by remember { mutableStateOf(false) }
+    var subtitleToastMessage by remember { mutableStateOf("") }
 
     // TV remote control focus
     val playPauseFocusRequester = remember { FocusRequester() }
     val seekBackwardFocusRequester = remember { FocusRequester() }
     val seekForwardFocusRequester = remember { FocusRequester() }
+    val subtitlesFocusRequester = remember { FocusRequester() }
     val closeFocusRequester = remember { FocusRequester() }
+
+    // Subtitle toggle function
+    fun toggleSubtitles() {
+        trackSelector?.let { selector ->
+            if (availableSubtitleTracks.isNotEmpty()) {
+                if (subtitlesEnabled) {
+                    // Disable subtitles
+                    selector.parameters = selector.parameters.buildUpon()
+                        .setRendererDisabled(C.TRACK_TYPE_TEXT, true)
+                        .build()
+                    subtitlesEnabled = false
+                    currentSubtitleTrack = null
+                    subtitleToastMessage = "Subtitles OFF"
+                } else {
+                    // Enable first available subtitle track
+                    val firstTrack = availableSubtitleTracks.firstOrNull()
+                    if (firstTrack != null) {
+                        selector.parameters = selector.parameters.buildUpon()
+                            .setRendererDisabled(C.TRACK_TYPE_TEXT, false)
+                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                            .build()
+                        subtitlesEnabled = true
+                        currentSubtitleTrack = 0
+                        subtitleToastMessage = "Subtitles ON"
+                    }
+                }
+                showSubtitleToast = true
+            } else {
+                subtitleToastMessage = "No subtitles available"
+                showSubtitleToast = true
+            }
+        }
+    }
+    
+    // Auto-hide subtitle toast
+    LaunchedEffect(showSubtitleToast) {
+        if (showSubtitleToast) {
+            delay(2000)
+            showSubtitleToast = false
+        }
+    }
 
     // Auto-hide controls
     LaunchedEffect(showControls, isPlaying) {
@@ -98,50 +155,74 @@ fun VideoPlayer(
         if (isVisible) {
             exoPlayer?.release()
 
-            // Add track selector to disable subtitles
-            val trackSelector = DefaultTrackSelector(context)
-            trackSelector.parameters = trackSelector.parameters.buildUpon()
-                .setRendererDisabled(C.TRACK_TYPE_TEXT, true)
+            // Create track selector with subtitle support
+            val newTrackSelector = DefaultTrackSelector(context)
+            // Initially disable subtitles but keep renderer enabled for toggling
+            newTrackSelector.parameters = newTrackSelector.parameters.buildUpon()
+                .setRendererDisabled(C.TRACK_TYPE_TEXT, false) // Keep text renderer enabled
+                .setSelectUndeterminedTextLanguage(false) // Don't auto-select unknown language subtitles
                 .build()
+            trackSelector = newTrackSelector
 
             // Enable decoder fallback for black screen issues
             val renderersFactory = DefaultRenderersFactory(context)
                 .setEnableDecoderFallback(true)
 
             val player = ExoPlayer.Builder(context)
-                .setTrackSelector(trackSelector)
+                .setTrackSelector(newTrackSelector)
                 .setRenderersFactory(renderersFactory)
                 .build()
                 .apply {
                     // ULTRA-INSTANT LAN STREAMING OPTIMIZATION
                     // Netflix-level buffer settings for instant streaming
 
-                    // Multiple streaming URL attempts for better compatibility
-                    val streamUrls = listOf(
-                        "http://192.168.0.109:8252/api/stream/${media.id}",
-                        "http://192.168.0.109:8252/stream/${media.id}",
-                        ApiUtils.getStreamUrl(media.id),
-                        if (media.filePath.isNotEmpty()) "file://${media.filePath}" else null
-                    ).filterNotNull()
-
+                    // FIXED: Use EXACT web app streaming URL pattern
                     var mediaLoaded = false
-                    for (url in streamUrls) {
+                    try {
+                        // Primary: Use EXACT same URL pattern as web app VideoPlayer.tsx
+                        val streamUrl = "${getBaseUrl()}/api/stream/${media.id}?quality=4k&format=mp4"
+                        val mediaItem = MediaItem.Builder()
+                            .setUri(streamUrl)
+                            .build()
+                        
+                        setMediaItem(mediaItem)
+                        prepare() // CRITICAL: Prepare the player
+                        mediaLoaded = true
+                        
+                        // Set start position if resuming
+                        if (!forceStartFromBeginning && startTime > 0) {
+                            seekTo(startTime)
+                        }
+                        
+                        // Auto-play when ready
+                        playWhenReady = true
+                        
+                    } catch (e: Exception) {
+                        // Fallback 1: Try simple stream URL (like web app fallback)
                         try {
+                            val fallbackUrl = "${getBaseUrl()}/api/stream/${media.id}"
                             val mediaItem = MediaItem.Builder()
-                                .setUri(url)
+                                .setUri(fallbackUrl)
                                 .build()
                             setMediaItem(mediaItem)
-
-                            // Set start position if resuming
-                            if (!forceStartFromBeginning && startTime > 0) {
-                                seekTo(startTime)
-                            }
-
+                            prepare()
                             mediaLoaded = true
-                            break
-                        } catch (e: Exception) {
-                            // Try next URL
-                            continue
+                            playWhenReady = true
+                        } catch (e2: Exception) {
+                            // Fallback 2: Direct file path if available
+                            if (media.filePath.isNotEmpty()) {
+                                try {
+                                    val mediaItem = MediaItem.Builder()
+                                        .setUri("file://${media.filePath}")
+                                        .build()
+                                    setMediaItem(mediaItem)
+                                    prepare()
+                                    mediaLoaded = true
+                                    playWhenReady = true
+                                } catch (e3: Exception) {
+                                    // Log error but don't crash
+                                }
+                            }
                         }
                     }
 
@@ -186,6 +267,14 @@ fun VideoPlayer(
 
                         override fun onIsPlayingChanged(playing: Boolean) {
                             isPlaying = playing
+                        }
+                        
+                        override fun onTracksChanged(tracks: Tracks) {
+                            // Update available subtitle tracks
+                            val subtitleGroups = tracks.groups.filter { group ->
+                                group.type == C.TRACK_TYPE_TEXT
+                            }
+                            availableSubtitleTracks = subtitleGroups
                         }
                     })
 
@@ -239,40 +328,55 @@ fun VideoPlayer(
                     if (keyEvent.type == KeyEventType.KeyDown) {
                         when (keyEvent.key) {
                             Key.DirectionCenter, Key.Enter, Key.Spacebar -> {
-                                // Play/Pause
-                                exoPlayer?.let { player ->
-                                    if (player.isPlaying) {
-                                        player.pause()
-                                    } else {
-                                        player.play()
+                                // Play/Pause when controls are hidden, otherwise let focused control handle it
+                                if (!showControls) {
+                                    exoPlayer?.let { player ->
+                                        if (player.isPlaying) {
+                                            player.pause()
+                                        } else {
+                                            player.play()
+                                        }
                                     }
+                                    showControls = true
+                                    true
+                                } else {
+                                    showControls = true
+                                    false // Let focused control handle the click
                                 }
-                                showControls = true
-                                true
                             }
                             Key.DirectionLeft -> {
-                                // Seek backward 10 seconds
-                                exoPlayer?.let { player ->
-                                    if (player.duration > 0) {
-                                        val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
-                                        player.seekTo(newPosition)
-                                        isBuffering = true // Show buffering during seek
+                                if (!showControls) {
+                                    // Seek backward 10 seconds when controls are hidden
+                                    exoPlayer?.let { player ->
+                                        if (player.duration > 0) {
+                                            val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
+                                            player.seekTo(newPosition)
+                                            isBuffering = true
+                                        }
                                     }
+                                    showControls = true
+                                    true
+                                } else {
+                                    showControls = true
+                                    false // Let D-pad navigation handle focus
                                 }
-                                showControls = true
-                                true
                             }
                             Key.DirectionRight -> {
-                                // Seek forward 10 seconds
-                                exoPlayer?.let { player ->
-                                    if (player.duration > 0) {
-                                        val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
-                                        player.seekTo(newPosition)
-                                        isBuffering = true // Show buffering during seek
+                                if (!showControls) {
+                                    // Seek forward 10 seconds when controls are hidden
+                                    exoPlayer?.let { player ->
+                                        if (player.duration > 0) {
+                                            val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
+                                            player.seekTo(newPosition)
+                                            isBuffering = true
+                                        }
                                     }
+                                    showControls = true
+                                    true
+                                } else {
+                                    showControls = true
+                                    false // Let D-pad navigation handle focus
                                 }
-                                showControls = true
-                                true
                             }
                             Key.DirectionUp -> {
                                 // Volume up
@@ -302,6 +406,12 @@ fun VideoPlayer(
                                 showControls = true
                                 true
                             }
+                            Key.S -> {
+                                // Toggle subtitles
+                                toggleSubtitles()
+                                showControls = true
+                                true
+                            }
                             else -> {
                                 // Show controls on any other key
                                 showControls = true
@@ -313,14 +423,19 @@ fun VideoPlayer(
                     }
                 }
         ) {
-            // Video Player View
+            // FIXED: Video Player View with proper player binding
             AndroidView(
                 factory = { context ->
                     PlayerView(context).apply {
-                        player = exoPlayer
                         useController = false // We'll use custom controls
                         setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                        // Set background to black to prevent white flash
+                        setBackgroundColor(android.graphics.Color.BLACK)
                     }
+                },
+                update = { playerView ->
+                    // CRITICAL: Update player when exoPlayer changes
+                    playerView.player = exoPlayer
                 },
                 modifier = Modifier.fillMaxSize()
             )
@@ -408,7 +523,7 @@ fun VideoPlayer(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(horizontal = 48.dp),
-                        horizontalArrangement = Arrangement.spacedBy(32.dp),
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Seek backward - Netflix style
@@ -491,6 +606,31 @@ fun VideoPlayer(
                                 modifier = Modifier.size(32.dp)
                             )
                         }
+
+                        // Subtitle toggle - Netflix style
+                        if (availableSubtitleTracks.isNotEmpty()) {
+                            IconButton(
+                                onClick = { toggleSubtitles() },
+                                modifier = Modifier
+                                    .focusRequester(subtitlesFocusRequester)
+                                    .focusable()
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(28.dp))
+                                    .background(
+                                        if (subtitlesEnabled) 
+                                            Color(0xFFE50914).copy(alpha = 0.8f) // Netflix red when enabled
+                                        else 
+                                            Color.Black.copy(alpha = 0.7f)
+                                    )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Subtitles,
+                                    contentDescription = if (subtitlesEnabled) "Disable subtitles" else "Enable subtitles",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
                     }
 
                     // Bottom progress bar and info
@@ -535,30 +675,108 @@ fun VideoPlayer(
                             }
                         }
 
-                        // Volume indicator
-                        if (isMuted || volume < 1f) {
+                        // Status indicators row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Volume indicator
+                            if (isMuted || volume < 1f) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (isMuted) "🔇" else "🔊",
+                                        color = Color.White,
+                                        fontSize = 16.sp
+                                    )
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    LinearProgressIndicator(
+                                        progress = if (isMuted) 0f else volume,
+                                        modifier = Modifier
+                                            .width(100.dp)
+                                            .height(4.dp)
+                                            .clip(RoundedCornerShape(2.dp)),
+                                        color = Color.White,
+                                        trackColor = Color.White.copy(alpha = 0.3f)
+                                    )
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.width(1.dp)) // Placeholder
+                            }
+
+                            // Subtitle status indicator
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(top = 8.dp)
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                if (availableSubtitleTracks.isNotEmpty()) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Subtitles,
+                                        contentDescription = null,
+                                        tint = if (subtitlesEnabled) Color(0xFFE50914) else Color.White.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    
+                                    Text(
+                                        text = if (subtitlesEnabled) "ON" else "OFF",
+                                        color = if (subtitlesEnabled) Color(0xFFE50914) else Color.White.copy(alpha = 0.5f),
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                
+                                // Control hints
+                                Spacer(modifier = Modifier.width(16.dp))
                                 Text(
-                                    text = if (isMuted) "🔇" else "🔊",
-                                    color = Color.White,
-                                    fontSize = 16.sp
-                                )
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                LinearProgressIndicator(
-                                    progress = if (isMuted) 0f else volume,
-                                    modifier = Modifier
-                                        .width(100.dp)
-                                        .height(4.dp)
-                                        .clip(RoundedCornerShape(2.dp)),
-                                    color = Color.White,
-                                    trackColor = Color.White.copy(alpha = 0.3f)
+                                    text = "Press S for subtitles • M for mute",
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    fontSize = 12.sp
                                 )
                             }
+                        }
+                    }
+                }
+            }
+            
+            // Subtitle toast notification
+            if (showSubtitleToast) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 100.dp)
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp)),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color.Black.copy(alpha = 0.8f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Subtitles,
+                                contentDescription = null,
+                                tint = if (subtitlesEnabled) Color(0xFFE50914) else Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = subtitleToastMessage,
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
                     }
                 }
