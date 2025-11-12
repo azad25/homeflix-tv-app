@@ -22,12 +22,13 @@ fun MediaRow(
     mediaList: List<Media>,
     onMediaClick: (Media) -> Unit,
     modifier: Modifier = Modifier,
-    focusRequester: FocusRequester? = null
+    focusRequester: FocusRequester? = null,
+    onNavigateUp: (() -> Unit)? = null,
+    onNavigateDown: (() -> Unit)? = null
 ) {
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val focusRequesters = remember { List(mediaList.size) { FocusRequester() } }
-    var focusedIndex by remember { mutableStateOf(0) }
     
     Column(
         modifier = modifier.fillMaxWidth()
@@ -35,25 +36,26 @@ fun MediaRow(
         // Section Title
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineMedium.copy(
+            style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.SemiBold,
                 color = TextPrimary
             ),
-            modifier = Modifier.padding(start = 48.dp, bottom = 12.dp)
+            modifier = Modifier.padding(start = 24.dp, bottom = 8.dp)
         )
         
-        // Media Cards Row
+        // RESTORED D-PAD NAVIGATION with crash protection
         LazyRow(
             state = listState,
-            contentPadding = PaddingValues(horizontal = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            userScrollEnabled = false
         ) {
             itemsIndexed(mediaList) { index, media ->
                 MediaCard(
                     media = media,
                     onClick = { onMediaClick(media) },
                     modifier = Modifier
-                        .width(220.dp) // Netflix TV card size
+                        .width(160.dp)
                         .then(
                             if (index == 0 && focusRequester != null) {
                                 Modifier.focusRequester(focusRequester)
@@ -62,29 +64,45 @@ fun MediaRow(
                             }
                         )
                         .onKeyEvent { keyEvent ->
-                            when {
-                                keyEvent.key == Key.DirectionLeft && keyEvent.type == KeyEventType.KeyDown -> {
-                                    if (index > 0) {
-                                        focusedIndex = index - 1
-                                        focusRequesters[index - 1].requestFocus()
-                                        coroutineScope.launch {
-                                            listState.animateScrollToItem(maxOf(0, index - 2))
+                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                when (keyEvent.key) {
+                                    Key.DirectionLeft -> {
+                                        if (index > 0) {
+                                            try {
+                                                focusRequesters[index - 1].requestFocus()
+                                                coroutineScope.launch {
+                                                    listState.animateScrollToItem(maxOf(0, index - 2))
+                                                }
+                                            } catch (e: Exception) {
+                                                // Ignore focus/scroll errors
+                                            }
                                         }
+                                        true
                                     }
-                                    true
-                                }
-                                keyEvent.key == Key.DirectionRight && keyEvent.type == KeyEventType.KeyDown -> {
-                                    if (index < mediaList.size - 1) {
-                                        focusedIndex = index + 1
-                                        focusRequesters[index + 1].requestFocus()
-                                        coroutineScope.launch {
-                                            listState.animateScrollToItem(minOf(mediaList.size - 1, index - 1))
+                                    Key.DirectionRight -> {
+                                        if (index < mediaList.size - 1) {
+                                            try {
+                                                focusRequesters[index + 1].requestFocus()
+                                                coroutineScope.launch {
+                                                    listState.animateScrollToItem(minOf(mediaList.size - 1, index - 1))
+                                                }
+                                            } catch (e: Exception) {
+                                                // Ignore focus/scroll errors
+                                            }
                                         }
+                                        true
                                     }
-                                    true
+                                    Key.DirectionUp -> {
+                                        onNavigateUp?.invoke()
+                                        true
+                                    }
+                                    Key.DirectionDown -> {
+                                        onNavigateDown?.invoke()
+                                        true
+                                    }
+                                    else -> false
                                 }
-                                else -> false
-                            }
+                            } else false
                         }
                 )
             }

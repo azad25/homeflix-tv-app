@@ -47,84 +47,39 @@ fun NetflixHeroSection(
     onPlayClick: (Media) -> Unit,
     onDetailsClick: (Media) -> Unit,
     onIndexChange: (Int) -> Unit,
-    onRefreshClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    playButtonFocusRequester: FocusRequester? = null,
+    onNavigateDown: (() -> Unit)? = null
 ) {
     if (mediaList.isEmpty()) return
     
-    val context = LocalContext.current
     val currentMedia = mediaList[currentIndex]
     var playButtonFocused by remember { mutableStateOf(false) }
     var infoButtonFocused by remember { mutableStateOf(false) }
-    val playButtonFocusRequester = remember { FocusRequester() }
     val infoButtonFocusRequester = remember { FocusRequester() }
-    
-    // Preview video state
-    var showPreview by remember { mutableStateOf(false) }
-    var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
     
     // Auto-focus play button when hero changes
     LaunchedEffect(currentIndex) {
-        playButtonFocusRequester.requestFocus()
-        showPreview = false
-        
-        // Start preview after 3 seconds
-        delay(3000)
-        showPreview = true
-    }
-    
-    // Initialize preview video player
-    LaunchedEffect(currentMedia.id, showPreview) {
-        if (showPreview) {
-            exoPlayer?.release()
-            
-            val player = ExoPlayer.Builder(context).build().apply {
-                val previewUrl = ApiUtils.getPreviewClipUrl(currentMedia.id)
-                val mediaItem = MediaItem.fromUri(previewUrl)
-                setMediaItem(mediaItem)
-                prepare()
-                playWhenReady = true
-                repeatMode = Player.REPEAT_MODE_ONE
-                volume = 0f // Muted preview
-            }
-            
-            exoPlayer = player
-        }
-    }
-    
-    // Cleanup player
-    DisposableEffect(Unit) {
-        onDispose {
-            exoPlayer?.release()
-        }
+        playButtonFocusRequester?.requestFocus()
     }
     
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(720.dp) // Full screen height for TV
+            .height(480.dp) // Reduced height for better scaling
     ) {
-        // Background image (always show as fallback)
+        // Background banner image with caching (Netflix/Prime style)
         AsyncImage(
-            model = ApiUtils.getBannerUrl(currentMedia),
+            model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                .data(ApiUtils.getBannerUrl(currentMedia))
+                .memoryCacheKey("banner_${currentMedia.id}")
+                .diskCacheKey("banner_${currentMedia.id}")
+                .crossfade(true)
+                .build(),
             contentDescription = currentMedia.title,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
-        
-        // Preview video overlay (Netflix-style)
-        if (showPreview && exoPlayer != null) {
-            AndroidView(
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        player = exoPlayer
-                        useController = false
-                        setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
         
         // Netflix-style gradient overlays
         Box(
@@ -169,9 +124,9 @@ fun NetflixHeroSection(
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 80.dp, end = 400.dp, bottom = 100.dp)
+                    .padding(start = 48.dp, end = 300.dp, bottom = 60.dp)
                     .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Netflix-style title
                 Text(
@@ -276,62 +231,73 @@ fun NetflixHeroSection(
                 
                 // Netflix-style action buttons
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
-                    // Play Button
+                    // Play Button - RESTORED NAVIGATION
                     Button(
                         onClick = { onPlayClick(media) },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White,
                             contentColor = Color.Black
                         ),
-                        shape = RoundedCornerShape(6.dp),
+                        shape = RoundedCornerShape(4.dp),
                         modifier = Modifier
-                            .height(56.dp)
-                            .focusRequester(playButtonFocusRequester)
+                            .height(44.dp)
+                            .then(
+                                if (playButtonFocusRequester != null) {
+                                    Modifier.focusRequester(playButtonFocusRequester)
+                                } else {
+                                    Modifier
+                                }
+                            )
                             .onFocusChanged { playButtonFocused = it.isFocused }
                             .onKeyEvent { keyEvent ->
-                                when {
-                                    keyEvent.key == Key.DirectionRight && keyEvent.type == KeyEventType.KeyDown -> {
-                                        infoButtonFocusRequester.requestFocus()
-                                        true
+                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                    when (keyEvent.key) {
+                                        Key.DirectionRight -> {
+                                            try {
+                                                infoButtonFocusRequester.requestFocus()
+                                            } catch (e: Exception) {
+                                                // Ignore focus errors
+                                            }
+                                            true
+                                        }
+                                        Key.DirectionLeft -> {
+                                            val newIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
+                                            onIndexChange(newIndex)
+                                            true
+                                        }
+                                        Key.DirectionDown -> {
+                                            onNavigateDown?.invoke()
+                                            true
+                                        }
+                                        else -> false
                                     }
-                                    keyEvent.key == Key.DirectionUp && keyEvent.type == KeyEventType.KeyDown -> {
-                                        val newIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
-                                        onIndexChange(newIndex)
-                                        true
-                                    }
-                                    keyEvent.key == Key.DirectionDown && keyEvent.type == KeyEventType.KeyDown -> {
-                                        val newIndex = (currentIndex + 1) % mediaList.size
-                                        onIndexChange(newIndex)
-                                        true
-                                    }
-                                    else -> false
-                                }
+                                } else false
                             },
                         elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = if (playButtonFocused) 8.dp else 4.dp
+                            defaultElevation = if (playButtonFocused) 6.dp else 2.dp
                         )
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
                                 text = "▶",
-                                style = MaterialTheme.typography.titleLarge
+                                style = MaterialTheme.typography.titleMedium
                             )
                             Text(
                                 text = "Play",
-                                style = MaterialTheme.typography.titleLarge.copy(
+                                style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold
                                 )
                             )
                         }
                     }
                     
-                    // More Info Button
+                    // More Info Button - RESTORED NAVIGATION
                     OutlinedButton(
                         onClick = { onDetailsClick(media) },
                         colors = ButtonDefaults.outlinedButtonColors(
@@ -339,7 +305,7 @@ fun NetflixHeroSection(
                             containerColor = Color.Black.copy(alpha = 0.5f)
                         ),
                         border = ButtonDefaults.outlinedButtonBorder.copy(
-                            width = 2.dp,
+                            width = 1.dp,
                             brush = Brush.linearGradient(
                                 colors = if (infoButtonFocused) {
                                     listOf(Color.White, Color.White.copy(alpha = 0.8f))
@@ -348,42 +314,47 @@ fun NetflixHeroSection(
                                 }
                             )
                         ),
-                        shape = RoundedCornerShape(6.dp),
+                        shape = RoundedCornerShape(4.dp),
                         modifier = Modifier
-                            .height(56.dp)
+                            .height(44.dp)
                             .focusRequester(infoButtonFocusRequester)
                             .onFocusChanged { infoButtonFocused = it.isFocused }
                             .onKeyEvent { keyEvent ->
-                                when {
-                                    keyEvent.key == Key.DirectionLeft && keyEvent.type == KeyEventType.KeyDown -> {
-                                        playButtonFocusRequester.requestFocus()
-                                        true
+                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                    when (keyEvent.key) {
+                                        Key.DirectionLeft -> {
+                                            try {
+                                                playButtonFocusRequester?.requestFocus()
+                                            } catch (e: Exception) {
+                                                // Ignore focus errors
+                                            }
+                                            true
+                                        }
+                                        Key.DirectionRight -> {
+                                            val newIndex = (currentIndex + 1) % mediaList.size
+                                            onIndexChange(newIndex)
+                                            true
+                                        }
+                                        Key.DirectionDown -> {
+                                            onNavigateDown?.invoke()
+                                            true
+                                        }
+                                        else -> false
                                     }
-                                    keyEvent.key == Key.DirectionUp && keyEvent.type == KeyEventType.KeyDown -> {
-                                        val newIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
-                                        onIndexChange(newIndex)
-                                        true
-                                    }
-                                    keyEvent.key == Key.DirectionDown && keyEvent.type == KeyEventType.KeyDown -> {
-                                        val newIndex = (currentIndex + 1) % mediaList.size
-                                        onIndexChange(newIndex)
-                                        true
-                                    }
-                                    else -> false
-                                }
+                                } else false
                             }
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
                                 text = "ⓘ",
-                                style = MaterialTheme.typography.titleLarge
+                                style = MaterialTheme.typography.titleMedium
                             )
                             Text(
                                 text = "More Info",
-                                style = MaterialTheme.typography.titleLarge.copy(
+                                style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             )
@@ -391,61 +362,23 @@ fun NetflixHeroSection(
                     }
                 }
                 
-                // Refresh recommendations button (if provided)
-                onRefreshClick?.let { refreshClick ->
-                    Row(
-                        modifier = Modifier.padding(top = 16.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = refreshClick,
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = NetflixRed,
-                                containerColor = Color.Transparent
-                            ),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    colors = listOf(NetflixRed, NetflixRed.copy(alpha = 0.8f))
-                                )
-                            ),
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.height(40.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = "🔄",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Text(
-                                    text = "Refresh Recommendations",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
+
             }
         }
         
-        // Netflix-style slide indicators
+        // Netflix-style circular slide indicators
         if (mediaList.size > 1) {
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(80.dp),
+                    .padding(48.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 mediaList.forEachIndexed { index, _ ->
                     Box(
                         modifier = Modifier
-                            .width(if (index == currentIndex) 24.dp else 8.dp)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
+                            .size(if (index == currentIndex) 10.dp else 6.dp)
+                            .clip(RoundedCornerShape(50)) // Circular shape
                             .background(
                                 if (index == currentIndex) Color.White else Color.White.copy(alpha = 0.4f)
                             )

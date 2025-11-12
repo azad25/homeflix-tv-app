@@ -7,6 +7,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,10 +24,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
 import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.util.ApiUtils
@@ -33,7 +39,7 @@ import kotlin.math.roundToInt
 
 /**
  * ULTRA-INSTANT LAN VIDEO PLAYER for Android TV
- * 
+ *
  * Optimized for sub-millisecond streaming performance on LAN networks.
  * Features:
  * - Zero-copy sendfile streaming for instant playback
@@ -44,14 +50,13 @@ import kotlin.math.roundToInt
  * - Instant MKV transcoding and caching
  * - Sub-millisecond response times
  * - TV remote D-pad navigation
- * 
+ *
  * Backend Integration:
  * - Uses ultra-fast streaming service with sendfile optimization
  * - Leverages L1 cache for instant preview access
  * - Supports instant seeking through backend transcoding
  * - Optimized for unlimited LAN bandwidth
  */
-
 @UnstableApi
 @Composable
 fun VideoPlayer(
@@ -70,15 +75,16 @@ fun VideoPlayer(
     var duration by remember { mutableStateOf(0L) }
     var showControls by remember { mutableStateOf(true) }
     var isBuffering by remember { mutableStateOf(false) }
+    var bufferPercentage by remember { mutableStateOf(0) }
     var volume by remember { mutableStateOf(1f) }
     var isMuted by remember { mutableStateOf(false) }
-    
+
     // TV remote control focus
     val playPauseFocusRequester = remember { FocusRequester() }
     val seekBackwardFocusRequester = remember { FocusRequester() }
     val seekForwardFocusRequester = remember { FocusRequester() }
     val closeFocusRequester = remember { FocusRequester() }
-    
+
     // Auto-hide controls
     LaunchedEffect(showControls, isPlaying) {
         if (showControls && isPlaying) {
@@ -86,44 +92,77 @@ fun VideoPlayer(
             showControls = false
         }
     }
-    
+
     // Initialize ExoPlayer
     LaunchedEffect(media.id, isVisible) {
         if (isVisible) {
             exoPlayer?.release()
-            
+
+            // Add track selector to disable subtitles
+            val trackSelector = DefaultTrackSelector(context)
+            trackSelector.parameters = trackSelector.parameters.buildUpon()
+                .setRendererDisabled(C.TRACK_TYPE_TEXT, true)
+                .build()
+
+            // Enable decoder fallback for black screen issues
+            val renderersFactory = DefaultRenderersFactory(context)
+                .setEnableDecoderFallback(true)
+
             val player = ExoPlayer.Builder(context)
+                .setTrackSelector(trackSelector)
+                .setRenderersFactory(renderersFactory)
                 .build()
                 .apply {
                     // ULTRA-INSTANT LAN STREAMING OPTIMIZATION
                     // Netflix-level buffer settings for instant streaming
-                    
-                    // Direct streaming URL - most reliable approach
-                    val streamUrl = ApiUtils.getStreamUrl(media.id)
-                    
-                    try {
-                        val mediaItem = MediaItem.fromUri(streamUrl)
-                        setMediaItem(mediaItem)
-                        
-                        // Set start position if resuming
-                        if (!forceStartFromBeginning && startTime > 0) {
-                            seekTo(startTime)
+
+                    // Multiple streaming URL attempts for better compatibility
+                    val streamUrls = listOf(
+                        "http://192.168.0.109:8252/api/stream/${media.id}",
+                        "http://192.168.0.109:8252/stream/${media.id}",
+                        ApiUtils.getStreamUrl(media.id),
+                        if (media.filePath.isNotEmpty()) "file://${media.filePath}" else null
+                    ).filterNotNull()
+
+                    var mediaLoaded = false
+                    for (url in streamUrls) {
+                        try {
+                            val mediaItem = MediaItem.Builder()
+                                .setUri(url)
+                                .build()
+                            setMediaItem(mediaItem)
+
+                            // Set start position if resuming
+                            if (!forceStartFromBeginning && startTime > 0) {
+                                seekTo(startTime)
+                            }
+
+                            mediaLoaded = true
+                            break
+                        } catch (e: Exception) {
+                            // Try next URL
+                            continue
                         }
-                    } catch (e: Exception) {
-                        // Fallback to simple URL if complex one fails
-                        val fallbackUrl = "http://192.168.1.100:3000/api/stream/${media.id}"
-                        val fallbackItem = MediaItem.fromUri(fallbackUrl)
-                        setMediaItem(fallbackItem)
                     }
-                    
+
+                    if (!mediaLoaded) {
+                        // Last resort - try direct file path
+                        if (media.filePath.isNotEmpty()) {
+                            val mediaItem = MediaItem.fromUri(media.filePath)
+                            setMediaItem(mediaItem)
+                        }
+                    }
+
                     // Player event listeners
                     addListener(object : Player.Listener {
                         override fun onPlaybackStateChanged(playbackState: Int) {
                             isBuffering = playbackState == Player.STATE_BUFFERING
-                            
+                            bufferPercentage = this@apply.bufferedPercentage
+
                             when (playbackState) {
                                 Player.STATE_READY -> {
                                     duration = this@apply.duration
+                                    isBuffering = false
                                     if (!forceStartFromBeginning && startTime > 0) {
                                         seekTo(startTime)
                                     }
@@ -134,54 +173,63 @@ fun VideoPlayer(
                                 Player.STATE_IDLE -> {
                                     // Player is idle, might need to retry
                                 }
+                                Player.STATE_BUFFERING -> {
+                                    isBuffering = true
+                                }
                             }
                         }
-                        
+
                         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                             // Handle playback errors
                             isBuffering = false
                         }
-                        
+
                         override fun onIsPlayingChanged(playing: Boolean) {
                             isPlaying = playing
                         }
                     })
-                    
-                    // Auto-play with audio enabled (Chrome audio fix equivalent)
+
+                    // Auto-play with audio enabled
                     prepare()
                     playWhenReady = true
                     volume = 1f
-                    isMuted = false
+                    setAudioAttributes(
+                        androidx.media3.common.AudioAttributes.Builder()
+                            .setUsage(androidx.media3.common.C.USAGE_MEDIA)
+                            .setContentType(androidx.media3.common.C.AUDIO_CONTENT_TYPE_MOVIE)
+                            .build(),
+                        true
+                    )
                 }
-            
+
             exoPlayer = player
-            
+
             // Focus on play/pause button initially
             playPauseFocusRequester.requestFocus()
         }
     }
-    
+
     // Update progress
     LaunchedEffect(exoPlayer, isPlaying) {
         while (isPlaying && exoPlayer != null) {
             currentPosition = exoPlayer?.currentPosition ?: 0L
             duration = exoPlayer?.duration ?: 0L
-            
+
             if (duration > 0) {
                 onProgress(currentPosition, duration)
             }
-            
+
             delay(1000) // Update every second
         }
     }
-    
+
     // Cleanup
     DisposableEffect(Unit) {
         onDispose {
             exoPlayer?.release()
         }
     }
-    
+
     if (isVisible) {
         Box(
             modifier = modifier
@@ -205,8 +253,11 @@ fun VideoPlayer(
                             Key.DirectionLeft -> {
                                 // Seek backward 10 seconds
                                 exoPlayer?.let { player ->
-                                    val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
-                                    player.seekTo(newPosition)
+                                    if (player.duration > 0) {
+                                        val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
+                                        player.seekTo(newPosition)
+                                        isBuffering = true // Show buffering during seek
+                                    }
                                 }
                                 showControls = true
                                 true
@@ -214,8 +265,11 @@ fun VideoPlayer(
                             Key.DirectionRight -> {
                                 // Seek forward 10 seconds
                                 exoPlayer?.let { player ->
-                                    val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
-                                    player.seekTo(newPosition)
+                                    if (player.duration > 0) {
+                                        val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
+                                        player.seekTo(newPosition)
+                                        isBuffering = true // Show buffering during seek
+                                    }
                                 }
                                 showControls = true
                                 true
@@ -270,20 +324,48 @@ fun VideoPlayer(
                 },
                 modifier = Modifier.fillMaxSize()
             )
-            
-            // Loading indicator (Netflix red)
+
+            // Netflix-style buffering indicator
             if (isBuffering) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(
-                        color = Color(0xFFE50914), // Netflix red
-                        modifier = Modifier.size(64.dp)
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color(0xFFE50914), // Netflix red
+                            modifier = Modifier.size(64.dp),
+                            strokeWidth = 6.dp
+                        )
+
+                        // Netflix-style buffering text
+                        Text(
+                            text = if (bufferPercentage > 0) "Buffering... ${bufferPercentage}%" else "Loading...",
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+
+                        // Buffer progress bar
+                        if (bufferPercentage > 0) {
+                            LinearProgressIndicator(
+                                progress = bufferPercentage / 100f,
+                                modifier = Modifier
+                                    .width(200.dp)
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp)),
+                                color = Color(0xFFE50914),
+                                trackColor = Color.White.copy(alpha = 0.3f)
+                            )
+                        }
+                    }
                 }
             }
-            
+
             // Custom TV Controls (Netflix-style)
             if (showControls) {
                 Box(
@@ -305,7 +387,7 @@ fun VideoPlayer(
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        
+
                         IconButton(
                             onClick = onClose,
                             modifier = Modifier
@@ -320,7 +402,7 @@ fun VideoPlayer(
                             )
                         }
                     }
-                    
+
                     // Center controls
                     Row(
                         modifier = Modifier
@@ -344,13 +426,14 @@ fun VideoPlayer(
                                 .clip(RoundedCornerShape(28.dp))
                                 .background(Color.Black.copy(alpha = 0.7f))
                         ) {
-                            Text(
-                                text = "⏪",
-                                color = Color.White,
-                                fontSize = 24.sp
+                            Icon(
+                                imageVector = Icons.Rounded.FastRewind,
+                                contentDescription = "Rewind 10 seconds",
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
                             )
                         }
-                        
+
                         // Play/Pause - Netflix style
                         IconButton(
                             onClick = {
@@ -370,10 +453,11 @@ fun VideoPlayer(
                                 .background(Color.White)
                         ) {
                             if (isPlaying) {
-                                Text(
-                                    text = "⏸",
-                                    color = Color.Black,
-                                    fontSize = 32.sp
+                                Icon(
+                                    imageVector = Icons.Rounded.Pause,
+                                    contentDescription = "Pause",
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(36.dp)
                                 )
                             } else {
                                 Icon(
@@ -384,7 +468,7 @@ fun VideoPlayer(
                                 )
                             }
                         }
-                        
+
                         // Seek forward - Netflix style
                         IconButton(
                             onClick = {
@@ -400,14 +484,15 @@ fun VideoPlayer(
                                 .clip(RoundedCornerShape(28.dp))
                                 .background(Color.Black.copy(alpha = 0.7f))
                         ) {
-                            Text(
-                                text = "⏩",
-                                color = Color.White,
-                                fontSize = 24.sp
+                            Icon(
+                                imageVector = Icons.Rounded.FastForward,
+                                contentDescription = "Forward 10 seconds",
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
                             )
                         }
                     }
-                    
+
                     // Bottom progress bar and info
                     Column(
                         modifier = Modifier
@@ -418,7 +503,7 @@ fun VideoPlayer(
                         // Progress bar (Netflix red)
                         if (duration > 0) {
                             val progress = (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
-                            
+
                             LinearProgressIndicator(
                                 progress = progress,
                                 modifier = Modifier
@@ -428,9 +513,9 @@ fun VideoPlayer(
                                 color = Color(0xFFE50914), // Netflix red
                                 trackColor = Color.White.copy(alpha = 0.3f)
                             )
-                            
+
                             Spacer(modifier = Modifier.height(8.dp))
-                            
+
                             // Time info
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -441,7 +526,7 @@ fun VideoPlayer(
                                     color = Color.White,
                                     fontSize = 16.sp
                                 )
-                                
+
                                 Text(
                                     text = formatTime(duration),
                                     color = Color.White,
@@ -449,7 +534,7 @@ fun VideoPlayer(
                                 )
                             }
                         }
-                        
+
                         // Volume indicator
                         if (isMuted || volume < 1f) {
                             Row(
@@ -461,9 +546,9 @@ fun VideoPlayer(
                                     color = Color.White,
                                     fontSize = 16.sp
                                 )
-                                
+
                                 Spacer(modifier = Modifier.width(8.dp))
-                                
+
                                 LinearProgressIndicator(
                                     progress = if (isMuted) 0f else volume,
                                     modifier = Modifier
@@ -487,7 +572,7 @@ private fun formatTime(timeMs: Long): String {
     val hours = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
-    
+
     return if (hours > 0) {
         String.format("%d:%02d:%02d", hours, minutes, seconds)
     } else {

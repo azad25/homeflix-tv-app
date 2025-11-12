@@ -34,14 +34,26 @@ object ApiUtils {
     }
     
     fun getBannerUrl(media: Media): String {
-        return if (!media.bannerPath.isNullOrEmpty()) {
-            if (media.bannerPath.startsWith("http")) {
+        return when {
+            // Full HTTP URL (TMDB backdrop - highest priority)
+            !media.bannerPath.isNullOrEmpty() && media.bannerPath.startsWith("http") -> {
                 media.bannerPath
-            } else {
-                getPosterUrl(media) // Fallback to poster
             }
-        } else {
-            getPosterUrl(media) // Fallback to poster
+            // Relative banner path from server
+            !media.bannerPath.isNullOrEmpty() -> {
+                "${getBaseUrl()}/banners/${media.id}"
+            }
+            // Fallback to thumbnail if available
+            !media.thumbnailPath.isNullOrEmpty() && media.thumbnailPath.startsWith("http") -> {
+                media.thumbnailPath
+            }
+            !media.thumbnailPath.isNullOrEmpty() -> {
+                "${getBaseUrl()}/thumbnails/${media.id}"
+            }
+            // Final fallback to poster
+            else -> {
+                getPosterUrl(media)
+            }
         }
     }
     

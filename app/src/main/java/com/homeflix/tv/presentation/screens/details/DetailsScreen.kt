@@ -1,8 +1,10 @@
 package com.homeflix.tv.presentation.screens.details
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,13 +41,15 @@ fun DetailsScreen(
         viewModel.loadMediaDetails(mediaId)
     }
     
-    // Netflix-style layout with side navigation
+    // Netflix-style layout with BLACK background
     Row(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black) // FORCE BLACK BACKGROUND
     ) {
-        // Side Navigation (60dp icon bar)
+        // Side Navigation (48dp icon bar)
         NetflixSideNavigation(
-            selectedRoute = Screen.Details.route,
+            selectedRoute = "details",
             onNavigate = { route ->
                 navController.navigate(route) {
                     popUpTo(Screen.Home.route) { inclusive = false }
@@ -98,17 +102,26 @@ fun DetailsScreen(
         is DetailsUiState.Success -> {
             val media = currentState.media
             
+            val scrollState = rememberLazyListState()
+            
+            // NO AUTO-SCROLL - Let user control navigation
+            // LaunchedEffect removed to prevent interference with D-pad navigation
+            
             LazyColumn(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusable(),
+                state = scrollState,
+                userScrollEnabled = true
             ) {
                 item {
-                    // Hero Section with Backdrop
+                    // Hero Section with Backdrop (Netflix/Prime style)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(500.dp)
+                            .height(400.dp)
                     ) {
-                        // Background Image
+                        // Background Banner Image
                         AsyncImage(
                             model = ApiUtils.getBannerUrl(media),
                             contentDescription = media.title,
@@ -134,25 +147,25 @@ fun DetailsScreen(
                         Row(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
-                                .padding(48.dp)
+                                .padding(32.dp)
                                 .fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(32.dp)
+                            horizontalArrangement = Arrangement.spacedBy(24.dp)
                         ) {
                             // Poster
                             AsyncImage(
                                 model = ApiUtils.getPosterUrl(media),
                                 contentDescription = media.title,
                                 modifier = Modifier
-                                    .width(200.dp)
+                                    .width(160.dp)
                                     .aspectRatio(2f / 3f)
-                                    .clip(RoundedCornerShape(8.dp)),
+                                    .clip(RoundedCornerShape(6.dp)),
                                 contentScale = ContentScale.Crop
                             )
                             
                             // Details
                             Column(
                                 modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 // Title
                                 Text(
@@ -235,7 +248,7 @@ fun DetailsScreen(
                                 
                                 // Action Buttons
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     // Play Button
                                     Button(
@@ -243,15 +256,16 @@ fun DetailsScreen(
                                             navController.navigate(Screen.VideoPlayer.createRoute(media.id))
                                         },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = NetflixRed
+                                            containerColor = Color.White,
+                                            contentColor = Color.Black
                                         ),
                                         shape = RoundedCornerShape(4.dp),
-                                        modifier = Modifier.height(48.dp)
+                                        modifier = Modifier.height(44.dp)
                                     ) {
                                         Text(
                                             text = "▶ Play",
                                             style = MaterialTheme.typography.titleMedium.copy(
-                                                fontWeight = FontWeight.SemiBold
+                                                fontWeight = FontWeight.Bold
                                             )
                                         )
                                     }
@@ -262,10 +276,11 @@ fun DetailsScreen(
                                             // TODO: Add to watchlist
                                         },
                                         colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = TextPrimary
+                                            contentColor = TextPrimary,
+                                            containerColor = Color.Black.copy(alpha = 0.5f)
                                         ),
                                         shape = RoundedCornerShape(4.dp),
-                                        modifier = Modifier.height(48.dp)
+                                        modifier = Modifier.height(44.dp)
                                     ) {
                                         Text(
                                             text = "+ My List",

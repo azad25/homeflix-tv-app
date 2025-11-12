@@ -10,6 +10,12 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * BROWSE SCREEN - ALWAYS FRESH CONTENT
+ * This screen intentionally does NOT use caching to ensure
+ * users always see the latest content when browsing.
+ * Only the Home screen uses caching for instant startup.
+ */
 @HiltViewModel
 class BrowseViewModel @Inject constructor(
     private val mediaRepository: MediaRepository
@@ -27,6 +33,7 @@ class BrowseViewModel @Inject constructor(
             _uiState.value = BrowseUiState.Loading
             
             try {
+                // NO CACHING - Always fetch fresh content for browse screen
                 // Load content in parallel
                 val moviesFlow = mediaRepository.getMovies(limit = 50)
                 val tvShowsFlow = mediaRepository.getTVShows(limit = 50)

@@ -14,9 +14,17 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * HOME SCREEN - CACHED FOR INSTANT STARTUP
+ * This screen uses aggressive caching to provide instant app startup.
+ * Content is cached for 24 hours and refreshed in the background.
+ * 
+ * Browse screen does NOT use caching to always show fresh content.
+ */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val mediaRepository: MediaRepository
+    private val mediaRepository: MediaRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -30,6 +38,10 @@ class HomeViewModel @Inject constructor(
     )
     
     init {
+        // Clear expired cache on startup (24-hour expiration)
+        viewModelScope.launch {
+            com.homeflix.tv.data.cache.ContentCache.clearExpiredCache(context)
+        }
         loadHomeContent()
     }
     
@@ -38,6 +50,13 @@ class HomeViewModel @Inject constructor(
             _uiState.value = HomeUiState.Loading
             
             try {
+                // Try to load from cache first for instant display
+                val cachedMovies = com.homeflix.tv.data.cache.ContentCache.getMediaList(context, "movies")
+                if (cachedMovies != null && cachedMovies.isNotEmpty()) {
+                    Log.d("HomeViewModel", "Loading from cache: ${cachedMovies.size} movies")
+                    displayCachedContent(cachedMovies)
+                }
+                
                 // Test basic connectivity first
                 Log.d("HomeViewModel", "Starting to load home content from: ${BuildConfig.BASE_URL}")
                 
@@ -56,6 +75,12 @@ class HomeViewModel @Inject constructor(
                             val trendingMovies = movies.sortedByDescending { it.viewCount }.take(15)
                             val popularMovies = movies.sortedByDescending { it.rating }.take(15)
                             val latestMovies = movies.sortedByDescending { it.createdAt }.take(15)
+                            
+                            // Cache the movies for next time
+                            viewModelScope.launch {
+                                com.homeflix.tv.data.cache.ContentCache.saveMediaList(context, "movies", movies)
+                                Log.d("HomeViewModel", "Cached ${movies.size} movies")
+                            }
                             
                             _uiState.value = HomeUiState.Success(
                                 featuredMedia = featuredMedia, // Use recommendation system
@@ -199,6 +224,33 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun displayCachedContent(movies: List<Media>) {
+        val featuredMedia = movies.shuffled().take(10)
+        val trendingMovies = movies.sortedByDescending { it.viewCount }.take(15)
+        val popularMovies = movies.sortedByDescending { it.rating }.take(15)
+        val latestMovies = movies.sortedByDescending { it.createdAt }.take(15)
+        
+        _uiState.value = HomeUiState.Success(
+            featuredMedia = featuredMedia,
+            continueWatching = fetchContinueWatching(),
+            trendingMovies = trendingMovies,
+            popularMovies = popularMovies,
+            latestMovies = latestMovies,
+            actionMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Action", ignoreCase = true) } }.take(15),
+            comedyMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Comedy", ignoreCase = true) } }.take(15),
+            dramaMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Drama", ignoreCase = true) } }.take(15),
+            sciFiMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Science Fiction", ignoreCase = true) || genre.name.contains("Sci-Fi", ignoreCase = true) } }.take(15),
+            horrorMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Horror", ignoreCase = true) } }.take(15),
+            romanceMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Romance", ignoreCase = true) } }.take(15),
+            thrillerMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Thriller", ignoreCase = true) } }.take(15),
+            currentHeroIndex = 0,
+            trending = trendingMovies,
+            popularTVShows = emptyList(),
+            recentlyAdded = latestMovies,
+            recommended = popularMovies.shuffled().take(10)
+        )
+    }
+    
     fun refreshFeaturedContent() {
         // Force refresh with new cycle count like web frontend
         cycleCount++

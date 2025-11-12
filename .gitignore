@@ -205,3 +205,6 @@ npm-debug.log*
 # Android lint
 lint-results.xml
 lint-results_files/
+
+# Ref Projects
+reference/

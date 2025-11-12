@@ -16,9 +16,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import com.homeflix.tv.domain.model.MediaType
+import kotlinx.coroutines.delay
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -42,19 +46,74 @@ fun BrowseScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    // Netflix-style layout with side navigation
+    // RESTORED focus management with crash protection
+    val sideNavFocusRequester = remember { FocusRequester() }
+    val gridFocusRequester = remember { FocusRequester() }
+    var isOnSideNav by remember { mutableStateOf(false) }
+    
+    // Safe initialization
+    LaunchedEffect(Unit) {
+        delay(300)
+        try {
+            gridFocusRequester.requestFocus()
+        } catch (e: Exception) {
+            // Ignore focus errors
+        }
+    }
+    
+    // RESTORED D-PAD NAVIGATION with crash protection
     Row(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.key) {
+                        Key.DirectionLeft -> {
+                            if (!isOnSideNav) {
+                                try {
+                                    sideNavFocusRequester.requestFocus()
+                                    isOnSideNav = true
+                                } catch (e: Exception) {
+                                    // Ignore focus errors
+                                }
+                                true
+                            } else false
+                        }
+                        Key.DirectionRight -> {
+                            if (isOnSideNav) {
+                                try {
+                                    gridFocusRequester.requestFocus()
+                                    isOnSideNav = false
+                                } catch (e: Exception) {
+                                    // Ignore focus errors
+                                }
+                                true
+                            } else false
+                        }
+                        else -> false
+                    }
+                } else false
+            }
     ) {
-        // Side Navigation (60dp icon bar)
+        // RESTORED SIDE NAVIGATION with crash protection
         NetflixSideNavigation(
-            selectedRoute = Screen.Browse.route,
+            selectedRoute = "browse",
             onNavigate = { route ->
                 navController.navigate(route) {
                     popUpTo(Screen.Home.route) { inclusive = false }
                     launchSingleTop = true
                 }
-            }
+            },
+            onNavigateToContent = {
+                try {
+                    gridFocusRequester.requestFocus()
+                    isOnSideNav = false
+                } catch (e: Exception) {
+                    // Ignore focus errors
+                }
+            },
+            modifier = Modifier.focusRequester(sideNavFocusRequester)
         )
         
         // Main Content - Netflix-style movie grid
@@ -118,13 +177,17 @@ fun BrowseScreen(
                 }
                 
                 is BrowseUiState.Success -> {
-                    // Netflix-style movie grid
+                    // RESTORED movie grid with D-pad navigation
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 200.dp),
-                        contentPadding = PaddingValues(32.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(24.dp),
-                        modifier = Modifier.fillMaxSize()
+                        columns = GridCells.Adaptive(minSize = 160.dp),
+                        contentPadding = PaddingValues(24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .focusRequester(gridFocusRequester)
+                            .focusable(),
+                        userScrollEnabled = true
                     ) {
                         // Combine all movies from different sections
                         val allMovies = buildList {
@@ -166,20 +229,20 @@ private fun NetflixMovieCard(
             .then(
                 if (isFocused) {
                     Modifier.border(
-                        width = 3.dp,
+                        width = 2.dp,
                         color = Color.White,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(6.dp)
                     )
                 } else {
                     Modifier
                 }
             ),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(6.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.Transparent
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isFocused) 8.dp else 2.dp
+            defaultElevation = if (isFocused) 6.dp else 2.dp
         )
     ) {
         Box {
@@ -189,7 +252,7 @@ private fun NetflixMovieCard(
                 contentDescription = media.title,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(8.dp)),
+                    .clip(RoundedCornerShape(6.dp)),
                 contentScale = ContentScale.Crop
             )
             
@@ -200,24 +263,24 @@ private fun NetflixMovieCard(
                         .fillMaxSize()
                         .background(
                             Color.Black.copy(alpha = 0.7f),
-                            RoundedCornerShape(8.dp)
+                            RoundedCornerShape(6.dp)
                         )
                 ) {
                     // Play button
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .size(60.dp)
+                            .size(48.dp)
                             .background(
                                 NetflixRed,
-                                RoundedCornerShape(30.dp)
+                                RoundedCornerShape(24.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "▶",
                             color = Color.White,
-                            style = MaterialTheme.typography.headlineMedium
+                            style = MaterialTheme.typography.headlineSmall
                         )
                     }
                     
@@ -225,7 +288,7 @@ private fun NetflixMovieCard(
                     Column(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(12.dp)
+                            .padding(8.dp)
                     ) {
                         Text(
                             text = media.title,

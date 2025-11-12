@@ -37,8 +37,8 @@ fun MediaCard(
     
     // Netflix-style scale animation on focus
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.05f else 1.0f,
-        animationSpec = tween(durationMillis = 200),
+        targetValue = if (isFocused) 1.03f else 1.0f,
+        animationSpec = tween(durationMillis = 150),
         label = "card_scale"
     )
     
@@ -52,30 +52,35 @@ fun MediaCard(
             .then(
                 if (isFocused) {
                     Modifier.border(
-                        width = 3.dp, // Netflix-style 3dp border
+                        width = 2.dp, // Smaller border
                         color = FocusedBorder,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(8.dp)
                     )
                 } else {
                     Modifier
                 }
             ),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color.Transparent
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isFocused) 12.dp else 4.dp
+            defaultElevation = if (isFocused) 8.dp else 2.dp
         )
     ) {
         Box {
-            // Poster Image
+            // Poster Image with caching
             AsyncImage(
-                model = ApiUtils.getPosterUrl(media),
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                    .data(ApiUtils.getPosterUrl(media))
+                    .memoryCacheKey("poster_${media.id}")
+                    .diskCacheKey("poster_${media.id}")
+                    .crossfade(true)
+                    .build(),
                 contentDescription = media.title,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp)),
+                    .clip(RoundedCornerShape(8.dp)),
                 contentScale = ContentScale.Crop
             )
             
@@ -86,13 +91,13 @@ fun MediaCard(
                         .fillMaxSize()
                         .background(
                             Color.Black.copy(alpha = 0.8f),
-                            RoundedCornerShape(12.dp)
+                            RoundedCornerShape(8.dp)
                         )
                 ) {
                     Column(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(12.dp),
+                            .padding(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(

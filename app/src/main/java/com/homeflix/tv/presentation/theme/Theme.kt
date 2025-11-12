@@ -35,14 +35,11 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun HomeFlixTVTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true, // ALWAYS DARK THEME FOR TV
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) {
-        DarkColorScheme
-    } else {
-        LightColorScheme
-    }
+    // FORCE DARK THEME ALWAYS
+    val colorScheme = DarkColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,
