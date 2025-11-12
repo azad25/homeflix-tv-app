@@ -57,11 +57,27 @@ fun NetflixHeroSection(
     var playButtonFocused by remember { mutableStateOf(false) }
     var infoButtonFocused by remember { mutableStateOf(false) }
     val infoButtonFocusRequester = remember { FocusRequester() }
+    var isUserInteracting by remember { mutableStateOf(false) }
     
-    // Auto-focus play button when hero changes
-    LaunchedEffect(currentIndex) {
-        playButtonFocusRequester?.requestFocus()
+    // Auto-slide functionality - Netflix style
+    LaunchedEffect(currentIndex, isUserInteracting) {
+        if (!isUserInteracting && mediaList.size > 1) {
+            delay(5000) // 5 seconds per slide
+            val nextIndex = (currentIndex + 1) % mediaList.size
+            onIndexChange(nextIndex)
+        }
     }
+    
+    // Reset user interaction after delay
+    LaunchedEffect(isUserInteracting) {
+        if (isUserInteracting) {
+            delay(10000) // Resume auto-slide after 10 seconds of no interaction
+            isUserInteracting = false
+        }
+    }
+    
+    // REMOVED: Auto-focus to prevent scroll issues
+    // Focus is managed by parent NetflixHomeScreen
     
     Box(
         modifier = modifier
@@ -264,6 +280,7 @@ fun NetflixHeroSection(
                                             true
                                         }
                                         Key.DirectionLeft -> {
+                                            isUserInteracting = true
                                             val newIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
                                             onIndexChange(newIndex)
                                             true
@@ -331,6 +348,7 @@ fun NetflixHeroSection(
                                             true
                                         }
                                         Key.DirectionRight -> {
+                                            isUserInteracting = true
                                             val newIndex = (currentIndex + 1) % mediaList.size
                                             onIndexChange(newIndex)
                                             true
@@ -366,23 +384,48 @@ fun NetflixHeroSection(
             }
         }
         
-        // Netflix-style circular slide indicators
+        // REMOVED: Navigation arrows to prevent focus issues
+        // Users can navigate with LEFT/RIGHT keys on the play/info buttons
+        
+        // Netflix-style slide indicators with auto-slide status
         if (mediaList.size > 1) {
-            Row(
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(48.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                mediaList.forEachIndexed { index, _ ->
-                    Box(
-                        modifier = Modifier
-                            .size(if (index == currentIndex) 10.dp else 6.dp)
-                            .clip(RoundedCornerShape(50)) // Circular shape
-                            .background(
-                                if (index == currentIndex) Color.White else Color.White.copy(alpha = 0.4f)
-                            )
-                    )
+                // Auto-slide status indicator
+                if (isUserInteracting) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.Black.copy(alpha = 0.7f)
+                    ) {
+                        Text(
+                            text = "Auto-slide paused",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = Color.White.copy(alpha = 0.8f)
+                            ),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+                
+                // Slide indicators
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    mediaList.forEachIndexed { index, _ ->
+                        Box(
+                            modifier = Modifier
+                                .size(if (index == currentIndex) 10.dp else 6.dp)
+                                .clip(RoundedCornerShape(50)) // Circular shape
+                                .background(
+                                    if (index == currentIndex) Color.White else Color.White.copy(alpha = 0.4f)
+                                )
+                        )
+                    }
                 }
             }
         }

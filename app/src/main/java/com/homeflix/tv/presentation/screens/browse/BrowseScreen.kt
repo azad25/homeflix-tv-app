@@ -112,15 +112,25 @@ fun BrowseScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header
-            Text(
-                text = "Browse Movies",
-                style = MaterialTheme.typography.displayMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                ),
+            // Header with latest content indication
+            Column(
                 modifier = Modifier.padding(32.dp)
-            )
+            ) {
+                Text(
+                    text = "Browse Movies",
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                )
+                Text(
+                    text = "Latest content first • Sorted by recently added",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = TextSecondary
+                    ),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
             val currentState = uiState
             when (currentState) {
                 is BrowseUiState.Loading -> {
@@ -169,7 +179,44 @@ fun BrowseScreen(
                 }
                 
                 is BrowseUiState.Success -> {
-                    // SIMPLIFIED movie grid
+                    // Movie count indicator with pagination info
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 32.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "Showing ${currentState.movies.size} movies" + 
+                                   if (currentState.hasMore) " • Load more available" else " • All movies loaded",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = NetflixRed,
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                        
+                        if (currentState.isLoadingMore) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    color = NetflixRed,
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Text(
+                                    text = "Loading more...",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = TextSecondary
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    
+                    // PAGINATED movie grid with latest content first
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 160.dp),
                         contentPadding = PaddingValues(24.dp),
@@ -178,21 +225,51 @@ fun BrowseScreen(
                         modifier = Modifier.fillMaxSize(),
                         userScrollEnabled = true
                     ) {
-                        // Combine all movies from different sections
-                        val allMovies = buildList {
-                            addAll(currentState.movies)
-                            currentState.genreContent.values.forEach { mediaList ->
-                                addAll(mediaList.filter { it.type == MediaType.MOVIE })
-                            }
-                        }.distinctBy { it.id } // Remove duplicates
-                        
-                        items(allMovies) { media ->
+                        // Show paginated movies (already sorted by latest in ViewModel)
+                        items(
+                            items = currentState.movies,
+                            key = { media -> media.id } // Use stable key for better performance
+                        ) { media ->
                             NetflixMovieCard(
                                 media = media,
                                 onClick = {
                                     navController.navigate(Screen.Details.createRoute(media.uuid))
                                 }
                             )
+                        }
+                        
+                        // Load more button
+                        if (currentState.hasMore && !currentState.isLoadingMore) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Button(
+                                        onClick = { viewModel.loadMoreMovies() },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = NetflixRed
+                                        ),
+                                        modifier = Modifier
+                                            .focusable()
+                                            .onFocusChanged { focused ->
+                                                if (focused.isFocused) {
+                                                    // Auto-load when focused for TV navigation
+                                                    viewModel.loadMoreMovies()
+                                                }
+                                            }
+                                    ) {
+                                        Text(
+                                            text = "Load More Movies",
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

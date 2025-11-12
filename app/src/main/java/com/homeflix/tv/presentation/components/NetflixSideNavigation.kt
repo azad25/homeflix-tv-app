@@ -50,23 +50,40 @@ fun NetflixSideNavigation(
     val focusRequesters = remember(navItems.size) { List(navItems.size) { FocusRequester() } }
     var isInitialized by remember { mutableStateOf(false) }
     
-    // CRITICAL FIX: NEVER auto-focus sidebar - only focus when LEFT arrow pressed
+    // FIXED: Initialize without auto-focus
     LaunchedEffect(selectedRoute) {
         if (!isInitialized) {
             val targetIndex = navItems.indexOfFirst { it.route == selectedRoute }.takeIf { it >= 0 } ?: 1
             focusedIndex = targetIndex
-            // ABSOLUTELY NO auto-focus - let content have focus
             isInitialized = true
+            // NO auto-focus - sidebar only gets focus when LEFT arrow is pressed
         }
     }
     
-    // Professional D-pad navigation with proper bounds checking
+    // Handle when sidebar receives focus from parent - SIMPLIFIED
+    var sidebarHasFocus by remember { mutableStateOf(false) }
+    LaunchedEffect(sidebarHasFocus) {
+        if (sidebarHasFocus && isInitialized) {
+            // Small delay to prevent focus conflicts
+            delay(50)
+            try {
+                focusRequesters[focusedIndex].requestFocus()
+            } catch (e: Exception) {
+                // Ignore focus errors
+            }
+        }
+    }
+    
+    // Professional D-pad navigation with MIDDLE positioning
     Column(
         modifier = modifier
             .width(48.dp)
             .fillMaxHeight()
             .background(Color.Black.copy(alpha = 0.9f))
-            .padding(vertical = 16.dp)
+            .focusable()
+            .onFocusChanged { focusState ->
+                sidebarHasFocus = focusState.isFocused || focusState.hasFocus
+            }
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.key) {
@@ -95,6 +112,7 @@ fun NetflixSideNavigation(
                             true
                         }
                         Key.DirectionRight -> {
+                            // IMMEDIATELY exit sidebar and go to content
                             onNavigateToContent?.invoke()
                             true
                         }
@@ -106,26 +124,38 @@ fun NetflixSideNavigation(
                     }
                 } else false
             },
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.Center, // CENTER the icons vertically
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        navItems.forEachIndexed { index, item ->
-            NavIconButton(
-                item = item,
-                isSelected = selectedRoute == item.route,
-                isFocused = focusedIndex == index,
-                onClick = { 
-                    focusedIndex = index
-                    onNavigate(item.route) 
-                },
-                focusRequester = focusRequesters[index],
-                onFocusChanged = { focused ->
-                    if (focused && focusedIndex != index) {
+        
+        // Add spacer to push icons to center
+        Spacer(modifier = Modifier.weight(1f))
+        // Navigation icons in the center
+        Column(
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            navItems.forEachIndexed { index, item ->
+                NavIconButton(
+                    item = item,
+                    isSelected = selectedRoute == item.route,
+                    isFocused = focusedIndex == index,
+                    onClick = { 
                         focusedIndex = index
+                        onNavigate(item.route) 
+                    },
+                    focusRequester = focusRequesters[index],
+                    onFocusChanged = { focused ->
+                        if (focused && focusedIndex != index) {
+                            focusedIndex = index
+                        }
                     }
-                }
-            )
+                )
+            }
         }
+        
+        // Add spacer to keep icons centered
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 

@@ -11,10 +11,9 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * BROWSE SCREEN - ALWAYS FRESH CONTENT
- * This screen intentionally does NOT use caching to ensure
- * users always see the latest content when browsing.
- * Only the Home screen uses caching for instant startup.
+ * BROWSE SCREEN - PAGINATED CONTENT FOR PERFORMANCE
+ * Implements pagination to prevent memory issues with large libraries.
+ * Shows latest content first with load more functionality.
  */
 @HiltViewModel
 class BrowseViewModel @Inject constructor(
@@ -23,6 +22,16 @@ class BrowseViewModel @Inject constructor(
     
     private val _uiState = MutableStateFlow<BrowseUiState>(BrowseUiState.Loading)
     val uiState: StateFlow<BrowseUiState> = _uiState.asStateFlow()
+    
+    // Pagination state with memory management
+    private var currentPage = 0
+    private val pageSize = 24 // Netflix-style page size for optimal performance
+    private var isLoadingMore = false
+    private var hasMoreContent = true
+    private val allLoadedMovies = mutableListOf<Media>()
+    
+    // Memory management - limit total loaded items to prevent OOM
+    private val maxLoadedItems = 200 // Maximum items to keep in memory
     
     init {
         loadBrowseContent()
@@ -33,54 +42,91 @@ class BrowseViewModel @Inject constructor(
             _uiState.value = BrowseUiState.Loading
             
             try {
-                // NO CACHING - Always fetch fresh content for browse screen
-                // Load content in parallel
-                val moviesFlow = mediaRepository.getMovies(limit = 50)
-                val tvShowsFlow = mediaRepository.getTVShows(limit = 50)
-                val genresFlow = mediaRepository.getAllGenres()
+                // Reset pagination state
+                currentPage = 0
+                allLoadedMovies.clear()
+                hasMoreContent = true
                 
-                combine(
-                    moviesFlow,
-                    tvShowsFlow,
-                    genresFlow
-                ) { moviesResult, tvShowsResult, genresResult ->
-                    Triple(moviesResult, tvShowsResult, genresResult)
-                }.collect { (moviesResult, tvShowsResult, genresResult) ->
-                    
-                    val movies = moviesResult.getOrNull() ?: emptyList()
-                    val tvShows = tvShowsResult.getOrNull() ?: emptyList()
-                    val genres = genresResult.getOrNull() ?: emptyList()
-                    
-                    if (movies.isEmpty() && tvShows.isEmpty()) {
-                        _uiState.value = BrowseUiState.Error("No content available")
-                        return@collect
-                    }
-                    
-                    // Load content by genre
-                    val genreContent = mutableMapOf<Genre, List<Media>>()
-                    
-                    genres.take(5).forEach { genre ->
-                        mediaRepository.getMediaByGenre(genre.name, limit = 20)
-                            .collect { result ->
-                                result.getOrNull()?.let { mediaList ->
-                                    if (mediaList.isNotEmpty()) {
-                                        genreContent[genre] = mediaList
-                                    }
-                                }
-                            }
-                    }
-                    
-                    _uiState.value = BrowseUiState.Success(
-                        movies = movies,
-                        tvShows = tvShows,
-                        genreContent = genreContent
-                    )
-                }
+                // Load first page of movies with pagination
+                loadMoviesPage()
                 
             } catch (e: Exception) {
                 _uiState.value = BrowseUiState.Error(e.message ?: "Unknown error occurred")
             }
         }
+    }
+    
+    private suspend fun loadMoviesPage() {
+        try {
+            val offset = currentPage * pageSize
+            
+            // Load movies with pagination - latest first
+            mediaRepository.getMovies(limit = pageSize, offset = offset)
+                .collect { moviesResult ->
+                    val newMovies = moviesResult.getOrNull()?.sortedByDescending { it.id } ?: emptyList()
+                    
+                    if (currentPage == 0) {
+                        // First page - replace all movies
+                        allLoadedMovies.clear()
+                        allLoadedMovies.addAll(newMovies)
+                        
+                        if (allLoadedMovies.isEmpty()) {
+                            _uiState.value = BrowseUiState.Error("No movies available")
+                            return@collect
+                        }
+                    } else {
+                        // Subsequent pages - append movies with memory management
+                        allLoadedMovies.addAll(newMovies)
+                        
+                        // Memory management: Remove oldest items if we exceed limit
+                        if (allLoadedMovies.size > maxLoadedItems) {
+                            val itemsToRemove = allLoadedMovies.size - maxLoadedItems
+                            repeat(itemsToRemove) {
+                                allLoadedMovies.removeFirstOrNull()
+                            }
+                        }
+                    }
+                    
+                    // Check if we have more content
+                    hasMoreContent = newMovies.size == pageSize
+                    
+                    _uiState.value = BrowseUiState.Success(
+                        movies = allLoadedMovies.toList(), // Create immutable copy
+                        hasMore = hasMoreContent,
+                        isLoadingMore = false,
+                        totalCount = allLoadedMovies.size
+                    )
+                    
+                    isLoadingMore = false
+                }
+                
+        } catch (e: Exception) {
+            _uiState.value = BrowseUiState.Error(e.message ?: "Failed to load movies")
+            isLoadingMore = false
+        }
+    }
+    
+    fun loadMoreMovies() {
+        if (isLoadingMore || !hasMoreContent) return
+        
+        viewModelScope.launch {
+            isLoadingMore = true
+            
+            // Update UI to show loading more state
+            val currentState = _uiState.value
+            if (currentState is BrowseUiState.Success) {
+                _uiState.value = currentState.copy(isLoadingMore = true)
+            }
+            
+            currentPage++
+            loadMoviesPage()
+        }
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        // Clean up memory when ViewModel is destroyed
+        allLoadedMovies.clear()
     }
 }
 
@@ -89,7 +135,8 @@ sealed class BrowseUiState {
     data class Error(val message: String) : BrowseUiState()
     data class Success(
         val movies: List<Media>,
-        val tvShows: List<Media>,
-        val genreContent: Map<Genre, List<Media>>
+        val hasMore: Boolean = false,
+        val isLoadingMore: Boolean = false,
+        val totalCount: Int = 0
     ) : BrowseUiState()
 }

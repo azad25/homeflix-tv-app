@@ -176,62 +176,45 @@ fun VideoPlayer(
                     // ULTRA-INSTANT LAN STREAMING OPTIMIZATION
                     // Netflix-level buffer settings for instant streaming
 
-                    // FIXED: Use EXACT web app streaming URL pattern
+                    // FIXED: Simplified video loading for better compatibility
                     var mediaLoaded = false
-                    try {
-                        // Primary: Use EXACT same URL pattern as web app VideoPlayer.tsx
-                        val streamUrl = "${getBaseUrl()}/api/stream/${media.id}?quality=4k&format=mp4"
-                        val mediaItem = MediaItem.Builder()
-                            .setUri(streamUrl)
-                            .build()
-                        
-                        setMediaItem(mediaItem)
-                        prepare() // CRITICAL: Prepare the player
-                        mediaLoaded = true
-                        
-                        // Set start position if resuming
-                        if (!forceStartFromBeginning && startTime > 0) {
-                            seekTo(startTime)
-                        }
-                        
-                        // Auto-play when ready
-                        playWhenReady = true
-                        
-                    } catch (e: Exception) {
-                        // Fallback 1: Try simple stream URL (like web app fallback)
+                    
+                    // Try multiple URL patterns for maximum compatibility
+                    val urlsToTry = listOf(
+                        "${getBaseUrl()}/api/stream/${media.id}",
+                        "file://${media.filePath}"
+                    )
+                    
+                    for (streamUrl in urlsToTry) {
                         try {
-                            val fallbackUrl = "${getBaseUrl()}/api/stream/${media.id}"
                             val mediaItem = MediaItem.Builder()
-                                .setUri(fallbackUrl)
+                                .setUri(streamUrl)
                                 .build()
+                            
                             setMediaItem(mediaItem)
                             prepare()
                             mediaLoaded = true
-                            playWhenReady = true
-                        } catch (e2: Exception) {
-                            // Fallback 2: Direct file path if available
-                            if (media.filePath.isNotEmpty()) {
-                                try {
-                                    val mediaItem = MediaItem.Builder()
-                                        .setUri("file://${media.filePath}")
-                                        .build()
-                                    setMediaItem(mediaItem)
-                                    prepare()
-                                    mediaLoaded = true
-                                    playWhenReady = true
-                                } catch (e3: Exception) {
-                                    // Log error but don't crash
-                                }
+                            
+                            // Set start position if resuming
+                            if (!forceStartFromBeginning && startTime > 0) {
+                                seekTo(startTime)
                             }
+                            
+                            // Enable audio and auto-play
+                            volume = 1f
+                            playWhenReady = true
+                            
+                            break // Success, exit loop
+                            
+                        } catch (e: Exception) {
+                            // Continue to next URL
+                            android.util.Log.w("VideoPlayer", "Failed to load URL: $streamUrl", e)
                         }
                     }
-
+                    
                     if (!mediaLoaded) {
-                        // Last resort - try direct file path
-                        if (media.filePath.isNotEmpty()) {
-                            val mediaItem = MediaItem.fromUri(media.filePath)
-                            setMediaItem(mediaItem)
-                        }
+                        // Final fallback - log error
+                        android.util.Log.e("VideoPlayer", "Failed to load any video URL for media: ${media.id}")
                     }
 
                     // Player event listeners
@@ -293,8 +276,13 @@ fun VideoPlayer(
 
             exoPlayer = player
 
-            // Focus on play/pause button initially
-            playPauseFocusRequester.requestFocus()
+            // Focus on play/pause button initially with delay
+            delay(500)
+            try {
+                playPauseFocusRequester.requestFocus()
+            } catch (e: Exception) {
+                // Ignore focus errors
+            }
         }
     }
 
@@ -328,55 +316,40 @@ fun VideoPlayer(
                     if (keyEvent.type == KeyEventType.KeyDown) {
                         when (keyEvent.key) {
                             Key.DirectionCenter, Key.Enter, Key.Spacebar -> {
-                                // Play/Pause when controls are hidden, otherwise let focused control handle it
-                                if (!showControls) {
-                                    exoPlayer?.let { player ->
-                                        if (player.isPlaying) {
-                                            player.pause()
-                                        } else {
-                                            player.play()
-                                        }
+                                // Always show controls and toggle play/pause
+                                exoPlayer?.let { player ->
+                                    if (player.isPlaying) {
+                                        player.pause()
+                                    } else {
+                                        player.play()
                                     }
-                                    showControls = true
-                                    true
-                                } else {
-                                    showControls = true
-                                    false // Let focused control handle the click
                                 }
+                                showControls = true
+                                true
                             }
                             Key.DirectionLeft -> {
-                                if (!showControls) {
-                                    // Seek backward 10 seconds when controls are hidden
-                                    exoPlayer?.let { player ->
-                                        if (player.duration > 0) {
-                                            val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
-                                            player.seekTo(newPosition)
-                                            isBuffering = true
-                                        }
+                                // Always seek backward and show controls
+                                exoPlayer?.let { player ->
+                                    if (player.duration > 0) {
+                                        val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
+                                        player.seekTo(newPosition)
+                                        isBuffering = true
                                     }
-                                    showControls = true
-                                    true
-                                } else {
-                                    showControls = true
-                                    false // Let D-pad navigation handle focus
                                 }
+                                showControls = true
+                                true
                             }
                             Key.DirectionRight -> {
-                                if (!showControls) {
-                                    // Seek forward 10 seconds when controls are hidden
-                                    exoPlayer?.let { player ->
-                                        if (player.duration > 0) {
-                                            val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
-                                            player.seekTo(newPosition)
-                                            isBuffering = true
-                                        }
+                                // Always seek forward and show controls
+                                exoPlayer?.let { player ->
+                                    if (player.duration > 0) {
+                                        val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
+                                        player.seekTo(newPosition)
+                                        isBuffering = true
                                     }
-                                    showControls = true
-                                    true
-                                } else {
-                                    showControls = true
-                                    false // Let D-pad navigation handle focus
                                 }
+                                showControls = true
+                                true
                             }
                             Key.DirectionUp -> {
                                 // Volume up

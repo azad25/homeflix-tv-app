@@ -60,8 +60,9 @@ class HomeViewModel @Inject constructor(
                 // Test basic connectivity first
                 Log.d("HomeViewModel", "Starting to load home content from: ${BuildConfig.BASE_URL}")
                 
-                // Load movies content
-                mediaRepository.getMovies(limit = 50).collect { result ->
+                // Load movies content - ALWAYS show latest content in hero slider
+                // Uses /api/media/movies?limit=100 and prioritizes newest movies first (like browse screen)
+                mediaRepository.getMovies(limit = 100).collect { result ->
                     result.fold(
                         onSuccess = { movies ->
                             if (movies.isEmpty()) {
@@ -69,12 +70,25 @@ class HomeViewModel @Inject constructor(
                                 return@collect
                             }
                         
-                            // Try to get featured media from recommendation endpoints first
-                            val featuredMedia = fetchRecommendedMedia() ?: movies.shuffled().take(10)
+                            // EXACTLY like web app: Sort by creation date for latest content
+                            val sortedByDate = movies.sortedByDescending { 
+                                it.createdAt?.time ?: it.id.toLong() // Use creation date or ID as fallback
+                            }
                             
-                            val trendingMovies = movies.sortedByDescending { it.viewCount }.take(15)
-                            val popularMovies = movies.sortedByDescending { it.rating }.take(15)
-                            val latestMovies = movies.sortedByDescending { it.createdAt }.take(15)
+                            // Sort by view count for popular content
+                            val sortedByViews = movies.sortedByDescending { it.viewCount }
+                            
+                            // Sort by rating for trending content  
+                            val sortedByRating = movies.sortedByDescending { it.rating }
+                            
+                            // ALWAYS show latest content in hero slider (like browse screen)
+                            val featuredMedia = sortedByDate.take(8) // Top 8 latest movies for hero slider
+                            Log.d("HomeViewModel", "Hero slider: Showing ${featuredMedia.size} latest movies")
+                            
+                            // Use the sorted lists from above
+                            val trendingMovies = sortedByRating.take(20) // Top rated as trending
+                            val popularMovies = sortedByViews.take(20) // Most viewed as popular
+                            val latestMovies = sortedByDate.take(20) // Latest by creation date
                             
                             // Cache the movies for next time
                             viewModelScope.launch {
@@ -83,24 +97,25 @@ class HomeViewModel @Inject constructor(
                             }
                             
                             _uiState.value = HomeUiState.Success(
-                                featuredMedia = featuredMedia, // Use recommendation system
+                                featuredMedia = featuredMedia, // ALWAYS latest content for hero slider
                                 continueWatching = fetchContinueWatching(),
                                 trendingMovies = trendingMovies,
                                 popularMovies = popularMovies,
                                 latestMovies = latestMovies,
-                                actionMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Action", ignoreCase = true) } }.take(15),
-                                comedyMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Comedy", ignoreCase = true) } }.take(15),
-                                dramaMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Drama", ignoreCase = true) } }.take(15),
-                                sciFiMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Science Fiction", ignoreCase = true) || genre.name.contains("Sci-Fi", ignoreCase = true) } }.take(15),
-                                horrorMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Horror", ignoreCase = true) } }.take(15),
-                                romanceMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Romance", ignoreCase = true) } }.take(15),
-                                thrillerMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Thriller", ignoreCase = true) } }.take(15),
+                                // Genre filtering from latest content first
+                                actionMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Action", ignoreCase = true) } }.take(15),
+                                comedyMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Comedy", ignoreCase = true) } }.take(15),
+                                dramaMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Drama", ignoreCase = true) } }.take(15),
+                                sciFiMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Science Fiction", ignoreCase = true) || genre.name.contains("Sci-Fi", ignoreCase = true) } }.take(15),
+                                horrorMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Horror", ignoreCase = true) } }.take(15),
+                                romanceMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Romance", ignoreCase = true) } }.take(15),
+                                thrillerMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Thriller", ignoreCase = true) } }.take(15),
                                 currentHeroIndex = 0,
                                 // Additional properties for NetflixHomeScreen
                                 trending = trendingMovies,
                                 popularTVShows = emptyList(), // No TV shows in this movie-focused app
                                 recentlyAdded = latestMovies,
-                                recommended = popularMovies.shuffled().take(10) // Use popular movies as recommendations
+                                recommended = latestMovies.take(10) // Use latest movies as recommendations
                             )
                         },
                         onFailure = { error ->
@@ -225,10 +240,23 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun displayCachedContent(movies: List<Media>) {
-        val featuredMedia = movies.shuffled().take(10)
-        val trendingMovies = movies.sortedByDescending { it.viewCount }.take(15)
-        val popularMovies = movies.sortedByDescending { it.rating }.take(15)
-        val latestMovies = movies.sortedByDescending { it.createdAt }.take(15)
+        // ALWAYS show latest content in hero slider (like browse screen)
+        val sortedByDate = movies.sortedByDescending { 
+            it.createdAt?.time ?: it.id.toLong() // Use creation date or ID as fallback
+        }
+        
+        // Sort by view count for popular content
+        val sortedByViews = movies.sortedByDescending { it.viewCount }
+        
+        // Sort by rating for trending content  
+        val sortedByRating = movies.sortedByDescending { it.rating }
+        
+        // ALWAYS show latest content in hero slider (like browse screen)
+        val featuredMedia = sortedByDate.take(8) // Top 8 latest movies for hero slider
+        
+        val trendingMovies = sortedByRating.take(20) // Top rated as trending
+        val popularMovies = sortedByViews.take(20) // Most viewed as popular
+        val latestMovies = sortedByDate.take(20) // Latest by creation date
         
         _uiState.value = HomeUiState.Success(
             featuredMedia = featuredMedia,
@@ -236,18 +264,19 @@ class HomeViewModel @Inject constructor(
             trendingMovies = trendingMovies,
             popularMovies = popularMovies,
             latestMovies = latestMovies,
-            actionMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Action", ignoreCase = true) } }.take(15),
-            comedyMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Comedy", ignoreCase = true) } }.take(15),
-            dramaMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Drama", ignoreCase = true) } }.take(15),
-            sciFiMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Science Fiction", ignoreCase = true) || genre.name.contains("Sci-Fi", ignoreCase = true) } }.take(15),
-            horrorMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Horror", ignoreCase = true) } }.take(15),
-            romanceMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Romance", ignoreCase = true) } }.take(15),
-            thrillerMovies = movies.filter { media -> media.genres.any { genre -> genre.name.contains("Thriller", ignoreCase = true) } }.take(15),
+            // Genre filtering from latest content first
+            actionMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Action", ignoreCase = true) } }.take(15),
+            comedyMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Comedy", ignoreCase = true) } }.take(15),
+            dramaMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Drama", ignoreCase = true) } }.take(15),
+            sciFiMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Science Fiction", ignoreCase = true) || genre.name.contains("Sci-Fi", ignoreCase = true) } }.take(15),
+            horrorMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Horror", ignoreCase = true) } }.take(15),
+            romanceMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Romance", ignoreCase = true) } }.take(15),
+            thrillerMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Thriller", ignoreCase = true) } }.take(15),
             currentHeroIndex = 0,
             trending = trendingMovies,
             popularTVShows = emptyList(),
             recentlyAdded = latestMovies,
-            recommended = popularMovies.shuffled().take(10)
+            recommended = latestMovies.take(10)
         )
     }
     
