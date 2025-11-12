@@ -64,135 +64,80 @@ fun NetflixHomeScreen(
         }
     }
     
-    // SIMPLIFIED Layout - let components handle their own focus
-    Row(
+    // CRITICAL FIX: Full screen loading overlay to prevent sidebar focus during loading
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // SIDE NAVIGATION with proper focus exit
-        NetflixSideNavigation(
-            selectedRoute = "home",
-            onNavigate = { route ->
-                when (route) {
-                    "search" -> navController.navigate(Screen.Search.route)
-                    "home" -> { /* Already on home */ }
-                    "browse" -> navController.navigate(Screen.Browse.route)
-                }
-            },
-            onNavigateToContent = {
-                // Exit sidebar and go to hero
-                currentFocusArea = FocusArea.HERO
-                try {
-                    heroPlayButtonFocusRequester.requestFocus()
-                } catch (e: Exception) {
-                    // Fallback to first content row
-                    currentFocusArea = FocusArea.CONTENT
-                    try {
-                        firstRowFocusRequester.requestFocus()
-                    } catch (e2: Exception) {
-                        // Let user navigate manually
-                    }
-                }
-            },
-            modifier = Modifier.focusRequester(sideNavFocusRequester)
-        )
-        
-        // Main content area with LEFT arrow navigation to sidebar
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-                .background(Color.Black)
-                .onKeyEvent { keyEvent ->
-                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
-                        // Move to sidebar when LEFT is pressed from content
-                        currentFocusArea = FocusArea.SIDEBAR
-                        try {
-                            sideNavFocusRequester.requestFocus()
-                        } catch (e: Exception) {
-                            // Ignore focus errors
-                        }
-                        true
-                    } else {
-                        false
-                    }
-                }
+        // Main content layout
+        Row(
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Wrap everything in a safe try-catch to prevent crashes
-            val currentState = uiState
+            // SIDE NAVIGATION with proper focus exit
+            NetflixSideNavigation(
+                selectedRoute = "home",
+                onNavigate = { route ->
+                    when (route) {
+                        "search" -> navController.navigate(Screen.Search.route)
+                        "home" -> { /* Already on home */ }
+                        "browse" -> navController.navigate(Screen.Browse.route)
+                    }
+                },
+                onNavigateToContent = {
+                    // Exit sidebar and go to hero
+                    currentFocusArea = FocusArea.HERO
+                    try {
+                        heroPlayButtonFocusRequester.requestFocus()
+                    } catch (e: Exception) {
+                        // Fallback to first content row
+                        currentFocusArea = FocusArea.CONTENT
+                        try {
+                            firstRowFocusRequester.requestFocus()
+                        } catch (e2: Exception) {
+                            // Let user navigate manually
+                        }
+                    }
+                },
+                modifier = Modifier.focusRequester(sideNavFocusRequester)
+            )
             
-            when (currentState) {
-                is HomeUiState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                color = NetflixRed,
-                                strokeWidth = 4.dp,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Text(
-                                text = "Loading HomeFlix...",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = TextPrimary
-                            )
-                        }
-                    }
-                }
-                
-                is HomeUiState.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.padding(48.dp)
-                        ) {
-                            Text(
-                                text = "Something went wrong",
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = TextPrimary,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = currentState.message,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = TextPrimary.copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center
-                            )
-                            Button(
-                                onClick = { viewModel.loadHomeContent() },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = NetflixRed
-                                )
-                            ) {
-                                Text("Try Again")
+            // Main content area with LEFT arrow navigation to sidebar
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+                    .background(Color.Black)
+                    .onKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
+                            // Move to sidebar when LEFT is pressed from content
+                            currentFocusArea = FocusArea.SIDEBAR
+                            try {
+                                sideNavFocusRequester.requestFocus()
+                            } catch (e: Exception) {
+                                // Ignore focus errors
                             }
+                            true
+                        } else {
+                            false
                         }
                     }
-                }
+            ) {
+                // Wrap everything in a safe try-catch to prevent crashes
+                val currentState = uiState
                 
-                is HomeUiState.Success -> {
-                    // FIXED: LazyColumn with state to ensure it starts at top
-                    val listState = rememberLazyListState()
-                    
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black)
-                            .focusable(false)
-                    ) {
+                when (currentState) {
+                    is HomeUiState.Success -> {
+                        // FIXED: LazyColumn with state to ensure it starts at top
+                        val listState = rememberLazyListState()
+                        
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black)
+                                .focusable(false)
+                        ) {
                         // HERO SECTION as LazyColumn item
                         if (currentState.featuredMedia.isNotEmpty()) {
                             val moviesOnly = currentState.featuredMedia.filter { it.type == MediaType.MOVIE }
@@ -328,12 +273,94 @@ fun NetflixHomeScreen(
                             }
                         }
                         
-                        // Bottom padding item
-                        item {
-                            Spacer(modifier = Modifier.height(48.dp))
+                            // Bottom padding item
+                            item {
+                                Spacer(modifier = Modifier.height(48.dp))
+                            }
+                        }
+                    }
+                    
+                    is HomeUiState.Loading -> {
+                        // Loading state is handled by the overlay below
+                    }
+                    
+                    is HomeUiState.Error -> {
+                        // Error state is handled by the overlay below
+                    }
+                }
+            }
+        }
+        
+        // CRITICAL FIX: Full screen loading overlay that covers everything including sidebar
+        val currentState = uiState
+        when (currentState) {
+            is HomeUiState.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                        .focusable(false), // Prevent any focus during loading
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = NetflixRed,
+                            strokeWidth = 4.dp,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Text(
+                            text = "Loading HomeFlix...",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary
+                        )
+                    }
+                }
+            }
+            
+            is HomeUiState.Error -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                        .focusable(false),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.padding(48.dp)
+                    ) {
+                        Text(
+                            text = "Something went wrong",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = TextPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = currentState.message,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextPrimary.copy(alpha = 0.7f),
+                            textAlign = TextAlign.Center
+                        )
+                        Button(
+                            onClick = { viewModel.loadHomeContent() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = NetflixRed
+                            )
+                        ) {
+                            Text("Try Again")
                         }
                     }
                 }
+            }
+            
+            else -> {
+                // Success state - content is already rendered above
             }
         }
     }

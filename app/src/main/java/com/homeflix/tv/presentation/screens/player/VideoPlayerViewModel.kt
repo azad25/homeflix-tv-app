@@ -47,16 +47,12 @@ class VideoPlayerViewModel @Inject constructor(
     }
     
     fun updateProgress(currentTime: Long, duration: Long) {
-        viewModelScope.launch {
-            try {
-                // TODO: Implement progress tracking API call
-                // This would match the web frontend's progress tracking
-                Log.d("VideoPlayerViewModel", "Progress: ${currentTime}ms / ${duration}ms")
-            } catch (e: Exception) {
-                Log.e("VideoPlayerViewModel", "Error updating progress", e)
-            }
-        }
+        // Progress updates are now handled only on player close for performance
+        // No frequent API calls during playback
+        Log.d("VideoPlayerViewModel", "Progress: ${currentTime}ms / ${duration}ms")
     }
+    
+    fun getMediaRepository(): MediaRepository = mediaRepository
 }
 
 sealed class VideoPlayerUiState {

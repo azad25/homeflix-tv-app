@@ -46,6 +46,21 @@ data class ViewHistoryDto(
     val watchedAt: String
 )
 
+data class RecentlyWatchedItemDto(
+    val id: Int,
+    @SerializedName("media_id")
+    val mediaId: Int,
+    @SerializedName("user_id")
+    val userId: String,
+    @SerializedName("last_watched_at")
+    val lastWatchedAt: String,
+    @SerializedName("progress_seconds")
+    val progressSeconds: Long,
+    @SerializedName("duration_seconds")
+    val durationSeconds: Long,
+    val media: MediaDto
+)
+
 data class RecommendationDto(
     val id: Int,
     @SerializedName("media_id")
@@ -158,6 +173,20 @@ fun ViewHistoryDto.toDomain(): ViewHistory {
         progress = progress,
         completed = completed,
         watchedAt = dateFormat.parse(watchedAt) ?: Date()
+    )
+}
+
+fun RecentlyWatchedItemDto.toDomain(): RecentlyWatchedItem {
+    val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+    
+    return RecentlyWatchedItem(
+        id = id,
+        mediaId = mediaId,
+        userId = userId,
+        lastWatchedAt = dateFormat.parse(lastWatchedAt) ?: Date(),
+        progressSeconds = progressSeconds,
+        durationSeconds = durationSeconds,
+        media = media.toDomain()
     )
 }
 

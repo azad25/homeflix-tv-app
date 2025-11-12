@@ -96,9 +96,11 @@ class HomeViewModel @Inject constructor(
                                 Log.d("HomeViewModel", "Cached ${movies.size} movies")
                             }
                             
+                            val continueWatchingItems = fetchContinueWatching()
+                            
                             _uiState.value = HomeUiState.Success(
                                 featuredMedia = featuredMedia, // ALWAYS latest content for hero slider
-                                continueWatching = fetchContinueWatching(),
+                                continueWatching = continueWatchingItems,
                                 trendingMovies = trendingMovies,
                                 popularMovies = popularMovies,
                                 latestMovies = latestMovies,
@@ -192,50 +194,59 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun fetchContinueWatching(): List<ContinueWatchingItem> {
-        // For now, create mock continue watching data
-        // In a real app, this would come from user's watch history API
+    private suspend fun fetchContinueWatching(): List<ContinueWatchingItem> {
         return try {
-            Log.d("HomeViewModel", "Creating mock continue watching data")
+            Log.d("HomeViewModel", "Fetching continue watching from API")
             
-            // Create mock continue watching items
-            listOf(
-                ContinueWatchingItem(
-                    media = Media(
-                        id = 1,
-                        uuid = "mock-1",
-                        title = "Sample Movie 1",
-                        type = MediaType.MOVIE,
-                        filePath = "/mock/path1",
-                        fileSize = 1000000L,
-                        duration = 7200,
-                        rating = 8.5,
-                        genres = emptyList(),
-                        genreNames = emptyList()
-                    ),
-                    progress = 0.25f,
-                    lastWatched = "2 days ago"
-                ),
-                ContinueWatchingItem(
-                    media = Media(
-                        id = 2,
-                        uuid = "mock-2", 
-                        title = "Sample Movie 2",
-                        type = MediaType.MOVIE,
-                        filePath = "/mock/path2",
-                        fileSize = 1500000L,
-                        duration = 6600,
-                        rating = 7.8,
-                        genres = emptyList(),
-                        genreNames = emptyList()
-                    ),
-                    progress = 0.67f,
-                    lastWatched = "1 day ago"
+            // Use the new recently watched API
+            var continueWatchingItems = emptyList<ContinueWatchingItem>()
+            
+            mediaRepository.getRecentlyWatchedWithProgress().collect { result ->
+                result.fold(
+                    onSuccess = { recentlyWatchedItems ->
+                        continueWatchingItems = recentlyWatchedItems.map { item ->
+                            val progressPercent = if (item.durationSeconds > 0) {
+                                (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
+                            } else {
+                                0f
+                            }
+                            
+                            val lastWatchedText = formatLastWatched(item.lastWatchedAt)
+                            
+                            ContinueWatchingItem(
+                                media = item.media,
+                                progress = progressPercent,
+                                lastWatched = lastWatchedText
+                            )
+                        }
+                        Log.d("HomeViewModel", "Successfully loaded ${continueWatchingItems.size} continue watching items")
+                    },
+                    onFailure = { error ->
+                        Log.e("HomeViewModel", "Error fetching continue watching", error)
+                        // Return empty list on error
+                        continueWatchingItems = emptyList()
+                    }
                 )
-            )
+            }
+            
+            continueWatchingItems
         } catch (e: Exception) {
-            Log.e("HomeViewModel", "Error creating continue watching: ${e.message}")
+            Log.e("HomeViewModel", "Error fetching continue watching: ${e.message}")
             emptyList()
+        }
+    }
+    
+    private fun formatLastWatched(date: java.util.Date): String {
+        val now = java.util.Date()
+        val diffMs = now.time - date.time
+        val diffHours = diffMs / (1000 * 60 * 60)
+        val diffDays = diffHours / 24
+        
+        return when {
+            diffHours < 1 -> "Just now"
+            diffHours < 24 -> "${diffHours}h ago"
+            diffDays < 7 -> "${diffDays}d ago"
+            else -> java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault()).format(date)
         }
     }
 
@@ -260,7 +271,7 @@ class HomeViewModel @Inject constructor(
         
         _uiState.value = HomeUiState.Success(
             featuredMedia = featuredMedia,
-            continueWatching = fetchContinueWatching(),
+            continueWatching = emptyList(), // Will be loaded separately for cached content
             trendingMovies = trendingMovies,
             popularMovies = popularMovies,
             latestMovies = latestMovies,

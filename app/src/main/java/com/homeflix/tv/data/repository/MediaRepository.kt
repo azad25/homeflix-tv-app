@@ -156,6 +156,52 @@ class MediaRepository @Inject constructor(
     suspend fun getContinueWatching() = apiService.getContinueWatching()
     suspend fun getRecentlyWatched() = apiService.getRecentlyWatched()
     
+    // Recently watched with progress (matching web app)
+    fun getRecentlyWatchedWithProgress(): Flow<Result<List<RecentlyWatchedItem>>> = flow {
+        try {
+            val response = apiService.getRecentlyWatchedWithProgress()
+            if (response.isSuccessful) {
+                val recentlyWatchedItems = response.body()?.map { it.toDomain() } ?: emptyList()
+                Log.d("MediaRepository", "getRecentlyWatchedWithProgress success: ${recentlyWatchedItems.size} items")
+                emit(Result.success(recentlyWatchedItems))
+            } else {
+                Log.e("MediaRepository", "getRecentlyWatchedWithProgress failed: ${response.code()} - ${response.message()}")
+                emit(Result.failure(Exception("Failed to fetch recently watched: ${response.code()} ${response.message()}")))
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "getRecentlyWatchedWithProgress error", e)
+            emit(Result.failure(e))
+        }
+    }
+    
+    // Update playback progress (matching web app)
+    suspend fun updatePlaybackProgress(
+        mediaId: Int,
+        position: Long,
+        duration: Long,
+        userId: String = "1"
+    ): Result<Unit> {
+        return try {
+            val request = com.homeflix.tv.data.remote.api.PlaybackProgressAltRequest(
+                media_id = mediaId,
+                position = position,
+                duration = duration
+            )
+            
+            val response = apiService.updatePlaybackProgressAlt(userId, request)
+            if (response.isSuccessful) {
+                Log.d("MediaRepository", "updatePlaybackProgress success: mediaId=$mediaId, position=$position, duration=$duration")
+                Result.success(Unit)
+            } else {
+                Log.e("MediaRepository", "updatePlaybackProgress failed: ${response.code()} - ${response.message()}")
+                Result.failure(Exception("Failed to update playback progress: ${response.code()} ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "updatePlaybackProgress error", e)
+            Result.failure(e)
+        }
+    }
+    
     // Episode methods for TV shows
     fun getEpisodesBySeriesAndSeason(seriesId: String, season: Int): Flow<Result<List<Media>>> = flow {
         try {

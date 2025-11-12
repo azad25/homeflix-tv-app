@@ -144,10 +144,10 @@ fun NetflixHeroSection(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Netflix-style title
+                // Netflix-style title - REDUCED SIZE for TV
                 Text(
                     text = media.title,
-                    style = MaterialTheme.typography.displayLarge.copy(
+                    style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Black,
                         color = TextPrimary
                     ),

@@ -38,6 +38,10 @@ import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.homeflix.tv.data.repository.MediaRepository
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 /**
  * ULTRA-INSTANT LAN VIDEO PLAYER for Android TV
  *
@@ -71,9 +75,11 @@ fun VideoPlayer(
     startTime: Long = 0L,
     forceStartFromBeginning: Boolean = false,
     onProgress: (currentTime: Long, duration: Long) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    mediaRepository: MediaRepository? = null
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableStateOf(0L) }
@@ -98,6 +104,35 @@ fun VideoPlayer(
     val seekForwardFocusRequester = remember { FocusRequester() }
     val subtitlesFocusRequester = remember { FocusRequester() }
     val closeFocusRequester = remember { FocusRequester() }
+
+    // Progress saving function (matching web app)
+    fun savePlaybackProgress() {
+        exoPlayer?.let { player ->
+            val currentTime = player.currentPosition / 1000 // Convert to seconds
+            val totalDuration = player.duration / 1000 // Convert to seconds
+            
+            if (totalDuration > 0 && currentTime > 0) {
+                coroutineScope.launch {
+                    try {
+                        mediaRepository?.updatePlaybackProgress(
+                            mediaId = media.id,
+                            position = currentTime,
+                            duration = totalDuration
+                        )
+                        android.util.Log.d("VideoPlayer", "Progress saved: $currentTime of $totalDuration seconds")
+                    } catch (e: Exception) {
+                        android.util.Log.e("VideoPlayer", "Failed to save progress", e)
+                    }
+                }
+            }
+        }
+    }
+    
+    // Enhanced close function with progress saving
+    fun closePlayerWithProgressSave() {
+        savePlaybackProgress()
+        onClose()
+    }
 
     // Subtitle toggle function
     fun toggleSubtitles() {
@@ -301,7 +336,7 @@ fun VideoPlayer(
         }
     }
 
-    // Update progress
+    // Update progress for UI only (no frequent saving for performance)
     LaunchedEffect(exoPlayer, isPlaying) {
         while (isPlaying && exoPlayer != null) {
             currentPosition = exoPlayer?.currentPosition ?: 0L
@@ -311,13 +346,15 @@ fun VideoPlayer(
                 onProgress(currentPosition, duration)
             }
 
-            delay(1000) // Update every second
+            delay(1000) // Update every second for UI only
         }
     }
 
-    // Cleanup
+    // Cleanup with progress saving
     DisposableEffect(Unit) {
         onDispose {
+            // Save progress before cleanup
+            savePlaybackProgress()
             exoPlayer?.release()
         }
     }
@@ -327,6 +364,7 @@ fun VideoPlayer(
             modifier = modifier
                 .fillMaxSize()
                 .background(Color.Black)
+                .focusable() // CRITICAL: Make video player focusable for D-pad
                 .onKeyEvent { keyEvent ->
                     if (keyEvent.type == KeyEventType.KeyDown) {
                         when (keyEvent.key) {
@@ -383,8 +421,8 @@ fun VideoPlayer(
                                 true
                             }
                             Key.Back, Key.Escape -> {
-                                // Close player
-                                onClose()
+                                // Close player with progress saving
+                                closePlayerWithProgressSave()
                                 true
                             }
                             Key.M -> {
@@ -491,19 +529,7 @@ fun VideoPlayer(
                             fontWeight = FontWeight.Bold
                         )
 
-                        IconButton(
-                            onClick = onClose,
-                            modifier = Modifier
-                                .focusRequester(closeFocusRequester)
-                                .focusable()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
+                        // Close button removed - use Back/Escape key to close
                     }
 
                     // Center controls

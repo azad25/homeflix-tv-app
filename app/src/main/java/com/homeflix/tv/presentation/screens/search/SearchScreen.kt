@@ -107,13 +107,27 @@ fun SearchScreen(
         Row(
             modifier = Modifier.fillMaxSize()
         ) {
-            // LEFT PANEL - Virtual Keyboard & Genres
+            // LEFT PANEL - Virtual Keyboard & Genres with RIGHT arrow navigation
             Column(
                 modifier = Modifier
                     .width(400.dp)
                     .fillMaxHeight()
                     .background(Color.Black.copy(alpha = 0.9f))
                     .padding(24.dp)
+                    .onKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionRight) {
+                            // Move focus to content panel on RIGHT arrow
+                            currentFocusArea = FocusArea.CONTENT
+                            try {
+                                contentFocusRequester.requestFocus()
+                            } catch (e: Exception) {
+                                // Ignore focus errors
+                            }
+                            true
+                        } else {
+                            false
+                        }
+                    }
             ) {
                 // Search Input Display
                 Card(
@@ -245,11 +259,20 @@ fun SearchScreen(
                 }
             }
             
-            // RIGHT PANEL - Top Searches & Results
+            // RIGHT PANEL - Top Searches & Results with LEFT arrow navigation
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(24.dp)
+                    .onKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
+                            // Move focus back to virtual keyboard/genres on LEFT arrow
+                            currentFocusArea = FocusArea.KEYBOARD
+                            true
+                        } else {
+                            false
+                        }
+                    }
             ) {
                 if (searchQuery.isEmpty()) {
                     // Top Searches Section
@@ -266,7 +289,9 @@ fun SearchScreen(
                         columns = GridCells.Fixed(4),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .focusRequester(contentFocusRequester)
                     ) {
                         items(topSearches.take(8)) { media ->
                             TopSearchCard(
@@ -328,7 +353,9 @@ fun SearchScreen(
                                     columns = GridCells.Adaptive(minSize = 160.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .focusRequester(contentFocusRequester)
                                 ) {
                                     items(currentState.results.filter { it.type == MediaType.MOVIE }) { media ->
                                         NetflixMovieCard(

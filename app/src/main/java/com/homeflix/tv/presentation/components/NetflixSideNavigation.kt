@@ -50,27 +50,13 @@ fun NetflixSideNavigation(
     val focusRequesters = remember(navItems.size) { List(navItems.size) { FocusRequester() } }
     var isInitialized by remember { mutableStateOf(false) }
     
-    // FIXED: Initialize without auto-focus
+    // COMPLETELY REMOVE AUTO-FOCUS - Let D-pad control everything
     LaunchedEffect(selectedRoute) {
         if (!isInitialized) {
             val targetIndex = navItems.indexOfFirst { it.route == selectedRoute }.takeIf { it >= 0 } ?: 1
             focusedIndex = targetIndex
             isInitialized = true
-            // NO auto-focus - sidebar only gets focus when LEFT arrow is pressed
-        }
-    }
-    
-    // Handle when sidebar receives focus from parent - SIMPLIFIED
-    var sidebarHasFocus by remember { mutableStateOf(false) }
-    LaunchedEffect(sidebarHasFocus) {
-        if (sidebarHasFocus && isInitialized) {
-            // Small delay to prevent focus conflicts
-            delay(50)
-            try {
-                focusRequesters[focusedIndex].requestFocus()
-            } catch (e: Exception) {
-                // Ignore focus errors
-            }
+            // NO auto-focus whatsoever
         }
     }
     
@@ -80,10 +66,7 @@ fun NetflixSideNavigation(
             .width(48.dp)
             .fillMaxHeight()
             .background(Color.Black.copy(alpha = 0.9f))
-            .focusable()
-            .onFocusChanged { focusState ->
-                sidebarHasFocus = focusState.isFocused || focusState.hasFocus
-            }
+            .focusable(false) // CRITICAL: Make container non-focusable
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.key) {

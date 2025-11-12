@@ -45,6 +45,7 @@ fun VideoPlayerScreen(
                 onProgress = { currentTime, duration ->
                     viewModel.updateProgress(currentTime, duration)
                 },
+                mediaRepository = viewModel.getMediaRepository(),
                 modifier = Modifier.fillMaxSize()
             )
         }

@@ -82,6 +82,13 @@ interface HomeFlixApiService {
     @POST("playback/progress")
     suspend fun updatePlaybackProgress(@Body request: PlaybackProgressRequest): Response<Unit>
     
+    // Alternative endpoint matching web app
+    @POST("api/playback/progress")
+    suspend fun updatePlaybackProgressAlt(
+        @Header("X-User-ID") userId: String = "1",
+        @Body request: PlaybackProgressAltRequest
+    ): Response<Unit>
+    
     @GET("playback/progress/{id}")
     suspend fun getPlaybackProgress(@Path("id") id: String): Response<PlaybackProgressDto>
     
@@ -93,6 +100,12 @@ interface HomeFlixApiService {
     
     @GET("playback/continue")
     suspend fun getContinueWatching(): Response<List<MediaDto>>
+    
+    // Recently watched with progress (matching web app)
+    @GET("playback/recently-watched")
+    suspend fun getRecentlyWatchedWithProgress(
+        @Header("X-User-ID") userId: String = "1"
+    ): Response<List<RecentlyWatchedItemDto>>
     
     @GET("playback/history")
     suspend fun getWatchHistory(): Response<List<ViewHistoryDto>>
@@ -168,4 +181,10 @@ data class PlaybackProgressRequest(
     val progress: Long,
     val duration: Long,
     val userId: String = "default"
+)
+
+data class PlaybackProgressAltRequest(
+    val media_id: Int,
+    val position: Long,
+    val duration: Long
 )

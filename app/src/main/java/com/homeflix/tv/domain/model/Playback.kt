@@ -38,6 +38,17 @@ data class ViewHistory(
 ) : Parcelable
 
 @Parcelize
+data class RecentlyWatchedItem(
+    val id: Int,
+    val mediaId: Int,
+    val userId: String,
+    val lastWatchedAt: Date,
+    val progressSeconds: Long,
+    val durationSeconds: Long,
+    val media: Media
+) : Parcelable
+
+@Parcelize
 data class Recommendation(
     val id: Int,
     val mediaId: Int,

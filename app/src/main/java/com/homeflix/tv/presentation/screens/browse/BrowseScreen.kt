@@ -80,9 +80,24 @@ fun BrowseScreen(
             }
         )
         
-        // Main Content - Netflix-style movie grid
+        // Main Content - Netflix-style movie grid with LEFT arrow navigation
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .onKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
+                        // Move to sidebar when LEFT is pressed from content
+                        currentFocusArea = FocusArea.SIDEBAR
+                        try {
+                            sideNavFocusRequester.requestFocus()
+                        } catch (e: Exception) {
+                            // Ignore focus errors
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                }
         ) {
             // Header with latest content indication
             Column(
