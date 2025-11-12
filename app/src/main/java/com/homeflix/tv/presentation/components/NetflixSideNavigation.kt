@@ -55,14 +55,18 @@ fun NetflixSideNavigation(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        navItems.forEach { item ->
+        navItems.forEachIndexed { index, item ->
             NetflixNavIcon(
                 item = item,
                 isSelected = selectedRoute == item.route,
                 onClick = { onNavigate(item.route) },
-                onNavigateRight = onNavigateToContent
+                onNavigateRight = onNavigateToContent,
+                // Focus the home icon (middle one) when sidebar is focused
+                autoFocus = item.route == selectedRoute
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            if (index < navItems.size - 1) {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 }
@@ -75,9 +79,23 @@ private fun NetflixNavIcon(
     item: NavItem,
     isSelected: Boolean,
     onClick: () -> Unit,
-    onNavigateRight: (() -> Unit)? = null
+    onNavigateRight: (() -> Unit)? = null,
+    autoFocus: Boolean = false
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    
+    // Auto-focus this icon when requested
+    LaunchedEffect(autoFocus) {
+        if (autoFocus) {
+            delay(100) // Small delay to ensure UI is ready
+            try {
+                focusRequester.requestFocus()
+            } catch (e: Exception) {
+                // Ignore focus errors
+            }
+        }
+    }
     
     Box(
         modifier = Modifier
@@ -95,6 +113,7 @@ private fun NetflixNavIcon(
                 color = if (isFocused) Color.White else Color.Transparent,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
             )
+            .focusRequester(focusRequester)
             .focusable()
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(onClick = onClick)

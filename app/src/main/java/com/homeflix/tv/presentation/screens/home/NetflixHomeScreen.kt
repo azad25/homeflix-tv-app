@@ -55,24 +55,34 @@ fun NetflixHomeScreen(
     var currentFocusArea by remember { mutableStateOf(FocusArea.HERO) }
     var isInitialized by remember { mutableStateOf(false) }
     
-    // CRITICAL: Android TV requires explicit initial focus
+    // NETFLIX-STYLE: Focus on first content row instead of hero
     LaunchedEffect(uiState) {
         if (uiState is HomeUiState.Success && !isInitialized) {
             isInitialized = true
-            delay(1000) // Longer delay to ensure UI is fully rendered
-            currentFocusArea = FocusArea.HERO
+            delay(800) // Shorter delay for better UX
+            currentFocusArea = FocusArea.CONTENT
             try {
-                android.util.Log.d("HomeScreen", "Requesting focus on hero play button")
-                heroPlayButtonFocusRequester.requestFocus()
+                android.util.Log.d("HomeScreen", "Requesting focus on first content row")
+                firstRowFocusRequester.requestFocus()
             } catch (e: Exception) {
-                android.util.Log.e("HomeScreen", "Hero focus failed, trying first row", e)
-                // If hero focus fails, try first row
+                android.util.Log.e("HomeScreen", "First row focus failed, trying hero", e)
+                // Fallback to hero if content focus fails
                 try {
-                    firstRowFocusRequester.requestFocus()
+                    currentFocusArea = FocusArea.HERO
+                    heroPlayButtonFocusRequester.requestFocus()
                 } catch (e2: Exception) {
                     android.util.Log.e("HomeScreen", "All focus requests failed", e2)
                 }
             }
+        }
+    }
+    
+    // Ensure LazyColumn starts at top
+    LaunchedEffect(uiState) {
+        if (uiState is HomeUiState.Success) {
+            // Reset scroll position to top when content loads
+            delay(100)
+            // listState.scrollToItem(0) will be called in the LazyColumn scope
         }
     }
     
@@ -114,12 +124,40 @@ fun NetflixHomeScreen(
                 modifier = Modifier.focusRequester(sideNavFocusRequester)
             )
             
-            // Main content area - NETFLIX PRINCIPLE: No container focus management
+            // Main content area with LEFT arrow and BACK button handling
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
                     .background(Color.Black)
+                    .onKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown) {
+                            when (keyEvent.key) {
+                                Key.DirectionLeft -> {
+                                    // Navigate to sidebar like Netflix
+                                    currentFocusArea = FocusArea.SIDEBAR
+                                    try {
+                                        sideNavFocusRequester.requestFocus()
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("HomeScreen", "Failed to focus sidebar", e)
+                                    }
+                                    true
+                                }
+                                Key.Back -> {
+                                    // Netflix behavior: Back button focuses navigation
+                                    currentFocusArea = FocusArea.SIDEBAR
+                                    try {
+                                        sideNavFocusRequester.requestFocus()
+                                    } catch (e: Exception) {
+                                        // If sidebar focus fails, let system handle back
+                                        false
+                                    }
+                                    true
+                                }
+                                else -> false
+                            }
+                        } else false
+                    }
             ) {
                 // Wrap everything in a safe try-catch to prevent crashes
                 val currentState = uiState
@@ -128,6 +166,15 @@ fun NetflixHomeScreen(
                     is HomeUiState.Success -> {
                         // FIXED: LazyColumn with state to ensure it starts at top
                         val listState = rememberLazyListState()
+                        
+                        // Ensure scroll starts at top
+                        LaunchedEffect(currentState) {
+                            try {
+                                listState.scrollToItem(0)
+                            } catch (e: Exception) {
+                                // Ignore scroll errors
+                            }
+                        }
                         
                         LazyColumn(
                             state = listState,
