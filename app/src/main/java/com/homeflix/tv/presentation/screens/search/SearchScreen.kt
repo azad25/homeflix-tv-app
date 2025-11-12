@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -29,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -41,7 +44,7 @@ import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
 
 enum class FocusArea {
-    SIDEBAR, CONTENT
+    SIDEBAR, KEYBOARD, GENRES, CONTENT
 }
 
 @Composable
@@ -50,60 +53,43 @@ fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val genres by viewModel.genres.collectAsState()
+    val topSearches by viewModel.topSearches.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
+    var currentFocusArea by remember { mutableStateOf(FocusArea.KEYBOARD) }
     
-    // NETFLIX-LEVEL focus management
+    // Focus requesters for different sections
     val sideNavFocusRequester = remember { FocusRequester() }
-    val searchFieldFocusRequester = remember { FocusRequester() }
-    var currentFocusArea by remember { mutableStateOf(FocusArea.CONTENT) }
+    val keyboardFocusRequester = remember { FocusRequester() }
+    val genresFocusRequester = remember { FocusRequester() }
+    val contentFocusRequester = remember { FocusRequester() }
     
-    // FIXED: Start with search field focus, not sidebar
-    LaunchedEffect(Unit) {
-        delay(300) // Allow UI to settle
-        currentFocusArea = FocusArea.CONTENT
-        try {
-            searchFieldFocusRequester.requestFocus()
-        } catch (e: Exception) {
-            // Let system handle focus naturally
+    // Virtual keyboard layout
+    val keyboardRows = listOf(
+        listOf("a", "b", "c", "d", "e", "f"),
+        listOf("g", "h", "i", "j", "k", "l"),
+        listOf("m", "n", "o", "p", "q", "r"),
+        listOf("s", "t", "u", "v", "w", "x"),
+        listOf("y", "z", "1", "2", "3", "4"),
+        listOf("5", "6", "7", "8", "9", "0")
+    )
+    
+    // Handle search when query changes
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotBlank()) {
+            viewModel.searchMedia(searchQuery)
+        } else {
+            viewModel.clearSearch()
         }
     }
     
-    // NETFLIX-LEVEL Layout with professional navigation
+    // TV-optimized layout
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown) {
-                    when (keyEvent.key) {
-                        Key.DirectionLeft -> {
-                            if (currentFocusArea != FocusArea.SIDEBAR) {
-                                currentFocusArea = FocusArea.SIDEBAR
-                                try {
-                                    sideNavFocusRequester.requestFocus()
-                                } catch (e: Exception) {
-                                    // Ignore
-                                }
-                                true
-                            } else false
-                        }
-                        Key.DirectionRight -> {
-                            if (currentFocusArea == FocusArea.SIDEBAR) {
-                                currentFocusArea = FocusArea.CONTENT
-                                try {
-                                    searchFieldFocusRequester.requestFocus()
-                                } catch (e: Exception) {
-                                    // Ignore
-                                }
-                                true
-                            } else false
-                        }
-                        else -> false
-                    }
-                } else false
-            }
     ) {
-        // NETFLIX-LEVEL SIDE NAVIGATION
+        // SIDE NAVIGATION (48dp width)
         NetflixSideNavigation(
             selectedRoute = "search",
             onNavigate = { route ->
@@ -113,184 +99,452 @@ fun SearchScreen(
                 }
             },
             onNavigateToContent = {
-                currentFocusArea = FocusArea.CONTENT
-                try {
-                    searchFieldFocusRequester.requestFocus()
-                } catch (e: Exception) {
-                    // Ignore focus errors
-                }
-            },
-            modifier = Modifier.focusRequester(sideNavFocusRequester)
+                currentFocusArea = FocusArea.KEYBOARD
+            }
         )
         
-        // Main Content
-        Column(
+        // Main Content Area
+        Row(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header with search
+            // LEFT PANEL - Virtual Keyboard & Genres
             Column(
-                modifier = Modifier.padding(32.dp)
+                modifier = Modifier
+                    .width(400.dp)
+                    .fillMaxHeight()
+                    .background(Color.Black.copy(alpha = 0.9f))
+                    .padding(24.dp)
             ) {
-                Text(
-                    text = "Search Movies",
-                    style = MaterialTheme.typography.displayMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                // Search Input Display
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.Black.copy(alpha = 0.7f)
                     ),
-                    modifier = Modifier.padding(bottom = 24.dp)
-                )
-        
-                // Netflix-style search input with D-pad navigation
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { 
-                        searchQuery = it
-                        if (it.isNotBlank()) {
-                            viewModel.searchMedia(it)
-                        } else {
-                            viewModel.clearSearch()
-                        }
-                    },
-                    label = { 
-                        Text(
-                            "Search movies...",
-                            color = TextSecondary
-                        ) 
-                    },
-                    leadingIcon = {
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Search",
-                            tint = TextSecondary
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(searchFieldFocusRequester),
-                    shape = RoundedCornerShape(8.dp),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = NetflixRed,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        cursorColor = NetflixRed
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (searchQuery.isEmpty()) "Search..." else searchQuery,
+                            color = if (searchQuery.isEmpty()) Color.Gray else Color.White,
+                            fontSize = 16.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = { searchQuery = "" },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Clear",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Virtual Keyboard
+                Column(
+                    modifier = Modifier.padding(bottom = 24.dp)
+                ) {
+                    keyboardRows.forEachIndexed { rowIndex, row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            row.forEach { key ->
+                                VirtualKey(
+                                    key = key,
+                                    onClick = { searchQuery += key },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    
+                    // Special keys row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Space key
+                        VirtualKey(
+                            key = "space",
+                            onClick = { searchQuery += " " },
+                            modifier = Modifier.weight(2f),
+                            isSpecial = true
+                        )
+                        
+                        // Backspace key
+                        Card(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                                .clickable {
+                                    if (searchQuery.isNotEmpty()) {
+                                        searchQuery = searchQuery.dropLast(1)
+                                    }
+                                },
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.Gray.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Backspace,
+                                    contentDescription = "Backspace",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Genre Categories
+                Column {
+                    Text(
+                        text = "Categories",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
-                )
+                    
+                    genres.forEach { genre ->
+                        GenreItem(
+                            genre = genre.name,
+                            onClick = { 
+                                searchQuery = genre.name
+                                viewModel.searchByGenre(genre.name)
+                            }
+                        )
+                    }
+                }
             }
-        
-            // Search Results
-            val currentState = uiState
-            when (currentState) {
-                is SearchUiState.Initial -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+            
+            // RIGHT PANEL - Top Searches & Results
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp)
+            ) {
+                if (searchQuery.isEmpty()) {
+                    // Top Searches Section
+                    Text(
+                        text = "Top Searches",
+                        color = Color.White,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    )
+                    
+                    // Top searches grid (2x4 layout like screenshot)
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "🔍",
-                                style = MaterialTheme.typography.displayLarge
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Search for your favorite movies",
-                                style = MaterialTheme.typography.headlineSmall.copy(
-                                    color = TextPrimary
-                                ),
-                                textAlign = TextAlign.Center
+                        items(topSearches.take(8)) { media ->
+                            TopSearchCard(
+                                media = media,
+                                onClick = {
+                                    navController.navigate(Screen.Details.createRoute(media.uuid))
+                                }
                             )
                         }
                     }
-                }
-                
-                is SearchUiState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = NetflixRed)
-                    }
-                }
-                
-                is SearchUiState.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "Error searching movies",
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    color = TextPrimary
-                                ),
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = currentState.message,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = TextSecondary
-                                ),
-                                textAlign = TextAlign.Center
-                            )
+                } else {
+                    // Search Results
+                    Text(
+                        text = "Search Results",
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    
+                    val currentState = uiState
+                    when (currentState) {
+                        is SearchUiState.Loading -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = NetflixRed)
+                            }
                         }
-                    }
-                }
-                
-                is SearchUiState.Success -> {
-                    if (currentState.results.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
+                        
+                        is SearchUiState.Error -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "😔",
-                                    style = MaterialTheme.typography.displayLarge
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(
-                                    text = "No movies found for \"$searchQuery\"",
-                                    style = MaterialTheme.typography.headlineSmall.copy(
-                                        color = TextPrimary
-                                    ),
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Try searching with different keywords",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = TextSecondary
-                                    ),
+                                    text = "Error: ${currentState.message}",
+                                    color = Color.White,
                                     textAlign = TextAlign.Center
                                 )
                             }
                         }
-                    } else {
-                        // SIMPLIFIED movie grid
-                        LazyVerticalGrid(
-                            columns = GridCells.Adaptive(minSize = 160.dp),
-                            contentPadding = PaddingValues(24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier.fillMaxSize(),
-                            userScrollEnabled = true
-                        ) {
-                            items(currentState.results.filter { it.type == MediaType.MOVIE }) { media ->
-                                NetflixMovieCard(
-                                    media = media,
-                                    onClick = {
-                                        navController.navigate(Screen.Details.createRoute(media.uuid))
+                        
+                        is SearchUiState.Success -> {
+                            if (currentState.results.isEmpty()) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No results found for \"$searchQuery\"",
+                                        color = Color.White,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            } else {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Adaptive(minSize = 160.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(currentState.results.filter { it.type == MediaType.MOVIE }) { media ->
+                                        NetflixMovieCard(
+                                            media = media,
+                                            onClick = {
+                                                navController.navigate(Screen.Details.createRoute(media.uuid))
+                                            }
+                                        )
                                     }
-                                )
+                                }
                             }
                         }
+                        
+                        else -> {
+                            // Initial state - show top searches
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VirtualKey(
+    key: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isSpecial: Boolean = false
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    
+    Card(
+        modifier = modifier
+            .height(40.dp)
+            .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
+            .clickable { onClick() }
+            .then(
+                if (isFocused) {
+                    Modifier.border(2.dp, Color.White, RoundedCornerShape(6.dp))
+                } else {
+                    Modifier
+                }
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSpecial) Color.Gray.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.3f)
+        ),
+        shape = RoundedCornerShape(6.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (key == "space") "SPACE" else key.uppercase(),
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+@Composable
+private fun GenreItem(
+    genre: String,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
+            .clickable { onClick() }
+            .padding(vertical = 8.dp, horizontal = 12.dp)
+            .then(
+                if (isFocused) {
+                    Modifier.background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                } else {
+                    Modifier
+                }
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Genre icon (you can customize these)
+        Text(
+            text = when (genre) {
+                "Celebrate Pride" -> "🏳️‍🌈"
+                "Comedies" -> "😂"
+                "Action" -> "💥"
+                "Children & Family" -> "👨‍👩‍👧‍👦"
+                "Horror" -> "👻"
+                "Documentaries" -> "📽️"
+                "Anime" -> "🎌"
+                "Crime" -> "🔍"
+                else -> "🎬"
+            },
+            fontSize = 16.sp,
+            modifier = Modifier.padding(end = 12.dp)
+        )
+        
+        Text(
+            text = genre,
+            color = Color.White,
+            fontSize = 14.sp
+        )
+    }
+}
+
+@Composable
+private fun TopSearchCard(
+    media: Media,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    
+    Card(
+        modifier = Modifier
+            .aspectRatio(2f / 3f)
+            .focusable()
+            .onFocusChanged { isFocused = it.isFocused }
+            .clickable { onClick() }
+            .then(
+                if (isFocused) {
+                    Modifier.border(2.dp, Color.White, RoundedCornerShape(8.dp))
+                } else {
+                    Modifier
+                }
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Gray.copy(alpha = 0.3f)
+        ),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Movie Poster
+            AsyncImage(
+                model = ApiUtils.getPosterUrl(media),
+                contentDescription = media.title,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
+            
+            // Title overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Color.Black.copy(alpha = 0.7f),
+                        RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
+                    )
+                    .align(Alignment.BottomCenter)
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = media.title,
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            
+            // "TOP 10" badge (like in screenshot)
+            Surface(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .align(Alignment.TopEnd),
+                color = NetflixRed,
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text(
+                    text = "TOP\n10",
+                    color = Color.White,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
+            
+            // Rating badge if available
+            if (media.rating > 0) {
+                Surface(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .align(Alignment.TopStart),
+                    color = Color.Black.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD700),
+                            modifier = Modifier.size(10.dp)
+                        )
+                        Text(
+                            text = String.format("%.1f", media.rating),
+                            color = Color.White,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

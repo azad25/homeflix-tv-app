@@ -38,8 +38,6 @@ import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
-import com.homeflix.tv.BuildConfig
-
 /**
  * ULTRA-INSTANT LAN VIDEO PLAYER for Android TV
  *
@@ -61,7 +59,7 @@ import com.homeflix.tv.BuildConfig
  * - Optimized for unlimited LAN bandwidth
  */
 private fun getBaseUrl(): String {
-    return BuildConfig.BASE_URL.removeSuffix("/")
+    return "http://192.168.0.109:8252"
 }
 
 @UnstableApi
@@ -176,24 +174,25 @@ fun VideoPlayer(
                     // ULTRA-INSTANT LAN STREAMING OPTIMIZATION
                     // Netflix-level buffer settings for instant streaming
 
-                    // FIXED: Simplified video loading for better compatibility
-                    var mediaLoaded = false
-                    
-                    // Try multiple URL patterns for maximum compatibility
+                    // FIXED: Proper video loading with multiple URL attempts
                     val urlsToTry = listOf(
                         "${getBaseUrl()}/api/stream/${media.id}",
-                        "file://${media.filePath}"
+                        "${getBaseUrl()}/stream/${media.id}",
+                        "file://${media.filePath}",
+                        media.filePath // Direct file path
                     )
                     
+                    var mediaLoaded = false
                     for (streamUrl in urlsToTry) {
                         try {
+                            android.util.Log.d("VideoPlayer", "Trying URL: $streamUrl")
+                            
                             val mediaItem = MediaItem.Builder()
                                 .setUri(streamUrl)
                                 .build()
                             
                             setMediaItem(mediaItem)
                             prepare()
-                            mediaLoaded = true
                             
                             // Set start position if resuming
                             if (!forceStartFromBeginning && startTime > 0) {
@@ -203,18 +202,34 @@ fun VideoPlayer(
                             // Enable audio and auto-play
                             volume = 1f
                             playWhenReady = true
+                            mediaLoaded = true
                             
+                            android.util.Log.d("VideoPlayer", "Successfully loaded URL: $streamUrl")
                             break // Success, exit loop
                             
                         } catch (e: Exception) {
-                            // Continue to next URL
                             android.util.Log.w("VideoPlayer", "Failed to load URL: $streamUrl", e)
+                            // Continue to next URL
                         }
                     }
                     
                     if (!mediaLoaded) {
-                        // Final fallback - log error
                         android.util.Log.e("VideoPlayer", "Failed to load any video URL for media: ${media.id}")
+                        // Try a simple test URL as final fallback
+                        try {
+                            val testUrl = "${getBaseUrl()}/api/media/${media.id}/stream"
+                            android.util.Log.d("VideoPlayer", "Final attempt with: $testUrl")
+                            
+                            val mediaItem = MediaItem.Builder()
+                                .setUri(testUrl)
+                                .build()
+                            
+                            setMediaItem(mediaItem)
+                            prepare()
+                            playWhenReady = true
+                        } catch (e: Exception) {
+                            android.util.Log.e("VideoPlayer", "All video loading attempts failed", e)
+                        }
                     }
 
                     // Player event listeners

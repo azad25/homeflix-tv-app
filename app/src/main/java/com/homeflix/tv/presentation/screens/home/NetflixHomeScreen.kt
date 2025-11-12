@@ -55,70 +55,22 @@ fun NetflixHomeScreen(
     var currentFocusArea by remember { mutableStateOf(FocusArea.HERO) }
     var isInitialized by remember { mutableStateOf(false) }
     
-    // CRITICAL FIX: NO AUTO-FOCUS to prevent scroll issues
+    // NO AUTO-FOCUS - Let user control navigation naturally
     LaunchedEffect(uiState) {
         if (uiState is HomeUiState.Success && !isInitialized) {
             currentFocusArea = FocusArea.HERO
             isInitialized = true
-            
-            // MINIMAL delay, then focus hero WITHOUT scrolling
-            delay(50)
-            try {
-                heroPlayButtonFocusRequester.requestFocus()
-            } catch (e: Exception) {
-                // Let user navigate manually - no fallback focus
-            }
+            // NO automatic focus - let system handle it naturally
         }
     }
     
-    // NETFLIX-LEVEL Layout with professional navigation
+    // SIMPLIFIED Layout - let components handle their own focus
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown) {
-                    when (keyEvent.key) {
-                        Key.DirectionLeft -> {
-                            // ONLY move to sidebar from hero/content, and ONLY if not already in sidebar
-                            if (currentFocusArea != FocusArea.SIDEBAR) {
-                                currentFocusArea = FocusArea.SIDEBAR
-                                try {
-                                    sideNavFocusRequester.requestFocus()
-                                } catch (e: Exception) {
-                                    // Ignore focus errors
-                                }
-                                true
-                            } else {
-                                false // Let sidebar handle internal navigation
-                            }
-                        }
-                        Key.DirectionRight -> {
-                            // ALWAYS move from sidebar to hero/content
-                            if (currentFocusArea == FocusArea.SIDEBAR) {
-                                currentFocusArea = FocusArea.HERO
-                                try {
-                                    heroPlayButtonFocusRequester.requestFocus()
-                                } catch (e: Exception) {
-                                    // Fallback to content
-                                    currentFocusArea = FocusArea.CONTENT
-                                    try {
-                                        firstRowFocusRequester.requestFocus()
-                                    } catch (e2: Exception) {
-                                        // Ignore
-                                    }
-                                }
-                                true
-                            } else {
-                                false // Let content handle internal navigation
-                            }
-                        }
-                        else -> false
-                    }
-                } else false
-            }
     ) {
-        // NETFLIX-LEVEL SIDE NAVIGATION
+        // SIDE NAVIGATION with proper focus exit
         NetflixSideNavigation(
             selectedRoute = "home",
             onNavigate = { route ->
@@ -129,28 +81,43 @@ fun NetflixHomeScreen(
                 }
             },
             onNavigateToContent = {
+                // Exit sidebar and go to hero
                 currentFocusArea = FocusArea.HERO
                 try {
                     heroPlayButtonFocusRequester.requestFocus()
                 } catch (e: Exception) {
-                    // Fallback to content
+                    // Fallback to first content row
                     currentFocusArea = FocusArea.CONTENT
                     try {
                         firstRowFocusRequester.requestFocus()
                     } catch (e2: Exception) {
-                        // Ignore
+                        // Let user navigate manually
                     }
                 }
             },
             modifier = Modifier.focusRequester(sideNavFocusRequester)
         )
         
-        // Main content area with crash prevention
+        // Main content area with LEFT arrow navigation to sidebar
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .weight(1f)
                 .background(Color.Black)
+                .onKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
+                        // Move to sidebar when LEFT is pressed from content
+                        currentFocusArea = FocusArea.SIDEBAR
+                        try {
+                            sideNavFocusRequester.requestFocus()
+                        } catch (e: Exception) {
+                            // Ignore focus errors
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                }
         ) {
             // Wrap everything in a safe try-catch to prevent crashes
             val currentState = uiState

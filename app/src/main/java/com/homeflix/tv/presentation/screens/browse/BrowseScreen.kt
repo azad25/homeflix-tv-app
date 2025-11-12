@@ -54,45 +54,19 @@ fun BrowseScreen(
     val sideNavFocusRequester = remember { FocusRequester() }
     var currentFocusArea by remember { mutableStateOf(FocusArea.CONTENT) }
     
-    // FIXED: Start with grid focus, not sidebar
+    // NO AUTO-FOCUS - Let system handle focus naturally
     LaunchedEffect(Unit) {
-        delay(300) // Allow UI to settle
         currentFocusArea = FocusArea.CONTENT
-        // Let the grid handle focus naturally - don't force it
+        // No forced focus - let the grid handle it naturally
     }
     
-    // NETFLIX-LEVEL Layout with professional navigation
+    // SIMPLIFIED Layout - let components handle their own focus
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown) {
-                    when (keyEvent.key) {
-                        Key.DirectionLeft -> {
-                            if (currentFocusArea != FocusArea.SIDEBAR) {
-                                currentFocusArea = FocusArea.SIDEBAR
-                                try {
-                                    sideNavFocusRequester.requestFocus()
-                                } catch (e: Exception) {
-                                    // Ignore
-                                }
-                                true
-                            } else false
-                        }
-                        Key.DirectionRight -> {
-                            if (currentFocusArea == FocusArea.SIDEBAR) {
-                                currentFocusArea = FocusArea.CONTENT
-                                // Let the grid handle focus naturally
-                                true
-                            } else false
-                        }
-                        else -> false
-                    }
-                } else false
-            }
     ) {
-        // NETFLIX-LEVEL SIDE NAVIGATION
+        // SIDE NAVIGATION
         NetflixSideNavigation(
             selectedRoute = "browse",
             onNavigate = { route ->
@@ -103,9 +77,7 @@ fun BrowseScreen(
             },
             onNavigateToContent = {
                 currentFocusArea = FocusArea.CONTENT
-                // Let the grid handle focus naturally
-            },
-            modifier = Modifier.focusRequester(sideNavFocusRequester)
+            }
         )
         
         // Main Content - Netflix-style movie grid
