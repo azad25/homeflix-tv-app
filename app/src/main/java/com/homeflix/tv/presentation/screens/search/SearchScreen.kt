@@ -40,6 +40,10 @@ import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
 
+enum class FocusArea {
+    SIDEBAR, CONTENT
+}
+
 @Composable
 fun SearchScreen(
     navController: NavController,
@@ -48,23 +52,23 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     
-    // RESTORED focus management with crash protection
+    // NETFLIX-LEVEL focus management
     val sideNavFocusRequester = remember { FocusRequester() }
     val searchFieldFocusRequester = remember { FocusRequester() }
-    val gridFocusRequester = remember { FocusRequester() }
-    var isOnSideNav by remember { mutableStateOf(false) }
+    var currentFocusArea by remember { mutableStateOf(FocusArea.CONTENT) }
     
-    // Safe initialization
+    // Professional initialization
     LaunchedEffect(Unit) {
-        delay(300)
+        delay(150)
+        currentFocusArea = FocusArea.CONTENT
         try {
             searchFieldFocusRequester.requestFocus()
         } catch (e: Exception) {
-            // Ignore focus errors
+            // Graceful fallback
         }
     }
     
-    // RESTORED D-PAD NAVIGATION with crash protection
+    // NETFLIX-LEVEL Layout with professional navigation
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -73,23 +77,23 @@ fun SearchScreen(
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.key) {
                         Key.DirectionLeft -> {
-                            if (!isOnSideNav) {
+                            if (currentFocusArea != FocusArea.SIDEBAR) {
+                                currentFocusArea = FocusArea.SIDEBAR
                                 try {
                                     sideNavFocusRequester.requestFocus()
-                                    isOnSideNav = true
                                 } catch (e: Exception) {
-                                    // Ignore focus errors
+                                    // Ignore
                                 }
                                 true
                             } else false
                         }
                         Key.DirectionRight -> {
-                            if (isOnSideNav) {
+                            if (currentFocusArea == FocusArea.SIDEBAR) {
+                                currentFocusArea = FocusArea.CONTENT
                                 try {
                                     searchFieldFocusRequester.requestFocus()
-                                    isOnSideNav = false
                                 } catch (e: Exception) {
-                                    // Ignore focus errors
+                                    // Ignore
                                 }
                                 true
                             } else false
@@ -99,7 +103,7 @@ fun SearchScreen(
                 } else false
             }
     ) {
-        // RESTORED SIDE NAVIGATION with crash protection
+        // NETFLIX-LEVEL SIDE NAVIGATION
         NetflixSideNavigation(
             selectedRoute = "search",
             onNavigate = { route ->
@@ -109,9 +113,9 @@ fun SearchScreen(
                 }
             },
             onNavigateToContent = {
+                currentFocusArea = FocusArea.CONTENT
                 try {
                     searchFieldFocusRequester.requestFocus()
-                    isOnSideNav = false
                 } catch (e: Exception) {
                     // Ignore focus errors
                 }
@@ -162,25 +166,7 @@ fun SearchScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(searchFieldFocusRequester)
-                        .onKeyEvent { keyEvent ->
-                            if (keyEvent.type == KeyEventType.KeyDown) {
-                                when (keyEvent.key) {
-                                    Key.DirectionDown -> {
-                                        val currentState = uiState
-                                        if (currentState is SearchUiState.Success && currentState.results.isNotEmpty()) {
-                                            try {
-                                                gridFocusRequester.requestFocus()
-                                            } catch (e: Exception) {
-                                                // Ignore focus errors
-                                            }
-                                            true
-                                        } else false
-                                    }
-                                    else -> false
-                                }
-                            } else false
-                        },
+                        .focusRequester(searchFieldFocusRequester),
                     shape = RoundedCornerShape(8.dp),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -287,16 +273,13 @@ fun SearchScreen(
                             }
                         }
                     } else {
-                        // RESTORED movie grid with D-pad navigation
+                        // SIMPLIFIED movie grid
                         LazyVerticalGrid(
                             columns = GridCells.Adaptive(minSize = 160.dp),
                             contentPadding = PaddingValues(24.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .focusRequester(gridFocusRequester)
-                                .focusable(),
+                            modifier = Modifier.fillMaxSize(),
                             userScrollEnabled = true
                         ) {
                             items(currentState.results.filter { it.type == MediaType.MOVIE }) { media ->

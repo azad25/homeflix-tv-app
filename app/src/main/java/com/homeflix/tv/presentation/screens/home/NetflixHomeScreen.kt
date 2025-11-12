@@ -29,9 +29,13 @@ import com.homeflix.tv.presentation.theme.TextPrimary
 import kotlinx.coroutines.delay
 
 /**
- * SIMPLIFIED NETFLIX-STYLE HOME SCREEN - FIXED NAVIGATION
- * Based on sample TV apps - simple focus management
+ * NETFLIX-LEVEL Android TV Home Screen
+ * Professional focus management and navigation
  */
+
+enum class FocusArea {
+    SIDEBAR, HERO, CONTENT
+}
 @UnstableApi
 @Composable
 fun NetflixHomeScreen(
@@ -41,31 +45,36 @@ fun NetflixHomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     var currentHeroIndex by remember { mutableStateOf(0) }
     
-    // RESTORED Focus management with crash protection
+    // NETFLIX-LEVEL Focus Management
     val sideNavFocusRequester = remember { FocusRequester() }
     val heroPlayButtonFocusRequester = remember { FocusRequester() }
     val firstRowFocusRequester = remember { FocusRequester() }
     
-    var isOnSideNav by remember { mutableStateOf(false) }
-    var isOnHero by remember { mutableStateOf(true) }
+    // Professional focus state management
+    var currentFocusArea by remember { mutableStateOf(FocusArea.HERO) }
     var isInitialized by remember { mutableStateOf(false) }
     
-    // SAFE initialization with error handling
+    // Netflix-style initialization with proper state management
     LaunchedEffect(uiState) {
         if (uiState is HomeUiState.Success && !isInitialized) {
-            delay(300)
+            delay(200) // Professional timing for UI stability
+            currentFocusArea = FocusArea.HERO
             try {
                 heroPlayButtonFocusRequester.requestFocus()
-                isOnHero = true
-                isOnSideNav = false
             } catch (e: Exception) {
-                // Ignore focus errors - let Android TV handle it
+                // Graceful fallback
+                currentFocusArea = FocusArea.CONTENT
+                try {
+                    firstRowFocusRequester.requestFocus()
+                } catch (e2: Exception) {
+                    // Final fallback - let system handle
+                }
             }
             isInitialized = true
         }
     }
     
-    // RESTORED D-PAD NAVIGATION with crash protection
+    // NETFLIX-LEVEL Layout with professional navigation
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -74,11 +83,10 @@ fun NetflixHomeScreen(
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.key) {
                         Key.DirectionLeft -> {
-                            if (!isOnSideNav) {
+                            if (currentFocusArea != FocusArea.SIDEBAR) {
+                                currentFocusArea = FocusArea.SIDEBAR
                                 try {
                                     sideNavFocusRequester.requestFocus()
-                                    isOnSideNav = true
-                                    isOnHero = false
                                 } catch (e: Exception) {
                                     // Ignore focus errors
                                 }
@@ -86,16 +94,18 @@ fun NetflixHomeScreen(
                             } else false
                         }
                         Key.DirectionRight -> {
-                            if (isOnSideNav) {
+                            if (currentFocusArea == FocusArea.SIDEBAR) {
+                                currentFocusArea = FocusArea.HERO
                                 try {
-                                    if (isOnHero) {
-                                        heroPlayButtonFocusRequester.requestFocus()
-                                    } else {
-                                        firstRowFocusRequester.requestFocus()
-                                    }
-                                    isOnSideNav = false
+                                    heroPlayButtonFocusRequester.requestFocus()
                                 } catch (e: Exception) {
-                                    // Ignore focus errors
+                                    // Fallback to content
+                                    currentFocusArea = FocusArea.CONTENT
+                                    try {
+                                        firstRowFocusRequester.requestFocus()
+                                    } catch (e2: Exception) {
+                                        // Ignore
+                                    }
                                 }
                                 true
                             } else false
@@ -105,7 +115,7 @@ fun NetflixHomeScreen(
                 } else false
             }
     ) {
-        // RESTORED SIDE NAVIGATION with crash protection
+        // NETFLIX-LEVEL SIDE NAVIGATION
         NetflixSideNavigation(
             selectedRoute = "home",
             onNavigate = { route ->
@@ -116,12 +126,17 @@ fun NetflixHomeScreen(
                 }
             },
             onNavigateToContent = {
+                currentFocusArea = FocusArea.HERO
                 try {
                     heroPlayButtonFocusRequester.requestFocus()
-                    isOnHero = true
-                    isOnSideNav = false
                 } catch (e: Exception) {
-                    // Ignore focus errors
+                    // Fallback to content
+                    currentFocusArea = FocusArea.CONTENT
+                    try {
+                        firstRowFocusRequester.requestFocus()
+                    } catch (e2: Exception) {
+                        // Ignore
+                    }
                 }
             },
             modifier = Modifier.focusRequester(sideNavFocusRequester)
@@ -224,9 +239,9 @@ fun NetflixHomeScreen(
                                     },
                                     playButtonFocusRequester = heroPlayButtonFocusRequester,
                                     onNavigateDown = {
+                                        currentFocusArea = FocusArea.CONTENT
                                         try {
                                             firstRowFocusRequester.requestFocus()
-                                            isOnHero = false
                                         } catch (e: Exception) {
                                             // Ignore focus errors
                                         }
@@ -257,9 +272,9 @@ fun NetflixHomeScreen(
                                         },
                                         focusRequester = firstRowFocusRequester,
                                         onNavigateUp = {
+                                            currentFocusArea = FocusArea.HERO
                                             try {
                                                 heroPlayButtonFocusRequester.requestFocus()
-                                                isOnHero = true
                                             } catch (e: Exception) {
                                                 // Ignore focus errors
                                             }
@@ -282,9 +297,9 @@ fun NetflixHomeScreen(
                                         if (currentState.continueWatching.isNotEmpty()) {
                                             firstRowFocusRequester.requestFocus()
                                         } else {
+                                            currentFocusArea = FocusArea.HERO
                                             try {
                                                 heroPlayButtonFocusRequester.requestFocus()
-                                                isOnHero = true
                                             } catch (e: Exception) {
                                                 // Ignore focus errors
                                             }

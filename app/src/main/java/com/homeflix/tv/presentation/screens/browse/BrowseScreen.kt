@@ -39,6 +39,10 @@ import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
 
+enum class FocusArea {
+    SIDEBAR, CONTENT
+}
+
 @Composable
 fun BrowseScreen(
     navController: NavController,
@@ -46,22 +50,13 @@ fun BrowseScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    // RESTORED focus management with crash protection
+    // NETFLIX-LEVEL focus management
     val sideNavFocusRequester = remember { FocusRequester() }
-    val gridFocusRequester = remember { FocusRequester() }
-    var isOnSideNav by remember { mutableStateOf(false) }
+    var currentFocusArea by remember { mutableStateOf(FocusArea.CONTENT) }
     
-    // Safe initialization
-    LaunchedEffect(Unit) {
-        delay(300)
-        try {
-            gridFocusRequester.requestFocus()
-        } catch (e: Exception) {
-            // Ignore focus errors
-        }
-    }
+    // Professional initialization - let content be naturally focusable
     
-    // RESTORED D-PAD NAVIGATION with crash protection
+    // NETFLIX-LEVEL Layout with professional navigation
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -70,24 +65,20 @@ fun BrowseScreen(
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.key) {
                         Key.DirectionLeft -> {
-                            if (!isOnSideNav) {
+                            if (currentFocusArea != FocusArea.SIDEBAR) {
+                                currentFocusArea = FocusArea.SIDEBAR
                                 try {
                                     sideNavFocusRequester.requestFocus()
-                                    isOnSideNav = true
                                 } catch (e: Exception) {
-                                    // Ignore focus errors
+                                    // Ignore
                                 }
                                 true
                             } else false
                         }
                         Key.DirectionRight -> {
-                            if (isOnSideNav) {
-                                try {
-                                    gridFocusRequester.requestFocus()
-                                    isOnSideNav = false
-                                } catch (e: Exception) {
-                                    // Ignore focus errors
-                                }
+                            if (currentFocusArea == FocusArea.SIDEBAR) {
+                                currentFocusArea = FocusArea.CONTENT
+                                // Let the grid handle focus naturally
                                 true
                             } else false
                         }
@@ -96,7 +87,7 @@ fun BrowseScreen(
                 } else false
             }
     ) {
-        // RESTORED SIDE NAVIGATION with crash protection
+        // NETFLIX-LEVEL SIDE NAVIGATION
         NetflixSideNavigation(
             selectedRoute = "browse",
             onNavigate = { route ->
@@ -106,12 +97,8 @@ fun BrowseScreen(
                 }
             },
             onNavigateToContent = {
-                try {
-                    gridFocusRequester.requestFocus()
-                    isOnSideNav = false
-                } catch (e: Exception) {
-                    // Ignore focus errors
-                }
+                currentFocusArea = FocusArea.CONTENT
+                // Let the grid handle focus naturally
             },
             modifier = Modifier.focusRequester(sideNavFocusRequester)
         )
@@ -177,16 +164,13 @@ fun BrowseScreen(
                 }
                 
                 is BrowseUiState.Success -> {
-                    // RESTORED movie grid with D-pad navigation
+                    // SIMPLIFIED movie grid
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 160.dp),
                         contentPadding = PaddingValues(24.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .focusRequester(gridFocusRequester)
-                            .focusable(),
+                        modifier = Modifier.fillMaxSize(),
                         userScrollEnabled = true
                     ) {
                         // Combine all movies from different sections

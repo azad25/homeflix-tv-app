@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 data class NavItem(
     val icon: ImageVector,
@@ -28,8 +29,8 @@ data class NavItem(
 )
 
 /**
- * RESTORED Netflix-style side navigation with SAFE D-pad navigation
- * Proper navigation without crashes
+ * NETFLIX-LEVEL Android TV Side Navigation
+ * Professional focus management with proper state handling
  */
 @Composable
 fun NetflixSideNavigation(
@@ -44,10 +45,28 @@ fun NetflixSideNavigation(
         NavItem(Icons.Default.List, "browse", "Browse Movies")
     )
     
-    var focusedIndex by remember { mutableStateOf(1) } // Start with Home focused
-    val focusRequesters = remember { List(navItems.size) { FocusRequester() } }
+    // Professional focus state management
+    var focusedIndex by remember { mutableStateOf(navItems.indexOfFirst { it.route == selectedRoute }.takeIf { it >= 0 } ?: 1) }
+    val focusRequesters = remember(navItems.size) { List(navItems.size) { FocusRequester() } }
+    var isInitialized by remember { mutableStateOf(false) }
     
-    // RESTORED D-PAD NAVIGATION - CRASH-PROOF VERSION
+    // Netflix-style initialization with proper timing
+    LaunchedEffect(selectedRoute) {
+        if (!isInitialized) {
+            delay(100) // Short delay for UI stability
+            val targetIndex = navItems.indexOfFirst { it.route == selectedRoute }.takeIf { it >= 0 } ?: 1
+            focusedIndex = targetIndex
+            try {
+                focusRequesters[targetIndex].requestFocus()
+                isInitialized = true
+            } catch (e: Exception) {
+                // Graceful fallback
+                isInitialized = true
+            }
+        }
+    }
+    
+    // Professional D-pad navigation with proper bounds checking
     Column(
         modifier = modifier
             .width(48.dp)
@@ -58,10 +77,11 @@ fun NetflixSideNavigation(
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.key) {
                         Key.DirectionUp -> {
-                            if (focusedIndex > 0) {
-                                focusedIndex--
+                            val newIndex = (focusedIndex - 1).coerceAtLeast(0)
+                            if (newIndex != focusedIndex) {
+                                focusedIndex = newIndex
                                 try {
-                                    focusRequesters[focusedIndex].requestFocus()
+                                    focusRequesters[newIndex].requestFocus()
                                 } catch (e: Exception) {
                                     // Ignore focus errors
                                 }
@@ -69,10 +89,11 @@ fun NetflixSideNavigation(
                             true
                         }
                         Key.DirectionDown -> {
-                            if (focusedIndex < navItems.size - 1) {
-                                focusedIndex++
+                            val newIndex = (focusedIndex + 1).coerceAtMost(navItems.size - 1)
+                            if (newIndex != focusedIndex) {
+                                focusedIndex = newIndex
                                 try {
-                                    focusRequesters[focusedIndex].requestFocus()
+                                    focusRequesters[newIndex].requestFocus()
                                 } catch (e: Exception) {
                                     // Ignore focus errors
                                 }
@@ -105,7 +126,7 @@ fun NetflixSideNavigation(
                 },
                 focusRequester = focusRequesters[index],
                 onFocusChanged = { focused ->
-                    if (focused) {
+                    if (focused && focusedIndex != index) {
                         focusedIndex = index
                     }
                 }
