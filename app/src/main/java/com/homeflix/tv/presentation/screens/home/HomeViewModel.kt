@@ -60,8 +60,7 @@ class HomeViewModel @Inject constructor(
                 // Test basic connectivity first
                 Log.d("HomeViewModel", "Starting to load home content from: ${BuildConfig.BASE_URL}")
                 
-                // Load movies content - ALWAYS show latest content in hero slider
-                // Uses /api/media/movies?limit=100 and prioritizes newest movies first (like browse screen)
+                // Load movies content first
                 mediaRepository.getMovies(limit = 100).collect { result ->
                     result.fold(
                         onSuccess = { movies ->
@@ -70,6 +69,8 @@ class HomeViewModel @Inject constructor(
                                 return@collect
                             }
                         
+                            Log.d("HomeViewModel", "Movies loaded: ${movies.size}")
+                            
                             // EXACTLY like web app: Sort by creation date for latest content
                             val sortedByDate = movies.sortedByDescending { 
                                 it.createdAt?.time ?: it.id.toLong() // Use creation date or ID as fallback
@@ -96,11 +97,15 @@ class HomeViewModel @Inject constructor(
                                 Log.d("HomeViewModel", "Cached ${movies.size} movies")
                             }
                             
+                            // Load recently watched data BEFORE updating UI
+                            Log.d("HomeViewModel", "Loading recently watched data...")
                             val continueWatchingItems = fetchContinueWatching()
+                            Log.d("HomeViewModel", "Continue watching items loaded: ${continueWatchingItems.size}")
                             
+                            // Update UI with ALL data loaded (movies + recently watched)
                             _uiState.value = HomeUiState.Success(
                                 featuredMedia = featuredMedia, // ALWAYS latest content for hero slider
-                                continueWatching = continueWatchingItems,
+                                continueWatching = continueWatchingItems, // Loaded synchronously
                                 trendingMovies = trendingMovies,
                                 popularMovies = popularMovies,
                                 latestMovies = latestMovies,
@@ -196,47 +201,150 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun fetchContinueWatching(): List<ContinueWatchingItem> {
         return try {
-            Log.d("HomeViewModel", "Fetching continue watching from API")
+            Log.d("HomeViewModel", "=== FETCHING CONTINUE WATCHING ===")
+            Log.d("HomeViewModel", "API Base URL: ${BuildConfig.BASE_URL}")
             
-            // Use the new recently watched API
             var continueWatchingItems = emptyList<ContinueWatchingItem>()
             
-            mediaRepository.getRecentlyWatchedWithProgress().collect { result ->
-                result.fold(
-                    onSuccess = { recentlyWatchedItems ->
-                        continueWatchingItems = recentlyWatchedItems.map { item ->
-                            val progressPercent = if (item.durationSeconds > 0) {
-                                (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
-                            } else {
-                                0f
+            // Use a single collect to avoid Flow exceptions with timeout
+            try {
+                // Add timeout to prevent hanging
+                kotlinx.coroutines.withTimeout(10000) { // 10 second timeout
+                    mediaRepository.getRecentlyWatchedWithProgress().collect { result ->
+                    result.fold(
+                        onSuccess = { recentlyWatchedItems ->
+                            Log.d("HomeViewModel", "Raw recently watched items: ${recentlyWatchedItems.size}")
+                            
+                            if (recentlyWatchedItems.isNotEmpty()) {
+                                val firstItem = recentlyWatchedItems[0]
+                                Log.d("HomeViewModel", "First item: ${firstItem.media.title} - ${firstItem.progressSeconds}s/${firstItem.durationSeconds}s")
                             }
                             
-                            val lastWatchedText = formatLastWatched(item.lastWatchedAt)
+                            continueWatchingItems = try {
+                                // Null safety check first
+                                if (recentlyWatchedItems.isNullOrEmpty()) {
+                                    Log.d("HomeViewModel", "No recently watched items to process")
+                                    emptyList()
+                                } else {
+                                    recentlyWatchedItems
+                                        .filterNotNull() // Remove any null items
+                                        .filter { item ->
+                                            try {
+                                                // Comprehensive validation with null safety
+                                                val isValid = item.media != null &&
+                                                             item.media.id > 0 && 
+                                                             !item.media.title.isNullOrBlank() && 
+                                                             item.durationSeconds > 0 &&
+                                                             item.progressSeconds >= 0 && // Allow 0 progress
+                                                             item.lastWatchedAt != null
+                                                
+                                                if (!isValid) {
+                                                    Log.w("HomeViewModel", "Filtering out invalid item: mediaId=${item.mediaId}, title='${item.media?.title}', duration=${item.durationSeconds}, progress=${item.progressSeconds}")
+                                                }
+                                                
+                                                isValid
+                                            } catch (e: Exception) {
+                                                Log.e("HomeViewModel", "Error validating item ${item.mediaId}: ${e.message}")
+                                                false // Filter out items that cause validation errors
+                                            }
+                                        }
+                                        .sortedByDescending { item ->
+                                            try {
+                                                // Safe sorting with null check
+                                                item.lastWatchedAt?.time ?: 0L
+                                            } catch (e: Exception) {
+                                                Log.w("HomeViewModel", "Error sorting item ${item.mediaId}: ${e.message}")
+                                                0L // Default to oldest if sorting fails
+                                            }
+                                        }
+                                        .take(10) // Safely limit to 10 items
+                                        .mapNotNull { item -> // Use mapNotNull to handle any mapping failures
+                                            try {
+                                                val progressPercent = if (item.durationSeconds > 0) {
+                                                    (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
+                                                } else {
+                                                    0f
+                                                }
+                                                
+                                                val lastWatchedText = try {
+                                                    formatLastWatchedFromDate(item.lastWatchedAt)
+                                                } catch (e: Exception) {
+                                                    Log.w("HomeViewModel", "Error formatting date for item ${item.mediaId}: ${e.message}")
+                                                    "Recently" // Fallback text
+                                                }
+                                                
+                                                Log.d("HomeViewModel", "Processing: ${item.media.title} - ${(progressPercent * 100).toInt()}%")
+                                                
+                                                ContinueWatchingItem(
+                                                    media = item.media,
+                                                    progress = progressPercent,
+                                                    lastWatched = lastWatchedText
+                                                )
+                                            } catch (e: Exception) {
+                                                Log.e("HomeViewModel", "Error processing item ${item.mediaId}: ${e.message}")
+                                                null // This item will be filtered out by mapNotNull
+                                            }
+                                        }
+                                }
+                            } catch (e: Exception) {
+                                Log.e("HomeViewModel", "Error processing recently watched items: ${e.message}", e)
+                                emptyList() // Return empty list if processing fails
+                            }
                             
-                            ContinueWatchingItem(
-                                media = item.media,
-                                progress = progressPercent,
-                                lastWatched = lastWatchedText
-                            )
+                            Log.d("HomeViewModel", "Successfully processed ${continueWatchingItems.size} continue watching items")
+                        },
+                        onFailure = { error ->
+                            Log.e("HomeViewModel", "API Error fetching continue watching: ${error.message}", error)
+                            continueWatchingItems = emptyList()
                         }
-                        Log.d("HomeViewModel", "Successfully loaded ${continueWatchingItems.size} continue watching items")
-                    },
-                    onFailure = { error ->
-                        Log.e("HomeViewModel", "Error fetching continue watching", error)
-                        // Return empty list on error
-                        continueWatchingItems = emptyList()
-                    }
-                )
+                    )
+                }
+                }
+            } catch (timeoutException: kotlinx.coroutines.TimeoutCancellationException) {
+                Log.e("HomeViewModel", "Timeout fetching continue watching data (10s)")
+                continueWatchingItems = emptyList()
+            } catch (flowException: Exception) {
+                Log.e("HomeViewModel", "Flow exception in fetchContinueWatching: ${flowException.message}", flowException)
+                continueWatchingItems = emptyList()
             }
             
             continueWatchingItems
         } catch (e: Exception) {
-            Log.e("HomeViewModel", "Error fetching continue watching: ${e.message}")
+            Log.e("HomeViewModel", "General exception in fetchContinueWatching: ${e.message}", e)
             emptyList()
         }
     }
     
-    private fun formatLastWatched(date: java.util.Date): String {
+    /**
+     * Format last watched date from API string format (e.g., "2025-11-13T07:20:52+06:00")
+     */
+    private fun formatLastWatched(dateString: String): String {
+        return try {
+            // Parse the date string (handles timezone offset)
+            val date = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.getDefault())
+                .parse(dateString) ?: return "Unknown"
+            
+            val now = java.util.Date()
+            val diffMs = now.time - date.time
+            val diffHours = diffMs / (1000 * 60 * 60)
+            val diffDays = diffHours / 24
+            
+            when {
+                diffHours < 1 -> "Just now"
+                diffHours < 24 -> "${diffHours}h ago"
+                diffDays < 7 -> "${diffDays}d ago"
+                else -> java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault()).format(date)
+            }
+        } catch (e: Exception) {
+            Log.w("HomeViewModel", "Error parsing date: $dateString", e)
+            "Recently"
+        }
+    }
+    
+    /**
+     * Format last watched date from Date object (legacy method)
+     */
+    private fun formatLastWatchedFromDate(date: java.util.Date): String {
         val now = java.util.Date()
         val diffMs = now.time - date.time
         val diffHours = diffMs / (1000 * 60 * 60)
@@ -302,6 +410,70 @@ class HomeViewModel @Inject constructor(
         val currentState = _uiState.value
         if (currentState is HomeUiState.Success) {
             _uiState.value = currentState.copy(currentHeroIndex = index)
+        }
+    }
+    
+    fun refreshRecentlyWatched() {
+        viewModelScope.launch {
+            Log.d("HomeViewModel", "Manual refresh of recently watched triggered")
+            try {
+                val continueWatchingItems = fetchContinueWatching()
+                Log.d("HomeViewModel", "Manual refresh loaded ${continueWatchingItems.size} items")
+                
+                val currentState = _uiState.value
+                if (currentState is HomeUiState.Success) {
+                    _uiState.value = currentState.copy(continueWatching = continueWatchingItems)
+                }
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error during manual refresh", e)
+            }
+        }
+    }
+    
+    fun testRecentlyWatchedAPI() {
+        viewModelScope.launch {
+            Log.d("HomeViewModel", "=== TESTING RECENTLY WATCHED API ===")
+            try {
+                // Direct API test with collect (avoiding first())
+                mediaRepository.getRecentlyWatchedWithProgress().collect { result ->
+                    result.fold(
+                        onSuccess = { items ->
+                            Log.d("HomeViewModel", "✅ API Test SUCCESS: ${items.size} items")
+                            items.forEachIndexed { index, item ->
+                                Log.d("HomeViewModel", "Item $index: ${item.media.title} - ${item.progressSeconds}s/${item.durationSeconds}s")
+                                Log.d("HomeViewModel", "  Media ID: ${item.media.id}, Type: ${item.media.type}")
+                                Log.d("HomeViewModel", "  Last Watched: ${item.lastWatchedAt}")
+                            }
+                            
+                            // Force update UI with test data
+                            val currentState = _uiState.value
+                            if (currentState is HomeUiState.Success) {
+                                val testContinueWatching = items.map { item ->
+                                    val progressPercent = if (item.durationSeconds > 0) {
+                                        (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
+                                    } else {
+                                        0f
+                                    }
+                                    
+                                    ContinueWatchingItem(
+                                        media = item.media,
+                                        progress = progressPercent,
+                                        lastWatched = formatLastWatchedFromDate(item.lastWatchedAt)
+                                    )
+                                }
+                                
+                                Log.d("HomeViewModel", "🔄 Forcing UI update with ${testContinueWatching.size} items")
+                                _uiState.value = currentState.copy(continueWatching = testContinueWatching)
+                            }
+                        },
+                        onFailure = { error ->
+                            Log.e("HomeViewModel", "❌ API Test FAILED: ${error.message}", error)
+                        }
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "❌ API Test EXCEPTION: ${e.message}", e)
+            }
         }
     }
 }

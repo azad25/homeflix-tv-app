@@ -51,11 +51,13 @@ fun HomeFlixNavigation(
             val mediaId = backStackEntry.arguments?.getString("mediaId")?.toIntOrNull() ?: 0
             val startTime = backStackEntry.arguments?.getString("startTime")?.toLongOrNull() ?: 0L
             val forceStart = backStackEntry.arguments?.getString("forceStart")?.toBooleanStrictOrNull() ?: false
+            val resume = backStackEntry.arguments?.getString("resume")?.toBooleanStrictOrNull() ?: false
             
             VideoPlayerScreen(
                 mediaId = mediaId,
                 startTime = startTime,
                 forceStartFromBeginning = forceStart,
+                resumeFromProgress = resume,
                 onNavigateBack = {
                     navController.popBackStack()
                 }
@@ -78,12 +80,13 @@ sealed class Screen(val route: String) {
             }
         )
     }
-    object VideoPlayer : Screen("player/{mediaId}?startTime={startTime}&forceStart={forceStart}") {
+    object VideoPlayer : Screen("player/{mediaId}?startTime={startTime}&forceStart={forceStart}&resume={resume}") {
         fun createRoute(
             mediaId: Int, 
             startTime: Long = 0L, 
-            forceStartFromBeginning: Boolean = false
-        ) = "player/$mediaId?startTime=$startTime&forceStart=$forceStartFromBeginning"
+            forceStartFromBeginning: Boolean = false,
+            resumeFromProgress: Boolean = false
+        ) = "player/$mediaId?startTime=$startTime&forceStart=$forceStartFromBeginning&resume=$resumeFromProgress"
         
         val arguments = listOf(
             androidx.navigation.navArgument("mediaId") {
@@ -94,6 +97,10 @@ sealed class Screen(val route: String) {
                 defaultValue = "0"
             },
             androidx.navigation.navArgument("forceStart") {
+                type = androidx.navigation.NavType.StringType
+                defaultValue = "false"
+            },
+            androidx.navigation.navArgument("resume") {
                 type = androidx.navigation.NavType.StringType
                 defaultValue = "false"
             }

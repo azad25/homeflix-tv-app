@@ -91,8 +91,19 @@ data class MediaDto(
     val tmdbPosterUrl: String? = null,
     @SerializedName("tmdb_trailer_url")
     val tmdbTrailerUrl: String? = null,
+    @SerializedName("tmdb_id")
+    val tmdbId: Int? = null,
     
-
+    // Episode-specific fields
+    @SerializedName("series_id")
+    val seriesId: Int? = null,
+    @SerializedName("season_number")
+    val seasonNumber: Int? = null,
+    @SerializedName("episode_number")
+    val episodeNumber: Int? = null,
+    @SerializedName("season_number_legacy")
+    val seasonNumberLegacy: Int? = null,
+    val episode: Int? = null,
     
     // Subtitles
     val subtitles: List<SubtitleDto>? = null,
@@ -139,7 +150,11 @@ fun MediaDto.toDomain(): Media {
         uuid = uuid,
         title = title,
         originalTitle = originalTitle,
-        type = MediaType.MOVIE, // Only movies supported
+        type = when (type.lowercase()) {
+            "movie" -> MediaType.MOVIE
+            "episode" -> MediaType.EPISODE
+            else -> MediaType.MOVIE
+        },
         filePath = filePath,
         fileSize = fileSize,
         duration = duration,
@@ -189,6 +204,14 @@ fun MediaDto.toDomain(): Media {
         tmdbBackdropUrl = tmdbBackdropUrl,
         tmdbPosterUrl = tmdbPosterUrl,
         tmdbTrailerUrl = tmdbTrailerUrl,
+        tmdbId = tmdbId,
+        
+        // Episode-specific fields
+        seriesId = seriesId,
+        seasonNumber = seasonNumber,
+        episodeNumber = episodeNumber,
+        seasonNumberLegacy = seasonNumberLegacy,
+        episode = episode,
 
         subtitles = subtitles?.map { it.toDomain() } ?: emptyList(),
         viewCount = viewCount,

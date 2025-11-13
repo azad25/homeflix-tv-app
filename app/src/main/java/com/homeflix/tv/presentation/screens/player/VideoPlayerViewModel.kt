@@ -20,7 +20,7 @@ class VideoPlayerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<VideoPlayerUiState>(VideoPlayerUiState.Loading)
     val uiState: StateFlow<VideoPlayerUiState> = _uiState.asStateFlow()
     
-    fun loadMedia(mediaId: Int) {
+    fun loadMedia(mediaId: Int, resumeFromProgress: Boolean = false) {
         viewModelScope.launch {
             _uiState.value = VideoPlayerUiState.Loading
             
@@ -29,7 +29,12 @@ class VideoPlayerViewModel @Inject constructor(
                     if (result.isSuccess) {
                         val media = result.getOrNull()
                         if (media != null) {
-                            _uiState.value = VideoPlayerUiState.Success(media)
+                            // If resumeFromProgress is true, load the saved progress
+                            if (resumeFromProgress) {
+                                loadSavedProgress(media)
+                            } else {
+                                _uiState.value = VideoPlayerUiState.Success(media, null)
+                            }
                         } else {
                             _uiState.value = VideoPlayerUiState.Error("Media not found")
                         }
@@ -46,6 +51,31 @@ class VideoPlayerViewModel @Inject constructor(
         }
     }
     
+    private suspend fun loadSavedProgress(media: Media) {
+        try {
+            // Get recently watched items to find saved progress
+            mediaRepository.getRecentlyWatchedWithProgress().collect { result ->
+                result.fold(
+                    onSuccess = { recentlyWatchedItems ->
+                        val savedProgress = recentlyWatchedItems
+                            .find { it.mediaId == media.id }
+                            ?.progressSeconds
+                        
+                        Log.d("VideoPlayerViewModel", "Found saved progress for media ${media.id}: ${savedProgress}s")
+                        _uiState.value = VideoPlayerUiState.Success(media, savedProgress)
+                    },
+                    onFailure = { error ->
+                        Log.w("VideoPlayerViewModel", "Failed to load saved progress: ${error.message}")
+                        _uiState.value = VideoPlayerUiState.Success(media, null)
+                    }
+                )
+            }
+        } catch (e: Exception) {
+            Log.w("VideoPlayerViewModel", "Error loading saved progress", e)
+            _uiState.value = VideoPlayerUiState.Success(media, null)
+        }
+    }
+    
     fun updateProgress(currentTime: Long, duration: Long) {
         // Progress updates are now handled only on player close for performance
         // No frequent API calls during playback
@@ -58,5 +88,8 @@ class VideoPlayerViewModel @Inject constructor(
 sealed class VideoPlayerUiState {
     object Loading : VideoPlayerUiState()
     data class Error(val message: String) : VideoPlayerUiState()
-    data class Success(val media: Media) : VideoPlayerUiState()
+    data class Success(
+        val media: Media,
+        val savedProgressSeconds: Long? = null // Saved progress in seconds
+    ) : VideoPlayerUiState()
 }

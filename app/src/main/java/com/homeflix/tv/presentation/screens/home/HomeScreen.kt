@@ -77,6 +77,9 @@ fun HomeScreen(
             }
             
             is HomeUiState.Success -> {
+                // Debug logging for UI updates
+                android.util.Log.d("HomeScreen", "UI Success state: ${currentState.continueWatching.size} continue watching items")
+                
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(24.dp)
@@ -96,18 +99,62 @@ fun HomeScreen(
                         }
                     }
                     
-                    // Continue Watching
-                    if (currentState.continueWatching.isNotEmpty()) {
-                        item {
+                    // Continue Watching - Always show for debugging
+                    item {
+                        if (currentState.continueWatching.isNotEmpty()) {
+                            android.util.Log.d("HomeScreen", "Rendering ContinueWatchingRow with ${currentState.continueWatching.size} items")
                             ContinueWatchingRow(
                                 continueWatchingItems = currentState.continueWatching,
                                 onPlay = { media ->
-                                    navController.navigate(Screen.VideoPlayer.createRoute(media.id))
+                                    try {
+                                        navController.navigate(Screen.VideoPlayer.createRoute(media.id, resumeFromProgress = true))
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("HomeScreen", "Error navigating to video player: ${e.message}")
+                                    }
                                 },
                                 onInfo = { media ->
-                                    navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                    try {
+                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("HomeScreen", "Error navigating to details: ${e.message}")
+                                    }
                                 }
                             )
+                        } else {
+                            // Debug: Show empty state with more info
+                            Column(
+                                modifier = Modifier.padding(horizontal = 60.dp)
+                            ) {
+                                Text(
+                                    text = "Continue Watching",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+                                Text(
+                                    text = "No recently watched items found.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Text(
+                                    text = "Debug Info: ${currentState.continueWatching.size} items loaded",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                )
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Button(
+                                    onClick = { 
+                                        android.util.Log.d("HomeScreen", "Refresh button clicked")
+                                        viewModel.refreshRecentlyWatched()
+                                    }
+                                ) {
+                                    Text("Refresh")
+                                }
+                            }
                         }
                     }
                     

@@ -72,8 +72,14 @@ data class Media(
     val tmdbBackdropUrl: String? = null,
     val tmdbPosterUrl: String? = null,
     val tmdbTrailerUrl: String? = null,
+    val tmdbId: Int? = null,
     
-
+    // Episode-specific fields
+    val seriesId: Int? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val seasonNumberLegacy: Int? = null, // For backward compatibility
+    val episode: Int? = null, // For backward compatibility
     
     // Subtitles
     val subtitles: List<Subtitle> = emptyList(),
@@ -89,7 +95,8 @@ data class Media(
 ) : Parcelable
 
 enum class MediaType {
-    MOVIE
+    MOVIE,
+    EPISODE
 }
 
 @Parcelize

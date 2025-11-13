@@ -177,13 +177,25 @@ fun ViewHistoryDto.toDomain(): ViewHistory {
 }
 
 fun RecentlyWatchedItemDto.toDomain(): RecentlyWatchedItem {
-    val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+    // Handle multiple date formats from API
+    val parsedDate = try {
+        // Try with timezone offset first (e.g., "2025-11-13T07:20:52+06:00")
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).parse(lastWatchedAt)
+    } catch (e: Exception) {
+        try {
+            // Fallback to Z format
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).parse(lastWatchedAt)
+        } catch (e2: Exception) {
+            // Final fallback to current date
+            Date()
+        }
+    }
     
     return RecentlyWatchedItem(
         id = id,
         mediaId = mediaId,
         userId = userId,
-        lastWatchedAt = dateFormat.parse(lastWatchedAt) ?: Date(),
+        lastWatchedAt = parsedDate ?: Date(),
         progressSeconds = progressSeconds,
         durationSeconds = durationSeconds,
         media = media.toDomain()

@@ -159,17 +159,38 @@ class MediaRepository @Inject constructor(
     // Recently watched with progress (matching web app)
     fun getRecentlyWatchedWithProgress(): Flow<Result<List<RecentlyWatchedItem>>> = flow {
         try {
+            Log.d("MediaRepository", "Calling getRecentlyWatchedWithProgress API...")
+            Log.d("MediaRepository", "Base URL: ${com.homeflix.tv.BuildConfig.BASE_URL}")
+            Log.d("MediaRepository", "Full URL should be: ${com.homeflix.tv.BuildConfig.BASE_URL}playback/recently-watched")
+            
             val response = apiService.getRecentlyWatchedWithProgress()
+            Log.d("MediaRepository", "API response code: ${response.code()}")
+            Log.d("MediaRepository", "API response message: ${response.message()}")
+            
             if (response.isSuccessful) {
-                val recentlyWatchedItems = response.body()?.map { it.toDomain() } ?: emptyList()
+                val rawItems = response.body() ?: emptyList()
+                Log.d("MediaRepository", "Raw API response: ${rawItems.size} items")
+                
+                if (rawItems.isNotEmpty()) {
+                    Log.d("MediaRepository", "First item sample: mediaId=${rawItems[0].mediaId}, title=${rawItems[0].media.title}")
+                }
+                
+                val recentlyWatchedItems = rawItems.map { dto ->
+                    Log.d("MediaRepository", "Processing item: mediaId=${dto.mediaId}, progress=${dto.progressSeconds}/${dto.durationSeconds}")
+                    dto.toDomain()
+                }
+                
                 Log.d("MediaRepository", "getRecentlyWatchedWithProgress success: ${recentlyWatchedItems.size} items")
                 emit(Result.success(recentlyWatchedItems))
             } else {
+                val errorBody = response.errorBody()?.string()
                 Log.e("MediaRepository", "getRecentlyWatchedWithProgress failed: ${response.code()} - ${response.message()}")
+                Log.e("MediaRepository", "Error body: $errorBody")
+                Log.e("MediaRepository", "Request URL: ${response.raw().request.url}")
                 emit(Result.failure(Exception("Failed to fetch recently watched: ${response.code()} ${response.message()}")))
             }
         } catch (e: Exception) {
-            Log.e("MediaRepository", "getRecentlyWatchedWithProgress error", e)
+            Log.e("MediaRepository", "getRecentlyWatchedWithProgress error: ${e.message}", e)
             emit(Result.failure(e))
         }
     }

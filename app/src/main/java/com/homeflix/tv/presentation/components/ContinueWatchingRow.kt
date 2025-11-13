@@ -43,8 +43,57 @@ fun ContinueWatchingRow(
     onInfo: (Media) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (continueWatchingItems.isEmpty()) return
+    // Debug logging with null safety
+    android.util.Log.d("ContinueWatchingRow", "Rendering with ${continueWatchingItems?.size ?: 0} items")
     
+    // Null safety check
+    if (continueWatchingItems.isNullOrEmpty()) {
+        android.util.Log.d("ContinueWatchingRow", "No items to display")
+        // Show debug info instead of returning early
+        Column(
+            modifier = modifier.padding(horizontal = 60.dp)
+        ) {
+            Text(
+                text = "Continue Watching (Debug)",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                ),
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            Text(
+                text = "No items loaded. Check logs for API errors.",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = TextSecondary
+                )
+            )
+        }
+        return
+    }
+    
+    // Additional validation - filter out any invalid items
+    val validItems = remember(continueWatchingItems) {
+        continueWatchingItems.filterNotNull().filter { item ->
+            try {
+                item.media != null && 
+                item.media.id > 0 && 
+                !item.media.title.isNullOrBlank() &&
+                item.progress >= 0f &&
+                item.progress <= 1f
+            } catch (e: Exception) {
+                android.util.Log.w("ContinueWatchingRow", "Invalid item filtered out: ${e.message}")
+                false
+            }
+        }
+    }
+    
+    if (validItems.isEmpty()) {
+        android.util.Log.w("ContinueWatchingRow", "All items were invalid after filtering")
+        return
+    }
+    
+    // Render the continue watching section
     Column(
         modifier = modifier.padding(horizontal = 60.dp)
     ) {
@@ -64,11 +113,23 @@ fun ContinueWatchingRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(end = 60.dp)
         ) {
-            items(continueWatchingItems) { item ->
+            items(validItems) { item ->
                 ContinueWatchingCard(
                     item = item,
-                    onPlay = { onPlay(item.media) },
-                    onInfo = { onInfo(item.media) }
+                    onPlay = { 
+                        try {
+                            onPlay(item.media) 
+                        } catch (e: Exception) {
+                            android.util.Log.e("ContinueWatchingRow", "Error in onPlay: ${e.message}")
+                        }
+                    },
+                    onInfo = { 
+                        try {
+                            onInfo(item.media) 
+                        } catch (e: Exception) {
+                            android.util.Log.e("ContinueWatchingRow", "Error in onInfo: ${e.message}")
+                        }
+                    }
                 )
             }
         }
@@ -173,13 +234,28 @@ private fun ContinueWatchingCard(
             
             Spacer(modifier = Modifier.height(4.dp))
             
-            Text(
-                text = "${(item.progress * 100).toInt()}% watched",
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.8f)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${(item.progress * 100).toInt()}% watched",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
                 )
-            )
+                
+                item.lastWatched?.let { lastWatched ->
+                    Text(
+                        text = "• $lastWatched",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    )
+                }
+            }
         }
         
         // Info Button (top right)

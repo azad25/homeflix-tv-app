@@ -249,42 +249,109 @@ fun DetailsScreen(
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    // Play Button
-                                    Button(
-                                        onClick = { 
-                                            navController.navigate(Screen.VideoPlayer.createRoute(media.id))
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color.White,
-                                            contentColor = Color.Black
-                                        ),
-                                        shape = RoundedCornerShape(4.dp),
-                                        modifier = Modifier.height(44.dp)
-                                    ) {
-                                        Text(
-                                            text = "▶ Play",
-                                            style = MaterialTheme.typography.titleMedium.copy(
-                                                fontWeight = FontWeight.Bold
+                                    // Continue Watching or Play Button based on progress
+                                    if (currentState.watchProgress != null && currentState.watchProgress > 0.05f) {
+                                        // Continue Watching Button (primary)
+                                        Button(
+                                            onClick = { 
+                                                navController.navigate(Screen.VideoPlayer.createRoute(media.id, resumeFromProgress = true))
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = Color.White,
+                                                contentColor = Color.Black
+                                            ),
+                                            shape = RoundedCornerShape(4.dp),
+                                            modifier = Modifier.height(44.dp)
+                                        ) {
+                                            Text(
+                                                text = "▶ Continue Watching",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontWeight = FontWeight.Bold
+                                                )
                                             )
-                                        )
+                                        }
+                                        
+                                        // Play from Beginning Button (secondary)
+                                        OutlinedButton(
+                                            onClick = { 
+                                                navController.navigate(Screen.VideoPlayer.createRoute(media.id, forceStartFromBeginning = true))
+                                            },
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = TextPrimary,
+                                                containerColor = Color.Black.copy(alpha = 0.5f)
+                                            ),
+                                            shape = RoundedCornerShape(4.dp),
+                                            modifier = Modifier.height(44.dp)
+                                        ) {
+                                            Text(
+                                                text = "↻ Play from Beginning",
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                        }
+                                    } else {
+                                        // Regular Play Button (no progress)
+                                        Button(
+                                            onClick = { 
+                                                navController.navigate(Screen.VideoPlayer.createRoute(media.id))
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = Color.White,
+                                                contentColor = Color.Black
+                                            ),
+                                            shape = RoundedCornerShape(4.dp),
+                                            modifier = Modifier.height(44.dp)
+                                        ) {
+                                            Text(
+                                                text = "▶ Play",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            )
+                                        }
+                                        
+                                        // Add to List Button
+                                        OutlinedButton(
+                                            onClick = { 
+                                                // TODO: Add to watchlist
+                                            },
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = TextPrimary,
+                                                containerColor = Color.Black.copy(alpha = 0.5f)
+                                            ),
+                                            shape = RoundedCornerShape(4.dp),
+                                            modifier = Modifier.height(44.dp)
+                                        ) {
+                                            Text(
+                                                text = "+ My List",
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                        }
                                     }
-                                    
-                                    // Add to List Button
-                                    OutlinedButton(
-                                        onClick = { 
-                                            // TODO: Add to watchlist
-                                        },
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = TextPrimary,
-                                            containerColor = Color.Black.copy(alpha = 0.5f)
-                                        ),
-                                        shape = RoundedCornerShape(4.dp),
-                                        modifier = Modifier.height(44.dp)
-                                    ) {
-                                        Text(
-                                            text = "+ My List",
-                                            style = MaterialTheme.typography.titleMedium
-                                        )
+                                }
+                                
+                                // Progress indicator if watching progress exists
+                                currentState.watchProgress?.let { progress ->
+                                    if (progress > 0.05f) {
+                                        Column(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "${(progress * 100).toInt()}% watched",
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    color = TextSecondary
+                                                )
+                                            )
+                                            LinearProgressIndicator(
+                                                progress = progress,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(4.dp)
+                                                    .clip(RoundedCornerShape(2.dp)),
+                                                color = NetflixRed,
+                                                trackColor = Color.White.copy(alpha = 0.3f)
+                                            )
+                                        }
                                     }
                                 }
                             }
