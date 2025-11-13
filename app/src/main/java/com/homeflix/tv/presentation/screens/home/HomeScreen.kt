@@ -77,8 +77,7 @@ fun HomeScreen(
             }
             
             is HomeUiState.Success -> {
-                // Debug logging for UI updates
-                android.util.Log.d("HomeScreen", "UI Success state: ${currentState.continueWatching.size} continue watching items")
+
                 
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -102,26 +101,18 @@ fun HomeScreen(
                     // Continue Watching - Always show for debugging
                     item {
                         if (currentState.continueWatching.isNotEmpty()) {
-                            android.util.Log.d("HomeScreen", "Rendering ContinueWatchingRow with ${currentState.continueWatching.size} items")
                             ContinueWatchingRow(
                                 continueWatchingItems = currentState.continueWatching,
-                                onPlay = { media ->
-                                    try {
-                                        navController.navigate(Screen.VideoPlayer.createRoute(media.id, resumeFromProgress = true))
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("HomeScreen", "Error navigating to video player: ${e.message}")
-                                    }
+                                onPlay = { media, progressMs ->
+                                    // Already in milliseconds from ContinueWatchingRow
+                                    navController.navigate(Screen.VideoPlayer.createRoute(media.id, startTime = progressMs))
                                 },
                                 onInfo = { media ->
-                                    try {
-                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("HomeScreen", "Error navigating to details: ${e.message}")
-                                    }
+                                    navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                 }
                             )
                         } else {
-                            // Debug: Show empty state with more info
+                            // Show empty state
                             Column(
                                 modifier = Modifier.padding(horizontal = 60.dp)
                             ) {
@@ -136,21 +127,8 @@ fun HomeScreen(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                 )
                                 
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
-                                Text(
-                                    text = "Debug Info: ${currentState.continueWatching.size} items loaded",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                                )
-                                
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
                                 Button(
-                                    onClick = { 
-                                        android.util.Log.d("HomeScreen", "Refresh button clicked")
-                                        viewModel.refreshRecentlyWatched()
-                                    }
+                                    onClick = { viewModel.refreshRecentlyWatched() }
                                 ) {
                                     Text("Refresh")
                                 }

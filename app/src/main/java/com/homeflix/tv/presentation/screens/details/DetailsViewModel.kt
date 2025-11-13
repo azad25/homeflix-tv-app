@@ -77,18 +77,18 @@ class DetailsViewModel @Inject constructor(
                         Log.d("DetailsViewModel", "Watch progress for media ${media.id}: ${(watchProgress!! * 100).toInt()}%")
                     }
                     
-                    _uiState.value = DetailsUiState.Success(media, watchProgress)
+                    _uiState.value = DetailsUiState.Success(media, watchProgress, recentlyWatchedItem?.progressSeconds)
                 },
                 onFailure = { error ->
                     Log.w("DetailsViewModel", "Failed to load watch progress: ${error.message}")
                     // Still show media details even if progress loading fails
-                    _uiState.value = DetailsUiState.Success(media, null)
+                    _uiState.value = DetailsUiState.Success(media, null, null)
                 }
             )
         } catch (e: Exception) {
             Log.w("DetailsViewModel", "Error loading watch progress", e)
             // Still show media details even if progress loading fails
-            _uiState.value = DetailsUiState.Success(media, null)
+            _uiState.value = DetailsUiState.Success(media, null, null)
         }
     }
 }
@@ -98,6 +98,7 @@ sealed class DetailsUiState {
     data class Error(val message: String) : DetailsUiState()
     data class Success(
         val media: Media,
-        val watchProgress: Float? = null // 0.0 to 1.0, null if no progress
+        val watchProgress: Float? = null, // 0.0 to 1.0, null if no progress
+        val progressSeconds: Long? = null // Progress in seconds for resume
     ) : DetailsUiState()
 }

@@ -14,14 +14,14 @@ fun VideoPlayerScreen(
     mediaId: Int,
     startTime: Long = 0L,
     forceStartFromBeginning: Boolean = false,
-    resumeFromProgress: Boolean = false,
     onNavigateBack: () -> Unit,
     viewModel: VideoPlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     
-    LaunchedEffect(mediaId, resumeFromProgress) {
-        viewModel.loadMedia(mediaId, resumeFromProgress)
+    LaunchedEffect(mediaId, startTime) {
+        val startTimeSeconds = startTime / 1000 // Convert ms to seconds for ViewModel
+        viewModel.loadMedia(mediaId, startTimeSeconds)
     }
     
     when (val state = uiState) {
@@ -37,8 +37,8 @@ fun VideoPlayerScreen(
         }
         
         is VideoPlayerUiState.Success -> {
-            // Use saved progress if resuming, otherwise use provided startTime
-            val actualStartTime = if (resumeFromProgress && state.savedProgressSeconds != null) {
+            // Use saved progress from ViewModel or provided startTime
+            val actualStartTime = if (state.savedProgressSeconds != null) {
                 state.savedProgressSeconds * 1000 // Convert seconds to milliseconds
             } else {
                 startTime

@@ -254,7 +254,8 @@ fun DetailsScreen(
                                         // Continue Watching Button (primary)
                                         Button(
                                             onClick = { 
-                                                navController.navigate(Screen.VideoPlayer.createRoute(media.id, resumeFromProgress = true))
+                                                val startTimeMs = (currentState.progressSeconds ?: 0L) * 1000
+                                                navController.navigate(Screen.VideoPlayer.createRoute(media.id, startTime = startTimeMs))
                                             },
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = Color.White,

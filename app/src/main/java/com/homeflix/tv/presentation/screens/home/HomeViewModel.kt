@@ -278,6 +278,7 @@ class HomeViewModel @Inject constructor(
                                                 ContinueWatchingItem(
                                                     media = item.media,
                                                     progress = progressPercent,
+                                                    progressSeconds = item.progressSeconds,
                                                     lastWatched = lastWatchedText
                                                 )
                                             } catch (e: Exception) {
@@ -458,12 +459,14 @@ class HomeViewModel @Inject constructor(
                                     ContinueWatchingItem(
                                         media = item.media,
                                         progress = progressPercent,
+                                        progressSeconds = item.progressSeconds,
                                         lastWatched = formatLastWatchedFromDate(item.lastWatchedAt)
                                     )
                                 }
                                 
                                 Log.d("HomeViewModel", "🔄 Forcing UI update with ${testContinueWatching.size} items")
-                                _uiState.value = currentState.copy(continueWatching = testContinueWatching)
+                                // DISABLED: This was overwriting correct Continue Watching data with progressSeconds: 0s
+                                // _uiState.value = currentState.copy(continueWatching = testContinueWatching)
                             }
                         },
                         onFailure = { error ->
@@ -476,6 +479,8 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
+    
+
 }
 
 sealed class HomeUiState {

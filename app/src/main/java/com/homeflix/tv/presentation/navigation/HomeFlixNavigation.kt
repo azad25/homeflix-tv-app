@@ -48,16 +48,14 @@ fun HomeFlixNavigation(
             route = Screen.VideoPlayer.route,
             arguments = Screen.VideoPlayer.arguments
         ) { backStackEntry ->
-            val mediaId = backStackEntry.arguments?.getString("mediaId")?.toIntOrNull() ?: 0
-            val startTime = backStackEntry.arguments?.getString("startTime")?.toLongOrNull() ?: 0L
-            val forceStart = backStackEntry.arguments?.getString("forceStart")?.toBooleanStrictOrNull() ?: false
-            val resume = backStackEntry.arguments?.getString("resume")?.toBooleanStrictOrNull() ?: false
+            val mediaId = backStackEntry.arguments?.getInt("mediaId") ?: 0
+            val startTime = backStackEntry.arguments?.getLong("startTime") ?: 0L
+            val forceStart = backStackEntry.arguments?.getBoolean("forceStart") ?: false
             
             VideoPlayerScreen(
                 mediaId = mediaId,
                 startTime = startTime,
                 forceStartFromBeginning = forceStart,
-                resumeFromProgress = resume,
                 onNavigateBack = {
                     navController.popBackStack()
                 }
@@ -80,29 +78,24 @@ sealed class Screen(val route: String) {
             }
         )
     }
-    object VideoPlayer : Screen("player/{mediaId}?startTime={startTime}&forceStart={forceStart}&resume={resume}") {
+    object VideoPlayer : Screen("player/{mediaId}?startTime={startTime}&forceStart={forceStart}") {
         fun createRoute(
             mediaId: Int, 
             startTime: Long = 0L, 
-            forceStartFromBeginning: Boolean = false,
-            resumeFromProgress: Boolean = false
-        ) = "player/$mediaId?startTime=$startTime&forceStart=$forceStartFromBeginning&resume=$resumeFromProgress"
+            forceStartFromBeginning: Boolean = false
+        ) = "player/$mediaId?startTime=$startTime&forceStart=$forceStartFromBeginning"
         
         val arguments = listOf(
             androidx.navigation.navArgument("mediaId") {
-                type = androidx.navigation.NavType.StringType
+                type = androidx.navigation.NavType.IntType
             },
             androidx.navigation.navArgument("startTime") {
-                type = androidx.navigation.NavType.StringType
-                defaultValue = "0"
+                type = androidx.navigation.NavType.LongType
+                defaultValue = 0L
             },
             androidx.navigation.navArgument("forceStart") {
-                type = androidx.navigation.NavType.StringType
-                defaultValue = "false"
-            },
-            androidx.navigation.navArgument("resume") {
-                type = androidx.navigation.NavType.StringType
-                defaultValue = "false"
+                type = androidx.navigation.NavType.BoolType
+                defaultValue = false
             }
         )
     }

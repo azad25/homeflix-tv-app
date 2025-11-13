@@ -33,42 +33,18 @@ import com.homeflix.tv.util.ApiUtils
 data class ContinueWatchingItem(
     val media: Media,
     val progress: Float, // 0.0 to 1.0
+    val progressSeconds: Long, // Actual progress in seconds
     val lastWatched: String? = null
 )
 
 @Composable
 fun ContinueWatchingRow(
     continueWatchingItems: List<ContinueWatchingItem>,
-    onPlay: (Media) -> Unit,
+    onPlay: (Media, Long) -> Unit, // Pass media and progressMs (milliseconds)
     onInfo: (Media) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Debug logging with null safety
-    android.util.Log.d("ContinueWatchingRow", "Rendering with ${continueWatchingItems?.size ?: 0} items")
-    
-    // Null safety check
     if (continueWatchingItems.isNullOrEmpty()) {
-        android.util.Log.d("ContinueWatchingRow", "No items to display")
-        // Show debug info instead of returning early
-        Column(
-            modifier = modifier.padding(horizontal = 60.dp)
-        ) {
-            Text(
-                text = "Continue Watching (Debug)",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                ),
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            Text(
-                text = "No items loaded. Check logs for API errors.",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = TextSecondary
-                )
-            )
-        }
         return
     }
     
@@ -82,14 +58,12 @@ fun ContinueWatchingRow(
                 item.progress >= 0f &&
                 item.progress <= 1f
             } catch (e: Exception) {
-                android.util.Log.w("ContinueWatchingRow", "Invalid item filtered out: ${e.message}")
                 false
             }
         }
     }
     
     if (validItems.isEmpty()) {
-        android.util.Log.w("ContinueWatchingRow", "All items were invalid after filtering")
         return
     }
     
@@ -117,19 +91,10 @@ fun ContinueWatchingRow(
                 ContinueWatchingCard(
                     item = item,
                     onPlay = { 
-                        try {
-                            onPlay(item.media) 
-                        } catch (e: Exception) {
-                            android.util.Log.e("ContinueWatchingRow", "Error in onPlay: ${e.message}")
-                        }
+                        // Convert seconds to milliseconds
+                        onPlay(item.media, item.progressSeconds * 1000)
                     },
-                    onInfo = { 
-                        try {
-                            onInfo(item.media) 
-                        } catch (e: Exception) {
-                            android.util.Log.e("ContinueWatchingRow", "Error in onInfo: ${e.message}")
-                        }
-                    }
+                    onInfo = { onInfo(item.media) }
                 )
             }
         }

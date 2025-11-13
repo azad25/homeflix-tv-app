@@ -78,6 +78,7 @@ fun VideoPlayer(
     modifier: Modifier = Modifier,
     mediaRepository: MediaRepository? = null
 ) {
+
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
@@ -89,6 +90,12 @@ fun VideoPlayer(
     var bufferPercentage by remember { mutableStateOf(0) }
     var volume by remember { mutableStateOf(1f) }
     var isMuted by remember { mutableStateOf(false) }
+    
+    // Resume seeking state - persists across recompositions, resets for new media
+    var resumeSeekAttempted by remember(media.id) { mutableStateOf(false) }
+    val shouldResumePlayback = remember(media.id) { !forceStartFromBeginning && startTime > 0 }
+    
+
     
     // Subtitle state
     var subtitlesEnabled by remember { mutableStateOf(false) }
@@ -187,6 +194,9 @@ fun VideoPlayer(
     LaunchedEffect(media.id, isVisible) {
         if (isVisible) {
             exoPlayer?.release()
+            
+            // Reset seek flag for new media
+            resumeSeekAttempted = false
 
             // Create track selector with subtitle support
             val newTrackSelector = DefaultTrackSelector(context)
@@ -226,13 +236,15 @@ fun VideoPlayer(
                                 .setUri(streamUrl)
                                 .build()
                             
-                            setMediaItem(mediaItem)
+                            if (shouldResumePlayback && startTime > 0) {
+                                // Use setMediaItems with start position for reliable resume
+                                setMediaItems(listOf(mediaItem), 0, startTime)
+                            } else {
+                                setMediaItem(mediaItem)
+                            }
                             prepare()
                             
-                            // Set start position if resuming
-                            if (!forceStartFromBeginning && startTime > 0) {
-                                seekTo(startTime)
-                            }
+                            // Don't seek here - wait for STATE_READY for reliable seeking
                             
                             // Enable audio and auto-play
                             volume = 1f
@@ -259,7 +271,11 @@ fun VideoPlayer(
                                 .setUri(testUrl)
                                 .build()
                             
-                            setMediaItem(mediaItem)
+                            if (shouldResumePlayback && startTime > 0) {
+                                setMediaItems(listOf(mediaItem), 0, startTime)
+                            } else {
+                                setMediaItem(mediaItem)
+                            }
                             prepare()
                             playWhenReady = true
                         } catch (e: Exception) {
@@ -275,11 +291,13 @@ fun VideoPlayer(
 
                             when (playbackState) {
                                 Player.STATE_READY -> {
-                                    duration = this@apply.duration
-                                    isBuffering = false
-                                    if (!forceStartFromBeginning && startTime > 0) {
-                                        seekTo(startTime)
+                                    val currentDuration = this@apply.duration
+                                    
+                                    if (currentDuration > 0 && currentDuration != C.TIME_UNSET) {
+                                        duration = currentDuration
                                     }
+                                    
+                                    isBuffering = false
                                 }
                                 Player.STATE_ENDED -> {
                                     onClose()
@@ -294,7 +312,6 @@ fun VideoPlayer(
                         }
 
                         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                            // Handle playback errors
                             isBuffering = false
                         }
 
@@ -308,6 +325,17 @@ fun VideoPlayer(
                                 group.type == C.TRACK_TYPE_TEXT
                             }
                             availableSubtitleTracks = subtitleGroups
+                        }
+                        
+                        override fun onPositionDiscontinuity(
+                            oldPosition: Player.PositionInfo,
+                            newPosition: Player.PositionInfo,
+                            reason: Int
+                        ) {
+                            if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                                // Reset buffering after seek completes
+                                isBuffering = false
+                            }
                         }
                     })
 
@@ -386,7 +414,7 @@ fun VideoPlayer(
                                     if (player.duration > 0) {
                                         val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
                                         player.seekTo(newPosition)
-                                        isBuffering = true
+                                        // Don't manually set isBuffering - let the player handle it
                                     }
                                 }
                                 showControls = true
@@ -398,7 +426,7 @@ fun VideoPlayer(
                                     if (player.duration > 0) {
                                         val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
                                         player.seekTo(newPosition)
-                                        isBuffering = true
+                                        // Don't manually set isBuffering - let the player handle it
                                     }
                                 }
                                 showControls = true
@@ -454,7 +482,7 @@ fun VideoPlayer(
                 factory = { context ->
                     PlayerView(context).apply {
                         useController = false // We'll use custom controls
-                        setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER) // Disable built-in buffering indicator
                         // Set background to black to prevent white flash
                         setBackgroundColor(android.graphics.Color.BLACK)
                         
@@ -487,44 +515,17 @@ fun VideoPlayer(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Netflix-style buffering indicator
+            // Simple red buffering indicator
             if (isBuffering) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            color = Color(0xFFE50914), // Netflix red
-                            modifier = Modifier.size(64.dp),
-                            strokeWidth = 6.dp
-                        )
-
-                        // Netflix-style buffering text
-                        Text(
-                            text = if (bufferPercentage > 0) "Buffering... ${bufferPercentage}%" else "Loading...",
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Medium
-                            )
-                        )
-
-                        // Buffer progress bar
-                        if (bufferPercentage > 0) {
-                            LinearProgressIndicator(
-                                progress = bufferPercentage / 100f,
-                                modifier = Modifier
-                                    .width(200.dp)
-                                    .height(4.dp)
-                                    .clip(RoundedCornerShape(2.dp)),
-                                color = Color(0xFFE50914),
-                                trackColor = Color.White.copy(alpha = 0.3f)
-                            )
-                        }
-                    }
+                    CircularProgressIndicator(
+                        color = Color(0xFFE50914), // Netflix red
+                        modifier = Modifier.size(64.dp),
+                        strokeWidth = 6.dp
+                    )
                 }
             }
 
