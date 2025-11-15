@@ -37,13 +37,16 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
 import com.homeflix.tv.domain.model.Media
+import com.homeflix.tv.domain.model.MediaType
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.homeflix.tv.data.repository.MediaRepository
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.EntryPoint
+import androidx.compose.ui.platform.LocalContext
 /**
  * ULTRA-INSTANT LAN VIDEO PLAYER for Android TV
  *
@@ -68,6 +71,12 @@ private fun getBaseUrl(): String {
     return "http://192.168.0.109:8252"
 }
 
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface VideoPlayerEntryPoint {
+    fun getMediaRepository(): com.homeflix.tv.domain.repository.MediaRepository
+}
+
 @UnstableApi
 @Composable
 fun VideoPlayer(
@@ -77,12 +86,23 @@ fun VideoPlayer(
     startTime: Long = 0L,
     forceStartFromBeginning: Boolean = false,
     onProgress: (currentTime: Long, duration: Long) -> Unit = { _, _ -> },
+    onPlayNext: ((Media) -> Unit)? = null,
     modifier: Modifier = Modifier,
-    mediaRepository: MediaRepository? = null
+    mediaRepository: com.homeflix.tv.domain.repository.MediaRepository? = null
 ) {
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    
+    // Get MediaRepository from Hilt if not provided
+    val repository = mediaRepository ?: remember {
+        val hiltEntryPoint = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            VideoPlayerEntryPoint::class.java
+        )
+        hiltEntryPoint.getMediaRepository()
+    }
+    
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableStateOf(0L) }
@@ -107,6 +127,10 @@ fun VideoPlayer(
     var showSubtitleToast by remember { mutableStateOf(false) }
     var subtitleToastMessage by remember { mutableStateOf("") }
 
+    // Next episode state for autoplay
+    var nextEpisode by remember(media.id) { mutableStateOf<Media?>(null) }
+    var showNextEpisodePreview by remember { mutableStateOf(false) }
+    
     // TV remote control focus
     val playPauseFocusRequester = remember { FocusRequester() }
     val seekBackwardFocusRequester = remember { FocusRequester() }
@@ -120,15 +144,19 @@ fun VideoPlayer(
             val currentTime = player.currentPosition / 1000 // Convert to seconds
             val totalDuration = player.duration / 1000 // Convert to seconds
             
-            if (totalDuration > 0 && currentTime > 0) {
+            if (totalDuration > 0 && currentTime > 5) { // Only save if watched more than 5 seconds
                 coroutineScope.launch {
                     try {
-                        mediaRepository?.updatePlaybackProgress(
+                        val result = repository.updatePlaybackProgress(
                             mediaId = media.id,
                             position = currentTime,
                             duration = totalDuration
                         )
-                        android.util.Log.d("VideoPlayer", "Progress saved: $currentTime of $totalDuration seconds")
+                        if (result.isSuccess) {
+                            android.util.Log.d("VideoPlayer", "Progress saved successfully: $currentTime of $totalDuration seconds")
+                        } else {
+                            android.util.Log.e("VideoPlayer", "Failed to save progress: ${result.exceptionOrNull()?.message}")
+                        }
                     } catch (e: Exception) {
                         android.util.Log.e("VideoPlayer", "Failed to save progress", e)
                     }
@@ -141,6 +169,39 @@ fun VideoPlayer(
     fun closePlayerWithProgressSave() {
         savePlaybackProgress()
         onClose()
+    }
+    
+    // Fetch next episode for TV series autoplay
+    LaunchedEffect(media.id) {
+        if (media.type == MediaType.EPISODE && media.seriesId != null && onPlayNext != null) {
+            try {
+                // Get all episodes for this series
+                val allMediaResult = repository.getAllMedia(limit = 1000, offset = 0)
+                allMediaResult.collect { result ->
+                    if (result.isSuccess) {
+                        val allMedia = result.getOrNull() ?: emptyList()
+                        
+                        // Filter episodes for this series
+                        val seriesEpisodes = allMedia.filter { 
+                            it.type == MediaType.EPISODE && it.seriesId == media.seriesId 
+                        }.sortedWith(compareBy({ it.seasonNumber }, { it.episodeNumber }))
+                        
+                        // Find current episode index
+                        val currentIndex = seriesEpisodes.indexOfFirst { it.id == media.id }
+                        
+                        if (currentIndex != -1 && currentIndex < seriesEpisodes.size - 1) {
+                            // Get next episode
+                            nextEpisode = seriesEpisodes[currentIndex + 1]
+                            android.util.Log.d("VideoPlayer", "Next episode found: ${nextEpisode?.title}")
+                        } else {
+                            android.util.Log.d("VideoPlayer", "No next episode found (last episode or not found)")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("VideoPlayer", "Failed to fetch next episode", e)
+            }
+        }
     }
 
     // Subtitle toggle function
@@ -302,7 +363,17 @@ fun VideoPlayer(
                                     isBuffering = false
                                 }
                                 Player.STATE_ENDED -> {
-                                    onClose()
+                                    // Save progress before handling episode end
+                                    savePlaybackProgress()
+                                    
+                                    // Check if there's a next episode for autoplay
+                                    if (nextEpisode != null && onPlayNext != null) {
+                                        android.util.Log.d("VideoPlayer", "Episode ended, playing next: ${nextEpisode?.title}")
+                                        onPlayNext(nextEpisode!!)
+                                    } else {
+                                        android.util.Log.d("VideoPlayer", "Episode ended, no next episode available")
+                                        onClose()
+                                    }
                                 }
                                 Player.STATE_IDLE -> {
                                     // Player is idle, might need to retry
@@ -366,17 +437,36 @@ fun VideoPlayer(
         }
     }
 
-    // Update progress for UI only (no frequent saving for performance)
+    // Update progress for UI and save periodically
     LaunchedEffect(exoPlayer, isPlaying) {
+        var lastSaveTime = 0L
         while (isPlaying && exoPlayer != null) {
             currentPosition = exoPlayer?.currentPosition ?: 0L
             duration = exoPlayer?.duration ?: 0L
 
             if (duration > 0) {
                 onProgress(currentPosition, duration)
+                
+                // Save progress every 30 seconds during playback
+                val currentTimeSeconds = currentPosition / 1000
+                if (currentTimeSeconds - lastSaveTime >= 30 && currentTimeSeconds > 5) {
+                    coroutineScope.launch {
+                        try {
+                            repository.updatePlaybackProgress(
+                                mediaId = media.id,
+                                position = currentTimeSeconds,
+                                duration = duration / 1000
+                            )
+                            lastSaveTime = currentTimeSeconds
+                            android.util.Log.d("VideoPlayer", "Periodic progress saved: $currentTimeSeconds seconds")
+                        } catch (e: Exception) {
+                            android.util.Log.e("VideoPlayer", "Failed to save periodic progress", e)
+                        }
+                    }
+                }
             }
 
-            delay(1000) // Update every second for UI only
+            delay(1000) // Update every second
         }
     }
 

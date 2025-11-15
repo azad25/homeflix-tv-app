@@ -86,6 +86,7 @@ fun NetflixHomeScreen(
                         "search" -> navController.navigate(Screen.Search.route)
                         "home" -> { /* Already on home */ }
                         "browse" -> navController.navigate(Screen.Browse.route)
+                        "tv-shows" -> navController.navigate(Screen.TvShows.route)
                     }
                 },
                 onNavigateToContent = {

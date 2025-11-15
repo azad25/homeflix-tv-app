@@ -12,13 +12,13 @@ import javax.inject.Singleton
 @Singleton
 class MediaRepository @Inject constructor(
     private val apiService: HomeFlixApiService
-) {
+) : com.homeflix.tv.domain.repository.MediaRepository {
     
-    fun getAllMedia(
-        limit: Int = 100,
-        offset: Int = 0,
-        genre: String? = null,
-        type: String? = null
+    override fun getAllMedia(
+        limit: Int,
+        offset: Int,
+        genre: String?,
+        type: String?
     ): Flow<Result<List<Media>>> = flow {
         try {
             val response = apiService.getAllMedia(limit, offset, genre, type)
@@ -36,7 +36,7 @@ class MediaRepository @Inject constructor(
         }
     }
     
-    fun getMovies(limit: Int = 100, offset: Int = 0): Flow<Result<List<Media>>> = flow {
+    override fun getMovies(limit: Int, offset: Int): Flow<Result<List<Media>>> = flow {
         try {
             val response = apiService.getMovies(limit, offset)
             if (response.isSuccessful) {
@@ -53,7 +53,7 @@ class MediaRepository @Inject constructor(
         }
     }
     
-    fun getTVShows(limit: Int = 100, offset: Int = 0): Flow<Result<List<Media>>> = flow {
+    override fun getTVShows(limit: Int, offset: Int): Flow<Result<List<Media>>> = flow {
         try {
             val response = apiService.getTVShows(limit, offset)
             if (response.isSuccessful) {
@@ -70,7 +70,7 @@ class MediaRepository @Inject constructor(
         }
     }
     
-    fun getMediaById(id: String): Flow<Result<Media>> = flow {
+    override fun getMediaById(id: String): Flow<Result<Media>> = flow {
         try {
             val response = apiService.getMediaById(id)
             if (response.isSuccessful) {
@@ -88,10 +88,10 @@ class MediaRepository @Inject constructor(
         }
     }
     
-    fun getMediaByGenre(
+    override fun getMediaByGenre(
         genre: String,
-        limit: Int = 100,
-        offset: Int = 0
+        limit: Int,
+        offset: Int
     ): Flow<Result<List<Media>>> = flow {
         try {
             val response = apiService.getMediaByGenre(genre, limit, offset)
@@ -106,10 +106,10 @@ class MediaRepository @Inject constructor(
         }
     }
     
-    fun searchMedia(
+    override fun searchMedia(
         query: String,
-        limit: Int = 50,
-        offset: Int = 0
+        limit: Int,
+        offset: Int
     ): Flow<Result<List<Media>>> = flow {
         try {
             val response = apiService.searchMedia(query, limit, offset)
@@ -128,7 +128,7 @@ class MediaRepository @Inject constructor(
     
 
     
-    fun getAllGenres(): Flow<Result<List<Genre>>> = flow {
+    override fun getAllGenres(): Flow<Result<List<Genre>>> = flow {
         try {
             val response = apiService.getAllGenres()
             if (response.isSuccessful) {
@@ -143,21 +143,21 @@ class MediaRepository @Inject constructor(
     }
 
     // Recommendation methods matching web frontend ScrollXHero.tsx
-    suspend fun getMixedRecommendations(limit: Int = 25) = apiService.getMixedRecommendations(limit)
-    suspend fun getTrendingRecommendations(limit: Int = 25) = apiService.getTrendingRecommendations(limit)
-    suspend fun getPopularRecommendations(limit: Int = 25) = apiService.getPopularRecommendations(limit)
-    suspend fun getRecentRecommendations(limit: Int = 25) = apiService.getRecentRecommendations(limit)
-    suspend fun getPersonalizedRecommendations(limit: Int = 25) = apiService.getPersonalizedRecommendations(limit)
-    suspend fun getUniqueRecommendations(limit: Int = 25) = apiService.getUniqueRecommendations(limit)
-    suspend fun getTopRatedRecommendations(limit: Int = 25) = apiService.getTopRatedRecommendations(limit)
-    suspend fun getGenreRecommendations(limit: Int = 25) = apiService.getGenreRecommendations(limit)
+    override suspend fun getMixedRecommendations(limit: Int) = apiService.getMixedRecommendations(limit)
+    override suspend fun getTrendingRecommendations(limit: Int) = apiService.getTrendingRecommendations(limit)
+    override suspend fun getPopularRecommendations(limit: Int) = apiService.getPopularRecommendations(limit)
+    override suspend fun getRecentRecommendations(limit: Int) = apiService.getRecentRecommendations(limit)
+    override suspend fun getPersonalizedRecommendations(limit: Int) = apiService.getPersonalizedRecommendations(limit)
+    override suspend fun getUniqueRecommendations(limit: Int) = apiService.getUniqueRecommendations(limit)
+    override suspend fun getTopRatedRecommendations(limit: Int) = apiService.getTopRatedRecommendations(limit)
+    override suspend fun getGenreRecommendations(limit: Int) = apiService.getGenreRecommendations(limit)
     
     // Playback methods matching web frontend
-    suspend fun getContinueWatching() = apiService.getContinueWatching()
-    suspend fun getRecentlyWatched() = apiService.getRecentlyWatched()
+    override suspend fun getContinueWatching() = apiService.getContinueWatching()
+    override suspend fun getRecentlyWatched() = apiService.getRecentlyWatched()
     
     // Recently watched with progress (matching web app)
-    fun getRecentlyWatchedWithProgress(): Flow<Result<List<RecentlyWatchedItem>>> = flow {
+    override fun getRecentlyWatchedWithProgress(): Flow<Result<List<RecentlyWatchedItem>>> = flow {
         try {
             Log.d("MediaRepository", "Calling getRecentlyWatchedWithProgress API...")
             Log.d("MediaRepository", "Base URL: ${com.homeflix.tv.BuildConfig.BASE_URL}")
@@ -196,11 +196,11 @@ class MediaRepository @Inject constructor(
     }
     
     // Update playback progress (matching web app)
-    suspend fun updatePlaybackProgress(
+    override suspend fun updatePlaybackProgress(
         mediaId: Int,
         position: Long,
         duration: Long,
-        userId: String = "1"
+        userId: String
     ): Result<Unit> {
         return try {
             val request = com.homeflix.tv.data.remote.api.PlaybackProgressAltRequest(
@@ -224,12 +224,248 @@ class MediaRepository @Inject constructor(
     }
     
     // Episode methods for TV shows
-    fun getEpisodesBySeriesAndSeason(seriesId: String, season: Int): Flow<Result<List<Media>>> = flow {
+    override fun getEpisodesBySeriesAndSeason(seriesId: String, season: Int): Flow<Result<List<Media>>> = flow {
         try {
             // For now, return empty list as this is a movie-focused app
             emit(Result.success(emptyList()))
         } catch (e: Exception) {
             emit(Result.failure(e))
+        }
+    }
+    
+    // TV Series methods
+    override suspend fun getTvSeries(): List<com.homeflix.tv.presentation.screens.tvshows.TvSeries> {
+        return try {
+            Log.d("MediaRepository", "Fetching TV series from API...")
+            
+            // First try the hierarchical series API
+            val seriesResponse = apiService.getTvSeries()
+            if (seriesResponse.isSuccessful) {
+                val seriesData = seriesResponse.body() ?: emptyList()
+                Log.d("MediaRepository", "Found ${seriesData.size} series from /api/series")
+                
+                return seriesData.map { dto ->
+                    val series = com.homeflix.tv.presentation.screens.tvshows.TvSeries(
+                        id = dto.id,
+                        title = dto.title,
+                        description = dto.description ?: dto.longDesc ?: dto.shortDesc,
+                        rating = dto.rating,
+                        year = dto.year ?: dto.releaseDate?.substring(0, 4)?.toIntOrNull(),
+                        totalSeasons = 0, // Will be calculated from episodes
+                        totalEpisodes = 0, // Will be calculated from episodes
+                        genres = dto.genres?.map { it.name } ?: dto.genreNames ?: emptyList(),
+                        posterPath = dto.posterPath,
+                        bannerPath = dto.bannerPath
+                    )
+                    Log.d("MediaRepository", "Series: ${series.title}, ID: ${series.id}, PosterPath: ${series.posterPath}")
+                    series
+                }
+            }
+            
+            Log.d("MediaRepository", "Series API not available, building from episodes...")
+            
+            // Fallback: Build series from episodes
+            val allMediaResponse = apiService.getAllMedia(limit = 1000, offset = 0, genre = null, type = "episode")
+            if (allMediaResponse.isSuccessful) {
+                val episodes = allMediaResponse.body() ?: emptyList()
+                Log.d("MediaRepository", "Found ${episodes.size} episodes to group into series")
+                
+                // Group episodes by series
+                val seriesMap = mutableMapOf<String, MutableList<com.homeflix.tv.data.remote.dto.MediaDto>>()
+                episodes.forEach { episode ->
+                    val seriesTitle = episode.title.replace(Regex("\\s*-\\s*S\\d+E\\d+.*$"), "")
+                    seriesMap.getOrPut(seriesTitle) { mutableListOf() }.add(episode)
+                }
+                
+                Log.d("MediaRepository", "Grouped episodes into ${seriesMap.size} series")
+                
+                // Convert to TvSeries objects
+                return seriesMap.entries.mapIndexed { index, (title, episodeList) ->
+                    val firstEpisode = episodeList.first()
+                    val seasons = episodeList.mapNotNull { ep ->
+                        ep.title?.let { title ->
+                            val seasonMatch = Regex("[Ss](\\d+)[Ee](\\d+)|[Ss]eason\\s*(\\d+)").find(title)
+                            seasonMatch?.groupValues?.get(1)?.toIntOrNull() 
+                                ?: seasonMatch?.groupValues?.get(3)?.toIntOrNull()
+                        }
+                    }.distinct().size
+                    
+                    com.homeflix.tv.presentation.screens.tvshows.TvSeries(
+                        id = firstEpisode.seriesId ?: (1000 + index),
+                        title = title,
+                        description = firstEpisode.description,
+                        rating = firstEpisode.rating,
+                        year = firstEpisode.releaseDate?.substring(0, 4)?.toIntOrNull(),
+                        totalSeasons = seasons,
+                        totalEpisodes = episodeList.size,
+                        genres = firstEpisode.genres?.map { it.name } ?: firstEpisode.genreNames ?: emptyList(),
+                        posterPath = firstEpisode.posterPath ?: firstEpisode.thumbnailPath,
+                        bannerPath = firstEpisode.bannerPath
+                    )
+                }.sortedByDescending { it.totalEpisodes }
+            }
+            
+            Log.w("MediaRepository", "No TV series data available")
+            emptyList()
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "getTvSeries error", e)
+            emptyList()
+        }
+    }
+    
+    override suspend fun getTvSeriesById(seriesId: Int): com.homeflix.tv.presentation.screens.tvshows.TvSeries {
+        return try {
+            val response = apiService.getTvSeriesById(seriesId)
+            if (response.isSuccessful) {
+                val dto = response.body()!!
+                com.homeflix.tv.presentation.screens.tvshows.TvSeries(
+                    id = dto.id,
+                    title = dto.title,
+                    description = dto.description ?: dto.longDesc ?: dto.shortDesc,
+                    rating = dto.rating,
+                    year = dto.year ?: dto.releaseDate?.substring(0, 4)?.toIntOrNull(),
+                    totalSeasons = 0, // Will be calculated from episodes
+                    totalEpisodes = 0, // Will be calculated from episodes
+                    genres = dto.genres?.map { it.name } ?: dto.genreNames ?: emptyList(),
+                    posterPath = dto.posterPath,
+                    bannerPath = dto.bannerPath
+                )
+            } else {
+                // Fallback to default
+                com.homeflix.tv.presentation.screens.tvshows.TvSeries(
+                    id = seriesId,
+                    title = "Unknown Series",
+                    description = "Series not found",
+                    rating = 0.0,
+                    year = null,
+                    totalSeasons = 0,
+                    totalEpisodes = 0,
+                    genres = emptyList(),
+                    posterPath = null,
+                    bannerPath = null
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "getTvSeriesById error", e)
+            com.homeflix.tv.presentation.screens.tvshows.TvSeries(
+                id = seriesId,
+                title = "Error",
+                description = "Failed to load series",
+                rating = 0.0,
+                year = null,
+                totalSeasons = 0,
+                totalEpisodes = 0,
+                genres = emptyList(),
+                posterPath = null,
+                bannerPath = null
+            )
+        }
+    }
+    
+    override suspend fun getTvSeriesSeasons(seriesId: Int): List<com.homeflix.tv.presentation.screens.tvshows.Season> {
+        return try {
+            val response = apiService.getTvSeriesSeasons(seriesId)
+            if (response.isSuccessful) {
+                val seasons = response.body() ?: emptyList()
+                seasons.map { dto ->
+                    com.homeflix.tv.presentation.screens.tvshows.Season(
+                        id = dto.id,
+                        seasonNumber = dto.season_number,
+                        name = dto.name ?: "Season ${dto.season_number}",
+                        description = dto.overview ?: "Season ${dto.season_number} of the series",
+                        episodeCount = dto.episode_count ?: 0,
+                        posterPath = dto.poster_path
+                    )
+                }
+            } else {
+                // Fallback to mock data
+                (1..3).map { seasonNum ->
+                    com.homeflix.tv.presentation.screens.tvshows.Season(
+                        id = seasonNum,
+                        seasonNumber = seasonNum,
+                        name = "Season $seasonNum",
+                        description = "Season $seasonNum of the series",
+                        episodeCount = 10,
+                        posterPath = null
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "getTvSeriesSeasons error", e)
+            emptyList()
+        }
+    }
+    
+    override suspend fun getTvSeriesSeason(seriesId: Int, seasonNumber: Int): com.homeflix.tv.presentation.screens.tvshows.Season {
+        return try {
+            val response = apiService.getTvSeriesSeason(seriesId, seasonNumber)
+            if (response.isSuccessful) {
+                val dto = response.body()!!
+                com.homeflix.tv.presentation.screens.tvshows.Season(
+                    id = dto.id,
+                    seasonNumber = dto.season_number,
+                    name = dto.name ?: "Season ${dto.season_number}",
+                    description = dto.overview ?: "Season ${dto.season_number} of the series",
+                    episodeCount = dto.episode_count ?: 0,
+                    posterPath = dto.poster_path
+                )
+            } else {
+                // Fallback
+                com.homeflix.tv.presentation.screens.tvshows.Season(
+                    id = seasonNumber,
+                    seasonNumber = seasonNumber,
+                    name = "Season $seasonNumber",
+                    description = "Season $seasonNumber of the series",
+                    episodeCount = 10,
+                    posterPath = null
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "getTvSeriesSeason error", e)
+            com.homeflix.tv.presentation.screens.tvshows.Season(
+                id = seasonNumber,
+                seasonNumber = seasonNumber,
+                name = "Season $seasonNumber",
+                description = "Error loading season",
+                episodeCount = 0,
+                posterPath = null
+            )
+        }
+    }
+    
+    override suspend fun getTvSeriesEpisodes(seriesId: Int, seasonNumber: Int): List<com.homeflix.tv.presentation.screens.tvshows.Episode> {
+        return try {
+            val response = apiService.getTvSeriesEpisodes(seriesId, seasonNumber)
+            if (response.isSuccessful) {
+                val episodes = response.body() ?: emptyList()
+                episodes.mapIndexed { index, dto ->
+                    com.homeflix.tv.presentation.screens.tvshows.Episode(
+                        id = dto.id,
+                        title = dto.title ?: "Episode ${index + 1}",
+                        description = dto.description ?: "Episode ${index + 1} of Season $seasonNumber",
+                        duration = dto.duration?.div(60) ?: 45, // Convert seconds to minutes
+                        rating = dto.rating ?: 0.0,
+                        airDate = dto.releaseDate,
+                        thumbnailPath = dto.thumbnailPath
+                    )
+                }
+            } else {
+                // Fallback to mock data
+                (1..10).map { episodeNum ->
+                    com.homeflix.tv.presentation.screens.tvshows.Episode(
+                        id = (seriesId * 1000) + (seasonNumber * 100) + episodeNum,
+                        title = "Episode $episodeNum",
+                        description = "Episode $episodeNum of Season $seasonNumber",
+                        duration = 45,
+                        rating = 8.0 + (episodeNum * 0.1),
+                        airDate = "2023-01-${episodeNum.toString().padStart(2, '0')}",
+                        thumbnailPath = null
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "getTvSeriesEpisodes error", e)
+            emptyList()
         }
     }
 }

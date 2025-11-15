@@ -54,7 +54,7 @@ fun ContinueWatchingRow(
         return
     }
     
-    // Additional validation - filter out any invalid items
+    // Additional validation - filter out any invalid items and show only movies
     val validItems = remember(continueWatchingItems) {
         continueWatchingItems.filterNotNull().filter { item ->
             try {
@@ -62,7 +62,11 @@ fun ContinueWatchingRow(
                 item.media.id > 0 && 
                 !item.media.title.isNullOrBlank() &&
                 item.progress >= 0f &&
-                item.progress <= 1f
+                item.progress <= 1f &&
+                // Only show movies, not TV episodes
+                (item.media.type == com.homeflix.tv.domain.model.MediaType.MOVIE || 
+                 item.media.type?.name?.equals("MOVIE", ignoreCase = true) == true ||
+                 item.media.type == null) // Include items without type specified (assume movies)
             } catch (e: Exception) {
                 false
             }

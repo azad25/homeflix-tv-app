@@ -166,6 +166,28 @@ interface HomeFlixApiService {
     
     @GET("genres/{id}")
     suspend fun getGenreById(@Path("id") id: Int): Response<GenreDto>
+    
+    // TV Series endpoints (hierarchical API matching web app)
+    @GET("series")
+    suspend fun getTvSeries(): Response<List<MediaDto>>
+    
+    @GET("series/{id}")
+    suspend fun getTvSeriesById(@Path("id") id: Int): Response<MediaDto>
+    
+    @GET("series/{id}/seasons")
+    suspend fun getTvSeriesSeasons(@Path("id") id: Int): Response<List<SeasonDto>>
+    
+    @GET("series/{id}/seasons/{season}")
+    suspend fun getTvSeriesSeason(
+        @Path("id") id: Int,
+        @Path("season") seasonNumber: Int
+    ): Response<SeasonDto>
+    
+    @GET("series/{id}/seasons/{season}/episodes")
+    suspend fun getTvSeriesEpisodes(
+        @Path("id") id: Int,
+        @Path("season") seasonNumber: Int
+    ): Response<List<MediaDto>>
 }
 
 // Response wrapper classes

@@ -8,6 +8,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import com.homeflix.tv.presentation.components.VideoPlayer
 
+
 @UnstableApi
 @Composable
 fun VideoPlayerScreen(
@@ -15,6 +16,7 @@ fun VideoPlayerScreen(
     startTime: Long = 0L,
     forceStartFromBeginning: Boolean = false,
     onNavigateBack: () -> Unit,
+    onNavigateToEpisode: ((Int) -> Unit)? = null,
     viewModel: VideoPlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -53,7 +55,11 @@ fun VideoPlayerScreen(
                 onProgress = { currentTime, duration ->
                     viewModel.updateProgress(currentTime, duration)
                 },
-                mediaRepository = viewModel.getMediaRepository(),
+                onPlayNext = { nextEpisode ->
+                    // Navigate to next episode
+                    onNavigateToEpisode?.invoke(nextEpisode.id)
+                },
+                mediaRepository = null, // VideoPlayer will get it from Hilt EntryPoint
                 modifier = Modifier.fillMaxSize()
             )
         }

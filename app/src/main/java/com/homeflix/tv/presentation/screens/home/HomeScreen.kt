@@ -36,6 +36,7 @@ fun HomeScreen(
                 navController.navigate(Screen.Browse.route)
             }
         )
+        
         val currentState = uiState
         when (currentState) {
             is HomeUiState.Loading -> {
@@ -77,11 +78,12 @@ fun HomeScreen(
             }
             
             is HomeUiState.Success -> {
-
-                
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f), // This makes LazyColumn take remaining space
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp) // Add bottom padding
                 ) {
                     // Hero Section
                     if (currentState.featuredMedia.isNotEmpty()) {
@@ -175,10 +177,7 @@ fun HomeScreen(
                         }
                     }
                     
-                    // Bottom padding
-                    item {
-                        Spacer(modifier = Modifier.height(32.dp))
-                    }
+                    // Remove this item since we're using contentPadding now
                 }
             }
         }

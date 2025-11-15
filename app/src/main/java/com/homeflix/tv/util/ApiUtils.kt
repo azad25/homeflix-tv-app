@@ -151,4 +151,45 @@ object ApiUtils {
     fun getSubtitleTracksUrl(mediaId: Int): String {
         return "${getBaseUrl()}/api/media/$mediaId/subtitles"
     }
+    
+    // TV Series specific methods
+    fun getSeriesPosterUrl(series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {
+        // Always use the series poster endpoint like the web app
+        val url = "${getBaseUrl()}/api/series/${series.id}/poster"
+        android.util.Log.d("ApiUtils", "Series poster URL for '${series.title}': $url")
+        return url
+    }
+    
+    fun getSeriesThumbnailUrl(seriesId: Int): String {
+        return "${getBaseUrl()}/api/thumbnails/$seriesId"
+    }
+    
+    fun getSeriesBannerUrl(series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {
+        return if (!series.bannerPath.isNullOrEmpty()) {
+            if (series.bannerPath.startsWith("http")) {
+                series.bannerPath
+            } else {
+                val fileName = series.bannerPath.split("/").lastOrNull()
+                if (!fileName.isNullOrEmpty()) {
+                    "${getBaseUrl()}/api/admin/assets/$fileName"
+                } else {
+                    "${getBaseUrl()}/api/series/${series.id}/banner"
+                }
+            }
+        } else {
+            "${getBaseUrl()}/api/series/${series.id}/banner"
+        }
+    }
+    
+    fun getEpisodeThumbnailUrl(episode: com.homeflix.tv.presentation.screens.tvshows.Episode): String {
+        return if (!episode.thumbnailPath.isNullOrEmpty()) {
+            if (episode.thumbnailPath.startsWith("http")) {
+                episode.thumbnailPath
+            } else {
+                "${getBaseUrl()}/api/thumbnails/${episode.id}"
+            }
+        } else {
+            "${getBaseUrl()}/api/thumbnails/${episode.id}"
+        }
+    }
 }

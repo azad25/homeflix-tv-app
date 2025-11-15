@@ -11,6 +11,9 @@ import com.homeflix.tv.presentation.screens.details.DetailsScreen
 import com.homeflix.tv.presentation.screens.home.NetflixHomeScreen
 import com.homeflix.tv.presentation.screens.player.VideoPlayerScreen
 import com.homeflix.tv.presentation.screens.search.SearchScreen
+import com.homeflix.tv.presentation.screens.tvshows.TvShowsScreen
+import com.homeflix.tv.presentation.screens.tvshows.TvSeriesDetailsScreen
+import com.homeflix.tv.presentation.screens.tvshows.TvSeriesSeasonScreen
 
 @UnstableApi
 @Composable
@@ -31,6 +34,34 @@ fun HomeFlixNavigation(
         
         composable(Screen.Search.route) {
             SearchScreen(navController = navController)
+        }
+        
+        composable(Screen.TvShows.route) {
+            TvShowsScreen(navController = navController)
+        }
+        
+        composable(
+            route = Screen.TvSeriesDetails.route,
+            arguments = Screen.TvSeriesDetails.arguments
+        ) { backStackEntry ->
+            val seriesId = backStackEntry.arguments?.getString("seriesId") ?: ""
+            TvSeriesDetailsScreen(
+                seriesId = seriesId,
+                navController = navController
+            )
+        }
+        
+        composable(
+            route = Screen.TvSeriesSeason.route,
+            arguments = Screen.TvSeriesSeason.arguments
+        ) { backStackEntry ->
+            val seriesId = backStackEntry.arguments?.getString("seriesId") ?: ""
+            val seasonNumber = backStackEntry.arguments?.getInt("seasonNumber") ?: 1
+            TvSeriesSeasonScreen(
+                seriesId = seriesId,
+                seasonNumber = seasonNumber,
+                navController = navController
+            )
         }
         
         composable(
@@ -58,6 +89,12 @@ fun HomeFlixNavigation(
                 forceStartFromBeginning = forceStart,
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToEpisode = { nextEpisodeId ->
+                    // Navigate to next episode, replacing current player
+                    navController.navigate(Screen.VideoPlayer.createRoute(nextEpisodeId)) {
+                        popUpTo(Screen.VideoPlayer.route) { inclusive = true }
+                    }
                 }
             )
         }
@@ -70,6 +107,26 @@ sealed class Screen(val route: String) {
         fun createRoute(type: String = "") = if (type.isNotEmpty()) "browse?type=$type" else "browse"
     }
     object Search : Screen("search")
+    object TvShows : Screen("tv-shows")
+    object TvSeriesDetails : Screen("tv-series/{seriesId}") {
+        fun createRoute(seriesId: String) = "tv-series/$seriesId"
+        val arguments = listOf(
+            androidx.navigation.navArgument("seriesId") {
+                type = androidx.navigation.NavType.StringType
+            }
+        )
+    }
+    object TvSeriesSeason : Screen("tv-series/{seriesId}/season/{seasonNumber}") {
+        fun createRoute(seriesId: String, seasonNumber: Int) = "tv-series/$seriesId/season/$seasonNumber"
+        val arguments = listOf(
+            androidx.navigation.navArgument("seriesId") {
+                type = androidx.navigation.NavType.StringType
+            },
+            androidx.navigation.navArgument("seasonNumber") {
+                type = androidx.navigation.NavType.IntType
+            }
+        )
+    }
     object Details : Screen("details/{mediaId}") {
         fun createRoute(mediaId: String) = "details/$mediaId"
         val arguments = listOf(
