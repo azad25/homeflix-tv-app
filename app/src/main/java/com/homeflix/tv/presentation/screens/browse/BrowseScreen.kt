@@ -276,12 +276,7 @@ private fun NetflixMovieCard(
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                    onClick()
-                    true
-                } else false
-            }
+
             .clickable { onClick() }
     ) {
         Card(

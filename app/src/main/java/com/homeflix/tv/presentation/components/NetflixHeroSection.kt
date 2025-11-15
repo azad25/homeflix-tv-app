@@ -267,6 +267,28 @@ fun NetflixHeroSection(
                         )
                     }
                     
+                    // Rating with yellow star
+                    if (media.rating > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "★",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    color = Color(0xFFFFD700) // Gold/Yellow
+                                )
+                            )
+                            Text(
+                                text = String.format("%.1f", media.rating),
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    color = TextSecondary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            )
+                        }
+                    }
+                    
                     // Age rating
                     Surface(
                         shape = RoundedCornerShape(4.dp),
@@ -372,7 +394,7 @@ fun NetflixHeroSection(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
-                    // Play Button - RESTORED NAVIGATION
+                    // Play Button - PROPER TV NAVIGATION
                     Button(
                         onClick = { onPlayClick(media) },
                         colors = ButtonDefaults.buttonColors(
@@ -431,7 +453,7 @@ fun NetflixHeroSection(
                         }
                     }
                     
-                    // More Info Button - RESTORED NAVIGATION
+                    // More Info Button - PROPER TV NAVIGATION
                     OutlinedButton(
                         onClick = { onDetailsClick(media) },
                         colors = ButtonDefaults.outlinedButtonColors(

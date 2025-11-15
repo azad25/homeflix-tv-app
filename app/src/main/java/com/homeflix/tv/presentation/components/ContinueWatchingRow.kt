@@ -134,19 +134,43 @@ private fun ContinueWatchingCard(
             .width(320.dp)
             .height(180.dp)
             .scale(scale)
-            .clip(RoundedCornerShape(8.dp))
             .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                    onPlay()
-                    true
-                } else false
-            }
             .clickable { onPlay() }
     ) {
+        // Card content with focus border
+        Card(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (isFocused) {
+                        Modifier
+                            .background(
+                                Color.White.copy(alpha = 0.1f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(2.dp)
+                    } else {
+                        Modifier
+                    }
+                ),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.Transparent
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = if (isFocused) 8.dp else 2.dp
+            ),
+            border = if (isFocused) {
+                androidx.compose.foundation.BorderStroke(
+                    width = 3.dp,
+                    color = Color.White
+                )
+            } else null
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
         // Background Image
         AsyncImage(
             model = ApiUtils.getThumbnailUrl(item.media),
@@ -264,6 +288,8 @@ private fun ContinueWatchingCard(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
+            }
+        }
             }
         }
     }

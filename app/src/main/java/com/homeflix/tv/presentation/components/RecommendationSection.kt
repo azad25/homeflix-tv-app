@@ -213,12 +213,7 @@ private fun NetflixRecommendationCard(
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                    onInfo()
-                    true
-                } else false
-            }
+
             .clickable { onInfo() }
     ) {
         Card(

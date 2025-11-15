@@ -379,12 +379,6 @@ private fun VirtualKey(
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                    onClick()
-                    true
-                } else false
-            }
             .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = when {
@@ -416,39 +410,26 @@ private fun GenreItem(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    // Scale animation on focus
-    val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isFocused) 1.5f else 1.0f,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
-        label = "genre_item_scale"
-    )
-    
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .scale(scale)
             .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                    onClick()
-                    true
-                } else false
-            }
             .clickable { onClick() }
-            .padding(vertical = 6.dp, horizontal = 8.dp)
+            .padding(vertical = 8.dp, horizontal = 12.dp)
             .background(
-                color = if (isFocused) Color.White.copy(alpha = 0.2f) else Color.Transparent,
+                color = if (isFocused) NetflixRed.copy(alpha = 0.8f) else Color.Transparent,
                 shape = RoundedCornerShape(6.dp)
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = genre,
-            color = Color.White,
-            fontSize = 12.sp
+            color = if (isFocused) Color.White else Color.White.copy(alpha = 0.8f),
+            fontSize = 13.sp,
+            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Normal
         )
     }
 }
@@ -475,12 +456,6 @@ private fun TopSearchCard(
             .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
-            }
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                    onClick()
-                    true
-                } else false
             }
             .clickable { onClick() }
     ) {
@@ -601,12 +576,6 @@ private fun NetflixMovieCard(
             .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
-            }
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                    onClick()
-                    true
-                } else false
             }
             .clickable { onClick() }
     ) {

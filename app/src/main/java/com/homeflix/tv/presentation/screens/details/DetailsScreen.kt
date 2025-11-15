@@ -204,6 +204,28 @@ fun DetailsScreen(
                                         }
                                     }
                                     
+                                    // Quality badge
+                                    media.quality?.let { quality ->
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = NetflixRed.copy(alpha = 0.8f)
+                                        ) {
+                                            Text(
+                                                text = when {
+                                                    quality.contains("4K", ignoreCase = true) -> "4K"
+                                                    quality.contains("1080", ignoreCase = true) -> "HD"
+                                                    quality.contains("720", ignoreCase = true) -> "720p"
+                                                    else -> "HD"
+                                                },
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold
+                                                ),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                    
                                     if (media.rating > 0) {
                                         Text(
                                             text = "★ ${String.format("%.1f", media.rating)}",
