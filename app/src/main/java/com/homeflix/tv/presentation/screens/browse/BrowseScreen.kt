@@ -1,7 +1,8 @@
 package com.homeflix.tv.presentation.screens.browse
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -258,31 +260,40 @@ private fun NetflixMovieCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    Card(
+    // Scale animation on focus
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.5f else 1.0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "browse_movie_card_scale"
+    )
+    
+    // Netflix-style card with scale animation
+    Box(
         modifier = modifier
             .aspectRatio(2f / 3f) // Netflix poster aspect ratio
+            .scale(scale)
             .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+            }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
+                    onClick()
+                    true
+                } else false
+            }
             .clickable { onClick() }
-            .then(
-                if (isFocused) {
-                    Modifier.border(
-                        width = 2.dp,
-                        color = Color.White,
-                        shape = RoundedCornerShape(6.dp)
-                    )
-                } else {
-                    Modifier
-                }
-            ),
-        shape = RoundedCornerShape(6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isFocused) 6.dp else 2.dp
-        )
     ) {
+        Card(
+            modifier = Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(6.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.Transparent
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = if (isFocused) 8.dp else 2.dp
+            )
+        ) {
         Box {
             // Movie Poster
             AsyncImage(
@@ -400,4 +411,5 @@ private fun NetflixMovieCard(
             }
         }
     }
+}
 }

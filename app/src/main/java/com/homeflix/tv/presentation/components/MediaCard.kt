@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,37 +42,48 @@ fun NetflixMediaCard(
     
     // Netflix-style scale animation on focus
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.05f else 1.0f,
+        targetValue = if (isFocused) 1.5f else 1.0f,
         animationSpec = tween(durationMillis = 200),
         label = "netflix_card_scale"
     )
     
-    Card(
+    // Netflix-style card with scale animation
+    Box(
         modifier = modifier
             .aspectRatio(2f / 3f)
             .scale(scale)
             .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+            }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
+                    onClick()
+                    true
+                } else false
+            }
             .clickable { onClick() }
             .then(
                 if (isFocused) {
-                    Modifier.border(
-                        width = 3.dp,
-                        color = Color.White,
-                        shape = RoundedCornerShape(8.dp)
+                    Modifier.background(
+                        Color.White.copy(alpha = 0.1f),
+                        RoundedCornerShape(8.dp)
                     )
                 } else {
                     Modifier
                 }
-            ),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isFocused) 12.dp else 4.dp
-        )
+            )
     ) {
+        Card(
+            modifier = Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.Transparent
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = if (isFocused) 12.dp else 4.dp
+            )
+        ) {
         Box {
             // Poster Image with caching
             AsyncImage(
@@ -169,4 +181,5 @@ fun MediaCard(
     modifier: Modifier = Modifier
 ) {
     NetflixMediaCard(media = media, onClick = onClick, modifier = modifier)
+}
 }

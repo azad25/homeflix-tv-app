@@ -1,5 +1,7 @@
 package com.homeflix.tv.presentation.screens.search
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -64,14 +67,12 @@ fun SearchScreen(
     val genresFocusRequester = remember { FocusRequester() }
     val contentFocusRequester = remember { FocusRequester() }
     
-    // Virtual keyboard layout
+    // QWERTY Virtual keyboard layout (compact)
     val keyboardRows = listOf(
-        listOf("a", "b", "c", "d", "e", "f"),
-        listOf("g", "h", "i", "j", "k", "l"),
-        listOf("m", "n", "o", "p", "q", "r"),
-        listOf("s", "t", "u", "v", "w", "x"),
-        listOf("y", "z", "1", "2", "3", "4"),
-        listOf("5", "6", "7", "8", "9", "0")
+        listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p"),
+        listOf("a", "s", "d", "f", "g", "h", "j", "k", "l"),
+        listOf("z", "x", "c", "v", "b", "n", "m"),
+        listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
     )
     
     // Handle search when query changes
@@ -110,10 +111,10 @@ fun SearchScreen(
             // LEFT PANEL - Virtual Keyboard & Genres - NETFLIX PRINCIPLE: No container focus
             Column(
                 modifier = Modifier
-                    .width(400.dp)
+                    .width(320.dp) // Reduced from 400dp to 320dp
                     .fillMaxHeight()
                     .background(Color.Black.copy(alpha = 0.9f))
-                    .padding(24.dp)
+                    .padding(16.dp) // Reduced padding from 24dp to 16dp
             ) {
                 // Search Input Display
                 Card(
@@ -160,14 +161,14 @@ fun SearchScreen(
                     }
                 }
                 
-                // Virtual Keyboard
+                // Virtual Keyboard (Compact)
                 Column(
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    modifier = Modifier.padding(bottom = 16.dp) // Reduced from 24dp
                 ) {
                     keyboardRows.forEachIndexed { rowIndex, row ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(2.dp) // Reduced from 4dp
                         ) {
                             row.forEach { key ->
                                 VirtualKey(
@@ -177,13 +178,13 @@ fun SearchScreen(
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp)) // Reduced from 4dp
                     }
                     
                     // Special keys row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp) // Reduced from 8dp
                     ) {
                         // Space key
                         VirtualKey(
@@ -197,7 +198,7 @@ fun SearchScreen(
                         Card(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(40.dp)
+                                .height(32.dp) // Reduced from 40dp to 32dp
                                 .clickable {
                                     if (searchQuery.isNotEmpty()) {
                                         searchQuery = searchQuery.dropLast(1)
@@ -228,9 +229,9 @@ fun SearchScreen(
                     Text(
                         text = "Categories",
                         color = Color.White,
-                        fontSize = 18.sp,
+                        fontSize = 16.sp, // Reduced from 18sp
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        modifier = Modifier.padding(bottom = 8.dp) // Reduced from 12dp
                     )
                     
                     genres.forEach { genre ->
@@ -363,21 +364,34 @@ private fun VirtualKey(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
+    // Scale animation on focus
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isFocused) 1.5f else 1.0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
+        label = "virtual_key_scale"
+    )
+    
     Card(
         modifier = modifier
-            .height(40.dp)
+            .height(32.dp)
+            .scale(scale)
             .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
-            .clickable { onClick() }
-            .then(
-                if (isFocused) {
-                    Modifier.border(2.dp, Color.White, RoundedCornerShape(6.dp))
-                } else {
-                    Modifier
-                }
-            ),
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+            }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
+                    onClick()
+                    true
+                } else false
+            }
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(
-            containerColor = if (isSpecial) Color.Gray.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.3f)
+            containerColor = when {
+                isFocused -> Color.White.copy(alpha = 0.3f)
+                isSpecial -> Color.Gray.copy(alpha = 0.5f)
+                else -> Color.Gray.copy(alpha = 0.3f)
+            }
         ),
         shape = RoundedCornerShape(6.dp)
     ) {
@@ -388,7 +402,7 @@ private fun VirtualKey(
             Text(
                 text = if (key == "space") "SPACE" else key.uppercase(),
                 color = Color.White,
-                fontSize = 14.sp,
+                fontSize = 12.sp, // Reduced from 14sp to 12sp
                 fontWeight = FontWeight.Medium
             )
         }
@@ -402,27 +416,39 @@ private fun GenreItem(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
+    // Scale animation on focus
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isFocused) 1.5f else 1.0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 150),
+        label = "genre_item_scale"
+    )
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .scale(scale)
             .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+            }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
+                    onClick()
+                    true
+                } else false
+            }
             .clickable { onClick() }
-            .padding(vertical = 8.dp, horizontal = 12.dp)
-            .then(
-                if (isFocused) {
-                    Modifier.background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
-                } else {
-                    Modifier
-                }
+            .padding(vertical = 6.dp, horizontal = 8.dp)
+            .background(
+                color = if (isFocused) Color.White.copy(alpha = 0.2f) else Color.Transparent,
+                shape = RoundedCornerShape(6.dp)
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Removed genre icons for cleaner look
         Text(
             text = genre,
             color = Color.White,
-            fontSize = 14.sp
+            fontSize = 12.sp
         )
     }
 }
@@ -434,103 +460,117 @@ private fun TopSearchCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    Card(
+    // Scale animation on focus
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isFocused) 1.5f else 1.0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
+        label = "top_search_card_scale"
+    )
+    
+    // Netflix-style card with scale animation
+    Box(
         modifier = Modifier
             .aspectRatio(2f / 3f)
+            .scale(scale)
             .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+            }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
+                    onClick()
+                    true
+                } else false
+            }
             .clickable { onClick() }
-            .then(
-                if (isFocused) {
-                    Modifier.border(2.dp, Color.White, RoundedCornerShape(8.dp))
-                } else {
-                    Modifier
-                }
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Gray.copy(alpha = 0.3f)
-        ),
-        shape = RoundedCornerShape(8.dp)
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize()
+        Card(
+            modifier = Modifier.fillMaxSize(),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.Gray.copy(alpha = 0.3f)
+            ),
+            shape = RoundedCornerShape(8.dp)
         ) {
-            // Movie Poster
-            AsyncImage(
-                model = ApiUtils.getPosterUrl(media),
-                contentDescription = media.title,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
-            
-            // Title overlay
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Color.Black.copy(alpha = 0.7f),
-                        RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Movie Poster
+                AsyncImage(
+                    model = ApiUtils.getPosterUrl(media),
+                    contentDescription = media.title,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                
+                // Title overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Color.Black.copy(alpha = 0.7f),
+                            RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp)
+                        )
+                        .align(Alignment.BottomCenter)
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = media.title,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    .align(Alignment.BottomCenter)
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = media.title,
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            
-            // "TOP 10" badge (like in screenshot)
-            Surface(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .align(Alignment.TopEnd),
-                color = NetflixRed,
-                shape = RoundedCornerShape(4.dp)
-            ) {
-                Text(
-                    text = "TOP\n10",
-                    color = Color.White,
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                )
-            }
-            
-            // Rating badge if available
-            if (media.rating > 0) {
+                }
+                
+                // "TOP 10" badge (like in screenshot)
                 Surface(
                     modifier = Modifier
                         .padding(8.dp)
-                        .align(Alignment.TopStart),
-                    color = Color.Black.copy(alpha = 0.7f),
+                        .align(Alignment.TopEnd),
+                    color = NetflixRed,
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    Text(
+                        text = "TOP\n10",
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+                
+                // Rating badge if available
+                if (media.rating > 0) {
+                    Surface(
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .align(Alignment.TopStart),
+                        color = Color.Black.copy(alpha = 0.7f),
+                        shape = RoundedCornerShape(4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = Color(0xFFFFD700),
-                            modifier = Modifier.size(10.dp)
-                        )
-                        Text(
-                            text = String.format("%.1f", media.rating),
-                            color = Color.White,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFD700),
+                                modifier = Modifier.size(10.dp)
+                            )
+                            Text(
+                                text = String.format("%.1f", media.rating),
+                                color = Color.White,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -546,117 +586,127 @@ private fun NetflixMovieCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    Card(
+    // Scale animation on focus
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isFocused) 1.5f else 1.0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
+        label = "netflix_movie_card_scale"
+    )
+    
+    // Netflix-style card with scale animation
+    Box(
         modifier = modifier
             .aspectRatio(2f / 3f) // Netflix poster aspect ratio
+            .scale(scale)
             .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+            }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
+                    onClick()
+                    true
+                } else false
+            }
             .clickable { onClick() }
-            .then(
-                if (isFocused) {
-                    Modifier.border(
-                        width = 2.dp,
-                        color = Color.White,
-                        shape = RoundedCornerShape(6.dp)
-                    )
-                } else {
-                    Modifier
-                }
-            ),
-        shape = RoundedCornerShape(6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isFocused) 6.dp else 2.dp
-        )
     ) {
-        Box {
-            // Movie Poster
-            AsyncImage(
-                model = ApiUtils.getPosterUrl(media),
-                contentDescription = media.title,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(6.dp)),
-                contentScale = ContentScale.Crop
+        Card(
+            modifier = Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(6.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.Transparent
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = if (isFocused) 6.dp else 2.dp
             )
-            
-            // Netflix-style overlay on focus
-            if (isFocused) {
-                Box(
+        ) {
+            Box {
+                // Movie Poster
+                AsyncImage(
+                    model = ApiUtils.getPosterUrl(media),
+                    contentDescription = media.title,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Color.Black.copy(alpha = 0.7f),
-                            RoundedCornerShape(6.dp)
-                        )
-                ) {
-                    // Play button
+                        .clip(RoundedCornerShape(6.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                
+                // Netflix-style overlay on focus
+                if (isFocused) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(48.dp)
+                            .fillMaxSize()
                             .background(
-                                NetflixRed,
-                                RoundedCornerShape(24.dp)
-                            ),
-                        contentAlignment = Alignment.Center
+                                Color.Black.copy(alpha = 0.7f),
+                                RoundedCornerShape(6.dp)
+                            )
                     ) {
-                        Text(
-                            text = "▶",
-                            color = Color.White,
-                            style = MaterialTheme.typography.headlineSmall
-                        )
-                    }
-                    
-                    // Movie info at bottom
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(8.dp)
-                    ) {
-                        Text(
-                            text = media.title,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            ),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 4.dp)
+                        // Play button
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(48.dp)
+                                .background(
+                                    NetflixRed,
+                                    RoundedCornerShape(24.dp)
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
-                            media.year?.let { year ->
-                                Text(
-                                    text = year.toString(),
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = TextSecondary
-                                    )
-                                )
-                            }
+                            Text(
+                                text = "▶",
+                                color = Color.White,
+                                style = MaterialTheme.typography.headlineSmall
+                            )
+                        }
+                        
+                        // Movie info at bottom
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(8.dp)
+                        ) {
+                            Text(
+                                text = media.title,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                ),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
                             
-                            if (media.rating > 0) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = Color(0xFFFFD700), // Gold
-                                        modifier = Modifier.size(12.dp)
-                                    )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                media.year?.let { year ->
                                     Text(
-                                        text = String.format("%.1f", media.rating),
+                                        text = year.toString(),
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             color = TextSecondary
                                         )
                                     )
+                                }
+                                
+                                if (media.rating > 0) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Star,
+                                            contentDescription = null,
+                                            tint = Color(0xFFFFD700), // Gold
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Text(
+                                            text = String.format("%.1f", media.rating),
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = TextSecondary
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }

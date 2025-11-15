@@ -24,6 +24,7 @@ import com.homeflix.tv.domain.model.MediaType
 import com.homeflix.tv.presentation.components.NetflixHeroSection
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.components.MediaRow
+import com.homeflix.tv.presentation.components.ContinueWatchingRow
 import com.homeflix.tv.presentation.navigation.Screen
 import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
@@ -55,27 +56,8 @@ fun NetflixHomeScreen(
     var currentFocusArea by remember { mutableStateOf(FocusArea.HERO) }
     var isInitialized by remember { mutableStateOf(false) }
     
-    // NETFLIX-STYLE: Focus on first content row instead of hero
-    LaunchedEffect(uiState) {
-        if (uiState is HomeUiState.Success && !isInitialized) {
-            isInitialized = true
-            delay(800) // Shorter delay for better UX
-            currentFocusArea = FocusArea.CONTENT
-            try {
-                android.util.Log.d("HomeScreen", "Requesting focus on first content row")
-                firstRowFocusRequester.requestFocus()
-            } catch (e: Exception) {
-                android.util.Log.e("HomeScreen", "First row focus failed, trying hero", e)
-                // Fallback to hero if content focus fails
-                try {
-                    currentFocusArea = FocusArea.HERO
-                    heroPlayButtonFocusRequester.requestFocus()
-                } catch (e2: Exception) {
-                    android.util.Log.e("HomeScreen", "All focus requests failed", e2)
-                }
-            }
-        }
-    }
+    // NO AUTO-FOCUS: Let user control navigation naturally
+    // Removed auto-focus to prevent unwanted scrolling
     
     // Ensure LazyColumn starts at top
     LaunchedEffect(uiState) {
@@ -167,7 +149,7 @@ fun NetflixHomeScreen(
                         // FIXED: LazyColumn with state to ensure it starts at top
                         val listState = rememberLazyListState()
                         
-                        // Ensure scroll starts at top
+                        // Ensure scroll starts at top and stays there
                         LaunchedEffect(currentState) {
                             try {
                                 listState.scrollToItem(0)
@@ -222,29 +204,19 @@ fun NetflixHomeScreen(
                         
                         // Continue Watching as LazyColumn item
                         if (currentState.continueWatching.isNotEmpty()) {
-                            val continueWatchingMedia = currentState.continueWatching.mapNotNull { 
-                                try { it.media } catch (e: Exception) { null } 
-                            }
-                            if (continueWatchingMedia.isNotEmpty()) {
-                                item {
-                                    MediaRow(
-                                        title = "Continue Watching",
-                                        mediaList = continueWatchingMedia,
-                                        onMediaClick = { media ->
-                                            navController.navigate(Screen.VideoPlayer.createRoute(media.id))
-                                        },
-                                        focusRequester = firstRowFocusRequester,
-                                        onNavigateUp = {
-                                            currentFocusArea = FocusArea.HERO
-                                            try {
-                                                heroPlayButtonFocusRequester.requestFocus()
-                                            } catch (e: Exception) {
-                                                // Ignore focus errors
-                                            }
-                                        },
-                                        modifier = Modifier.padding(bottom = 24.dp)
-                                    )
-                                }
+                            item {
+                                ContinueWatchingRow(
+                                    continueWatchingItems = currentState.continueWatching,
+                                    onPlay = { media, startTimeMs ->
+                                        // Navigate with resume time
+                                        navController.navigate(Screen.VideoPlayer.createRoute(media.id, startTime = startTimeMs))
+                                    },
+                                    onInfo = { media ->
+                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                    },
+                                    focusRequester = firstRowFocusRequester,
+                                    modifier = Modifier.padding(bottom = 24.dp)
+                                )
                             }
                         }
                         
@@ -252,6 +224,7 @@ fun NetflixHomeScreen(
                         if (currentState.trending.isNotEmpty()) {
                             item {
                                 val trendingRowFocusRequester = remember { FocusRequester() }
+                                val popularMoviesFocusRequester = remember { FocusRequester() }
                                 MediaRow(
                                     title = "Trending Now",
                                     mediaList = currentState.trending,
@@ -261,11 +234,28 @@ fun NetflixHomeScreen(
                                     focusRequester = if (currentState.continueWatching.isEmpty()) firstRowFocusRequester else trendingRowFocusRequester,
                                     onNavigateUp = {
                                         if (currentState.continueWatching.isNotEmpty()) {
-                                            firstRowFocusRequester.requestFocus()
+                                            // Focus continue watching row
+                                            try {
+                                                firstRowFocusRequester.requestFocus()
+                                            } catch (e: Exception) {
+                                                // Fallback to hero
+                                                currentFocusArea = FocusArea.HERO
+                                                heroPlayButtonFocusRequester.requestFocus()
+                                            }
                                         } else {
                                             currentFocusArea = FocusArea.HERO
                                             try {
                                                 heroPlayButtonFocusRequester.requestFocus()
+                                            } catch (e: Exception) {
+                                                // Ignore focus errors
+                                            }
+                                        }
+                                    },
+                                    onNavigateDown = {
+                                        // Navigate to Popular Movies row
+                                        if (currentState.popularMovies.isNotEmpty()) {
+                                            try {
+                                                popularMoviesFocusRequester.requestFocus()
                                             } catch (e: Exception) {
                                                 // Ignore focus errors
                                             }
@@ -279,11 +269,42 @@ fun NetflixHomeScreen(
                         // Popular Movies as LazyColumn item
                         if (currentState.popularMovies.isNotEmpty()) {
                             item {
+                                val popularMoviesFocusRequester = remember { FocusRequester() }
+                                val recentlyAddedFocusRequester = remember { FocusRequester() }
                                 MediaRow(
                                     title = "Popular Movies",
                                     mediaList = currentState.popularMovies,
                                     onMediaClick = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                    },
+                                    focusRequester = popularMoviesFocusRequester,
+                                    onNavigateUp = {
+                                        // Navigate back to Trending Now
+                                        if (currentState.trending.isNotEmpty()) {
+                                            try {
+                                                // Focus trending row
+                                                if (currentState.continueWatching.isEmpty()) {
+                                                    firstRowFocusRequester.requestFocus()
+                                                } else {
+                                                    // There's a trending row focus requester we need to access
+                                                    firstRowFocusRequester.requestFocus()
+                                                }
+                                            } catch (e: Exception) {
+                                                // Fallback to hero
+                                                currentFocusArea = FocusArea.HERO
+                                                heroPlayButtonFocusRequester.requestFocus()
+                                            }
+                                        }
+                                    },
+                                    onNavigateDown = {
+                                        // Navigate to Recently Added row
+                                        if (currentState.recentlyAdded.isNotEmpty()) {
+                                            try {
+                                                recentlyAddedFocusRequester.requestFocus()
+                                            } catch (e: Exception) {
+                                                // Ignore focus errors
+                                            }
+                                        }
                                     },
                                     modifier = Modifier.padding(bottom = 24.dp)
                                 )
@@ -293,11 +314,37 @@ fun NetflixHomeScreen(
                         // Recently Added as LazyColumn item
                         if (currentState.recentlyAdded.isNotEmpty()) {
                             item {
+                                val recentlyAddedFocusRequester = remember { FocusRequester() }
+                                val recommendedFocusRequester = remember { FocusRequester() }
                                 MediaRow(
                                     title = "Recently Added",
                                     mediaList = currentState.recentlyAdded,
                                     onMediaClick = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                    },
+                                    focusRequester = recentlyAddedFocusRequester,
+                                    onNavigateUp = {
+                                        // Navigate back to Popular Movies
+                                        if (currentState.popularMovies.isNotEmpty()) {
+                                            try {
+                                                // We need to access the popular movies focus requester
+                                                firstRowFocusRequester.requestFocus()
+                                            } catch (e: Exception) {
+                                                // Fallback to hero
+                                                currentFocusArea = FocusArea.HERO
+                                                heroPlayButtonFocusRequester.requestFocus()
+                                            }
+                                        }
+                                    },
+                                    onNavigateDown = {
+                                        // Navigate to Recommended row
+                                        if (currentState.recommended.isNotEmpty()) {
+                                            try {
+                                                recommendedFocusRequester.requestFocus()
+                                            } catch (e: Exception) {
+                                                // Ignore focus errors
+                                            }
+                                        }
                                     },
                                     modifier = Modifier.padding(bottom = 24.dp)
                                 )
@@ -307,11 +354,26 @@ fun NetflixHomeScreen(
                         // Recommended as LazyColumn item
                         if (currentState.recommended.isNotEmpty()) {
                             item {
+                                val recommendedFocusRequester = remember { FocusRequester() }
                                 MediaRow(
                                     title = "Recommended for You",
                                     mediaList = currentState.recommended,
                                     onMediaClick = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                    },
+                                    focusRequester = recommendedFocusRequester,
+                                    onNavigateUp = {
+                                        // Navigate back to Recently Added
+                                        if (currentState.recentlyAdded.isNotEmpty()) {
+                                            try {
+                                                // We need to access the recently added focus requester
+                                                firstRowFocusRequester.requestFocus()
+                                            } catch (e: Exception) {
+                                                // Fallback to hero
+                                                currentFocusArea = FocusArea.HERO
+                                                heroPlayButtonFocusRequester.requestFocus()
+                                            }
+                                        }
                                     },
                                     modifier = Modifier.padding(bottom = 24.dp)
                                 )

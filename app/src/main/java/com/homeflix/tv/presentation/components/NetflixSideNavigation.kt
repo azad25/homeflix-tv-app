@@ -1,7 +1,8 @@
 package com.homeflix.tv.presentation.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -85,6 +87,13 @@ private fun NetflixNavIcon(
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     
+    // Netflix-style scale animation on focus
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isFocused) 1.5f else 1.0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
+        label = "nav_icon_scale"
+    )
+    
     // Auto-focus this icon when requested
     LaunchedEffect(autoFocus) {
         if (autoFocus) {
@@ -100,17 +109,13 @@ private fun NetflixNavIcon(
     Box(
         modifier = Modifier
             .size(36.dp)
+            .scale(scale)
             .background(
                 color = when {
                     isSelected -> Color(0xFFE50914) // Netflix Red
-                    isFocused -> Color.White.copy(alpha = 0.1f)
+                    isFocused -> Color.White.copy(alpha = 0.2f)
                     else -> Color.Transparent
                 },
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
-            )
-            .border(
-                width = if (isFocused) 2.dp else 0.dp,
-                color = if (isFocused) Color.White else Color.Transparent,
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
             )
             .focusRequester(focusRequester)

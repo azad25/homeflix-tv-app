@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -388,7 +389,27 @@ fun NetflixHeroSection(
                                     Modifier
                                 }
                             )
-                            .onFocusChanged { playButtonFocused = it.isFocused },
+                            .onFocusChanged { 
+                                playButtonFocused = it.isFocused
+                                if (it.isFocused) {
+                                    isUserInteracting = true
+                                }
+                            }
+                            .onKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                    when (keyEvent.key) {
+                                        Key.DirectionRight -> {
+                                            infoButtonFocusRequester.requestFocus()
+                                            true
+                                        }
+                                        Key.DirectionDown -> {
+                                            onNavigateDown?.invoke()
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                } else false
+                            },
                         elevation = ButtonDefaults.buttonElevation(
                             defaultElevation = if (playButtonFocused) 6.dp else 2.dp
                         )
@@ -431,7 +452,27 @@ fun NetflixHeroSection(
                         modifier = Modifier
                             .height(44.dp)
                             .focusRequester(infoButtonFocusRequester)
-                            .onFocusChanged { infoButtonFocused = it.isFocused }
+                            .onFocusChanged { 
+                                infoButtonFocused = it.isFocused
+                                if (it.isFocused) {
+                                    isUserInteracting = true
+                                }
+                            }
+                            .onKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                    when (keyEvent.key) {
+                                        Key.DirectionLeft -> {
+                                            playButtonFocusRequester?.requestFocus()
+                                            true
+                                        }
+                                        Key.DirectionDown -> {
+                                            onNavigateDown?.invoke()
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                } else false
+                            }
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,

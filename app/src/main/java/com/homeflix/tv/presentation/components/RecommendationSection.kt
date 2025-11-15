@@ -1,7 +1,8 @@
 package com.homeflix.tv.presentation.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
@@ -16,9 +17,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -193,26 +196,35 @@ private fun NetflixRecommendationCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    Card(
+    // Scale animation on focus
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.5f else 1.0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "recommendation_card_scale"
+    )
+    
+    // Netflix-style card with scale animation
+    Box(
         modifier = modifier
             .width(220.dp)
             .aspectRatio(16f / 9f) // Netflix landscape card ratio
+            .scale(scale)
             .focusable()
-            .onFocusChanged { isFocused = it.isFocused }
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+            }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
+                    onInfo()
+                    true
+                } else false
+            }
             .clickable { onInfo() }
-            .then(
-                if (isFocused) {
-                    Modifier.border(
-                        width = 3.dp,
-                        color = Color.White,
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                } else {
-                    Modifier
-                }
-            ),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
+    ) {
+        Card(
+            modifier = Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(
             containerColor = Color.Transparent
         ),
         elevation = CardDefaults.cardElevation(
@@ -378,4 +390,5 @@ private fun NetflixRecommendationCard(
             }
         }
     }
+}
 }

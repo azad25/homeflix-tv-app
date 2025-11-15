@@ -5,58 +5,56 @@
     android:viewportWidth="320"
     android:viewportHeight="180">
     
-    <!-- Netflix Red Background with rounded corners -->
+    <!-- Background -->
     <path
-        android:fillColor="#E50914"
-        android:pathData="M20,20 L300,20 A20,20 0 0,1 320,40 L320,140 A20,20 0 0,1 300,160 L20,160 A20,20 0 0,1 0,140 L0,40 A20,20 0 0,1 20,20 Z" />
+        android:fillColor="#FF3333"
+        android:pathData="M0,0h320v180h-320z" />
     
-    <!-- White HOMEFLIX text -->
-    <group android:translateX="160" android:translateY="80">
+    <!-- Rounded corners -->
+    <path
+        android:fillColor="#FF3333"
+        android:pathData="M16,0h288c8.837,0 16,7.163 16,16v148c0,8.837 -7.163,16 -16,16h-288c-8.837,0 -16,-7.163 -16,-16v-148c0,-8.837 7.163,-16 16,-16z" />
+    
+    <!-- HOMEFLIX Text (centered) -->
+    <group android:scaleX="1.2" android:scaleY="1.2" android:pivotX="160" android:pivotY="90">
         <!-- H -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M-120,-20 L-110,-20 L-110,20 L-120,20 Z M-120,-5 L-95,-5 L-95,5 L-120,5 Z M-105,-20 L-95,-20 L-95,20 L-105,20 Z" />
+            android:pathData="M50,70 L50,110 L55,110 L55,95 L65,95 L65,110 L70,110 L70,70 L65,70 L65,90 L55,90 L55,70 Z" />
         
         <!-- O -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M-85,-20 L-65,-20 L-65,-10 L-85,-10 Z M-85,-10 L-75,-10 L-75,10 L-85,10 Z M-75,10 L-65,10 L-65,20 L-75,20 Z M-85,10 L-65,10 L-65,20 L-85,20 Z M-75,-10 L-65,-10 L-65,10 L-75,10 Z" />
+            android:pathData="M80,70 C87,70 92,75 92,82 L92,98 C92,105 87,110 80,110 C73,110 68,105 68,98 L68,82 C68,75 73,70 80,70 Z M80,75 C76,75 73,78 73,82 L73,98 C73,102 76,105 80,105 C84,105 87,102 87,98 L87,82 C87,78 84,75 80,75 Z" />
         
         <!-- M -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M-55,-20 L-45,-20 L-45,20 L-55,20 Z M-45,-20 L-35,-20 L-35,0 L-45,0 Z M-35,-20 L-25,-20 L-25,0 L-35,0 Z M-25,-20 L-15,-20 L-15,20 L-25,20 Z" />
+            android:pathData="M100,70 L100,110 L105,110 L105,85 L110,105 L115,105 L120,85 L120,110 L125,110 L125,70 L115,70 L112.5,95 L110,70 Z" />
         
         <!-- E -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M-5,-20 L5,-20 L5,20 L-5,20 Z M-5,-20 L25,-20 L25,-10 L-5,-10 Z M-5,-5 L20,-5 L20,5 L-5,5 Z M-5,10 L25,10 L25,20 L-5,20 Z" />
+            android:pathData="M135,70 L135,110 L155,110 L155,105 L140,105 L140,92.5 L150,92.5 L150,87.5 L140,87.5 L140,75 L155,75 L155,70 Z" />
         
         <!-- F -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M35,-20 L45,-20 L45,20 L35,20 Z M35,-20 L65,-20 L65,-10 L35,-10 Z M35,-5 L60,-5 L60,5 L35,5 Z" />
+            android:pathData="M165,70 L165,110 L170,110 L170,92.5 L180,92.5 L180,87.5 L170,87.5 L170,75 L185,75 L185,70 Z" />
         
         <!-- L -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M75,-20 L85,-20 L85,20 L75,20 Z M75,10 L105,10 L105,20 L75,20 Z" />
+            android:pathData="M195,70 L195,110 L215,110 L215,105 L200,105 L200,70 Z" />
         
         <!-- I -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M115,-20 L125,-20 L125,20 L115,20 Z" />
+            android:pathData="M225,70 L225,75 L230,75 L230,105 L225,105 L225,110 L245,110 L245,105 L240,105 L240,75 L245,75 L245,70 Z" />
         
         <!-- X -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M135,-20 L145,-10 L155,-20 L165,-20 L150,-5 L165,10 L155,10 L145,0 L135,10 L125,10 L140,-5 L125,-20 Z" />
-    </group>
-    
-    <!-- TV text -->
-    <group android:translateX="160" android:translateY="120">
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M-15,-8 L15,-8 L15,-4 L5,-4 L5,8 L-5,8 L-5,-4 L-15,-4 Z M20,-8 L30,-8 L30,8 L20,8 Z M30,-8 L40,-8 L40,-4 L30,-4 Z M30,4 L40,4 L40,8 L30,8 Z" />
+            android:pathData="M255,70 L262.5,85 L270,70 L275,70 L265,90 L275,110 L270,110 L262.5,95 L255,110 L250,110 L260,90 L250,70 Z" />
     </group>
 </vector>

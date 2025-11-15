@@ -5,48 +5,47 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     
-    <!-- Netflix Red background with rounded corners -->
-    <path
-        android:fillColor="#E50914"
-        android:pathData="M8,8 L100,8 A8,8 0 0,1 108,16 L108,92 A8,8 0 0,1 100,100 L8,100 A8,8 0 0,1 0,92 L0,16 A8,8 0 0,1 8,8 Z" />
-    
-    <!-- White HOMEFLIX text - simplified and bold -->
-    <group android:translateX="54" android:translateY="54">
-        <!-- H -->
+    <!-- Simplified HOMEFLIX logo -->
+    <group android:scaleX="0.9" android:scaleY="0.9" android:pivotX="54" android:pivotY="54">
+        <!-- Main text block -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M-40,-12 L-36,-12 L-36,12 L-40,12 Z M-40,-2 L-30,-2 L-30,2 L-40,2 Z M-34,-12 L-30,-12 L-30,12 L-34,12 Z" />
+            android:pathData="M15,40 L15,68 L19,68 L19,56 L25,56 L25,68 L29,68 L29,40 L25,40 L25,52 L19,52 L19,40 Z" />
         
         <!-- O -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M-26,-12 L-18,-12 L-18,-8 L-26,-8 Z M-26,-8 L-22,-8 L-22,8 L-26,8 Z M-22,8 L-18,8 L-18,12 L-22,12 Z M-26,8 L-18,8 L-18,12 L-26,12 Z M-22,-8 L-18,-8 L-18,8 L-22,8 Z" />
+            android:pathData="M35,40 C39,40 42,43 42,47 L42,61 C42,65 39,68 35,68 C31,68 28,65 28,61 L28,47 C28,43 31,40 35,40 Z M35,44 C33,44 32,45 32,47 L32,61 C32,63 33,64 35,64 C37,64 38,63 38,61 L38,47 C38,45 37,44 35,44 Z" />
         
         <!-- M -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M-14,-12 L-10,-12 L-10,12 L-14,12 Z M-10,-12 L-6,-12 L-6,0 L-10,0 Z M-6,-12 L-2,-12 L-2,0 L-6,0 Z M-2,-12 L2,-12 L2,12 L-2,12 Z" />
+            android:pathData="M46,40 L46,68 L50,68 L50,50 L52,62 L56,62 L58,50 L58,68 L62,68 L62,40 L56,40 L54,56 L52,40 Z" />
         
         <!-- E -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M6,-12 L10,-12 L10,12 L6,12 Z M6,-12 L18,-12 L18,-8 L6,-8 Z M6,-2 L16,-2 L16,2 L6,2 Z M6,8 L18,8 L18,12 L6,12 Z" />
+            android:pathData="M66,40 L66,68 L78,68 L78,64 L70,64 L70,56 L76,56 L76,52 L70,52 L70,44 L78,44 L78,40 Z" />
         
+        <!-- Second row: FLIX -->
         <!-- F -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M22,-12 L26,-12 L26,12 L22,12 Z M22,-12 L34,-12 L34,-8 L22,-8 Z M22,-2 L32,-2 L32,2 L22,2 Z" />
+            android:pathData="M15,72 L15,100 L19,100 L19,88 L27,88 L27,84 L19,84 L19,76 L29,76 L29,72 Z" />
         
         <!-- L -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M38,-12 L42,-12 L42,12 L38,12 Z M38,8 L50,8 L50,12 L38,12 Z" />
-    </group>
-    
-    <!-- Smaller "TV" text below -->
-    <group android:translateX="54" android:translateY="75">
+            android:pathData="M33,72 L33,100 L45,100 L45,96 L37,96 L37,72 Z" />
+        
+        <!-- I -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M-8,-4 L8,-4 L8,-2 L2,-2 L2,4 L-2,4 L-2,-2 L-8,-2 Z M10,-4 L14,-4 L14,4 L10,4 Z M14,-4 L18,-4 L18,-2 L14,-2 Z M14,2 L18,2 L18,4 L14,4 Z" />
+            android:pathData="M49,72 L49,76 L51,76 L51,96 L49,96 L49,100 L57,100 L57,96 L55,96 L55,76 L57,76 L57,72 Z" />
+        
+        <!-- X -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M61,72 L65,82 L69,72 L73,72 L67,86 L73,100 L69,100 L65,90 L61,100 L57,100 L63,86 L57,72 Z" />
     </group>
 </vector>

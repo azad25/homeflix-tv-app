@@ -57,13 +57,25 @@ fun MediaRow(
             modifier = Modifier.fillMaxWidth()
         ) {
             itemsIndexed(mediaList) { index, media ->
+                val itemFocusRequester = if (index < itemFocusRequesters.size) itemFocusRequesters[index] else null
+                
                 NetflixMediaCard(
                     media = media,
                     onClick = { onMediaClick(media) },
                     modifier = Modifier
                         .width(160.dp)
+                        .then(
+                            if (itemFocusRequester != null && index == 0 && focusRequester != null) {
+                                Modifier.focusRequester(focusRequester)
+                            } else if (itemFocusRequester != null) {
+                                Modifier.focusRequester(itemFocusRequester)
+                            } else {
+                                Modifier
+                            }
+                        )
                         .onFocusChanged { focusState ->
                             if (focusState.isFocused) {
+                                currentFocusedIndex = index
                                 // Auto-scroll to focused item - Netflix behavior
                                 coroutineScope.launch {
                                     listState.animateScrollToItem(index)
@@ -71,10 +83,40 @@ fun MediaRow(
                             }
                         }
                         .onKeyEvent { keyEvent ->
-                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionUp) {
-                                // Navigate up from any card in the row
-                                onNavigateUp?.invoke()
-                                true
+                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                when (keyEvent.key) {
+                                    Key.DirectionUp -> {
+                                        // Navigate up from any card in the row
+                                        onNavigateUp?.invoke()
+                                        true
+                                    }
+                                    Key.DirectionDown -> {
+                                        // Navigate down from any card in the row
+                                        onNavigateDown?.invoke()
+                                        true
+                                    }
+                                    Key.DirectionLeft -> {
+                                        // Navigate to previous item in row
+                                        if (index > 0) {
+                                            val prevIndex = index - 1
+                                            if (prevIndex < itemFocusRequesters.size) {
+                                                itemFocusRequesters[prevIndex].requestFocus()
+                                            }
+                                        }
+                                        true
+                                    }
+                                    Key.DirectionRight -> {
+                                        // Navigate to next item in row
+                                        if (index < mediaList.size - 1) {
+                                            val nextIndex = index + 1
+                                            if (nextIndex < itemFocusRequesters.size) {
+                                                itemFocusRequesters[nextIndex].requestFocus()
+                                            }
+                                        }
+                                        true
+                                    }
+                                    else -> false
+                                }
                             } else false
                         }
                 )
