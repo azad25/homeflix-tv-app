@@ -83,7 +83,7 @@ interface HomeFlixApiService {
     suspend fun updatePlaybackProgress(@Body request: PlaybackProgressRequest): Response<Unit>
     
     // Alternative endpoint matching web app
-    @POST("api/playback/progress")
+    @POST("playback/progress")
     suspend fun updatePlaybackProgressAlt(
         @Header("X-User-ID") userId: String = "1",
         @Body request: PlaybackProgressAltRequest
@@ -130,28 +130,28 @@ interface HomeFlixApiService {
         @Query("limit") limit: Int = 20
     ): Response<List<MediaDto>>
     
-    @GET("api/recommendations/mixed")
+    @GET("recommendations/mixed")
     suspend fun getMixedRecommendations(@Query("limit") limit: Int = 25): Response<List<MediaDto>>
 
-    @GET("api/recommendations/trending")
+    @GET("recommendations/trending")
     suspend fun getTrendingRecommendations(@Query("limit") limit: Int = 25): Response<List<MediaDto>>
 
-    @GET("api/recommendations/popular")
+    @GET("recommendations/popular")
     suspend fun getPopularRecommendations(@Query("limit") limit: Int = 25): Response<List<MediaDto>>
 
-    @GET("api/recommendations/recent")
+    @GET("recommendations/recent")
     suspend fun getRecentRecommendations(@Query("limit") limit: Int = 25): Response<List<MediaDto>>
 
-    @GET("api/recommendations/personalized")
+    @GET("recommendations/personalized")
     suspend fun getPersonalizedRecommendations(@Query("limit") limit: Int = 25): Response<List<MediaDto>>
 
-    @GET("api/recommendations/unique")
+    @GET("recommendations/unique")
     suspend fun getUniqueRecommendations(@Query("limit") limit: Int = 25): Response<List<MediaDto>>
 
-    @GET("api/recommendations/top-rated")
+    @GET("recommendations/top-rated")
     suspend fun getTopRatedRecommendations(@Query("limit") limit: Int = 25): Response<List<MediaDto>>
 
-    @GET("api/recommendations/genre")
+    @GET("recommendations/genre")
     suspend fun getGenreRecommendations(@Query("limit") limit: Int = 25): Response<List<MediaDto>>
     
     @GET("recommendations/similar/{id}")

@@ -586,20 +586,6 @@ fun VideoPlayer(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Netflix-style red buffering indicator - Clean loader only
-            if (isBuffering) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = Color(0xFFE50914), // Netflix red
-                        modifier = Modifier.size(64.dp),
-                        strokeWidth = 6.dp
-                    )
-                }
-            }
-
             // Custom TV Controls (Netflix-style)
             if (showControls) {
                 Box(
@@ -934,6 +920,20 @@ fun VideoPlayer(
                             }
                         }
                     }
+                }
+            }
+            
+            // Netflix-style red buffering indicator - Clean loader on top of everything
+            if (isBuffering) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = Color(0xFFE50914), // Netflix red
+                        modifier = Modifier.size(64.dp),
+                        strokeWidth = 6.dp
+                    )
                 }
             }
             

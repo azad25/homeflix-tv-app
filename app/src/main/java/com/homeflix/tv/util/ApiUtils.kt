@@ -172,8 +172,8 @@ object ApiUtils {
             }
         }
         
-        // Use posters endpoint (matching web app exactly)
-        return "${getBaseUrl()}/posters/${series.id}"
+        // Use series poster endpoint (matching web app exactly)
+        return "${getBaseUrl()}/series/${series.id}/poster"
     }
     
     fun getSeriesBackdropUrl(series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {

@@ -236,7 +236,7 @@ private fun TvSeriesCard(
                 var currentImageUrl by remember { mutableStateOf(ApiUtils.getSeriesPosterUrl(series)) }
                 var fallbackLevel by remember { mutableStateOf(0) }
                 
-                if (fallbackLevel >= 2) {
+                if (fallbackLevel >= 3) {
                     // Final fallback: Gradient with series title
                     Box(
                         modifier = Modifier
@@ -275,7 +275,7 @@ private fun TvSeriesCard(
                         }
                     }
                 } else {
-                    // Try poster with proper fallback chain (matching web app)
+                    // Try poster with proper fallback chain (matching web app exactly)
                     AsyncImage(
                         model = currentImageUrl,
                         contentDescription = series.title,
@@ -286,14 +286,20 @@ private fun TvSeriesCard(
                         onError = {
                             when (fallbackLevel) {
                                 0 -> {
-                                    // First fallback: Try thumbnail endpoint (matching web app)
-                                    currentImageUrl = "${ApiUtils.getBaseUrl()}/thumbnails/${series.id}"
+                                    // First fallback: Try /api/posters/{id} endpoint (matching web app)
+                                    currentImageUrl = "${ApiUtils.getBaseUrl()}/posters/${series.id}"
                                     fallbackLevel = 1
-                                    android.util.Log.d("TvSeriesCard", "Fallback to thumbnail: $currentImageUrl")
+                                    android.util.Log.d("TvSeriesCard", "Fallback to posters API: $currentImageUrl")
                                 }
                                 1 -> {
-                                    // Final fallback to gradient
+                                    // Second fallback: Try thumbnail endpoint (matching web app)
+                                    currentImageUrl = "${ApiUtils.getBaseUrl()}/thumbnails/${series.id}"
                                     fallbackLevel = 2
+                                    android.util.Log.d("TvSeriesCard", "Fallback to thumbnail: $currentImageUrl")
+                                }
+                                2 -> {
+                                    // Final fallback to gradient
+                                    fallbackLevel = 3
                                     android.util.Log.d("TvSeriesCard", "All image sources failed, showing gradient")
                                 }
                             }
