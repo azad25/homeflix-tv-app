@@ -56,15 +56,30 @@ fun NetflixHomeScreen(
     var currentFocusArea by remember { mutableStateOf(FocusArea.HERO) }
     var isInitialized by remember { mutableStateOf(false) }
     
-    // NO AUTO-FOCUS: Let user control navigation naturally
-    // Removed auto-focus to prevent unwanted scrolling
+    // NETFLIX-STYLE FOCUS MANAGEMENT: Start with hero section
+    LaunchedEffect(uiState) {
+        if (uiState is HomeUiState.Success && !isInitialized) {
+            delay(300) // Allow UI to settle
+            try {
+                // Focus hero section first (like Netflix)
+                heroPlayButtonFocusRequester.requestFocus()
+                currentFocusArea = FocusArea.HERO
+                isInitialized = true
+            } catch (e: Exception) {
+                android.util.Log.e("HomeScreen", "Failed to set initial focus", e)
+            }
+        }
+    }
     
-    // Ensure LazyColumn starts at top
+    // Smooth scrolling management
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Ensure LazyColumn starts at top and handles smooth scrolling
     LaunchedEffect(uiState) {
         if (uiState is HomeUiState.Success) {
             // Reset scroll position to top when content loads
             delay(100)
-            // listState.scrollToItem(0) will be called in the LazyColumn scope
+            // Scroll will be handled in LazyColumn scope
         }
     }
     
@@ -147,13 +162,14 @@ fun NetflixHomeScreen(
                 
                 when (currentState) {
                     is HomeUiState.Success -> {
-                        // FIXED: LazyColumn with state to ensure it starts at top
+                        // FIXED: LazyColumn with state to ensure it starts at top and STAYS there
                         val listState = rememberLazyListState()
                         
-                        // Ensure scroll starts at top and stays there
+                        // Ensure scroll starts at top and NEVER auto-scrolls
                         LaunchedEffect(currentState) {
                             try {
-                                listState.scrollToItem(0)
+                                // Force scroll to top and keep it there
+                                listState.scrollToItem(0, 0)
                             } catch (e: Exception) {
                                 // Ignore scroll errors
                             }
@@ -163,7 +179,36 @@ fun NetflixHomeScreen(
                             state = listState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black),
+                                .background(Color.Black)
+                                .focusable()
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.key) {
+                                            Key.DirectionUp -> {
+                                                // Smooth scroll up
+                                                coroutineScope.launch {
+                                                    val currentItem = listState.firstVisibleItemIndex
+                                                    if (currentItem > 0) {
+                                                        listState.animateScrollToItem(currentItem - 1)
+                                                    }
+                                                }
+                                                true
+                                            }
+                                            Key.DirectionDown -> {
+                                                // Smooth scroll down
+                                                coroutineScope.launch {
+                                                    val currentItem = listState.firstVisibleItemIndex
+                                                    val totalItems = listState.layoutInfo.totalItemsCount
+                                                    if (currentItem < totalItems - 1) {
+                                                        listState.animateScrollToItem(currentItem + 1)
+                                                    }
+                                                }
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else false
+                                },
                             userScrollEnabled = true
                         ) {
                         // HERO SECTION as LazyColumn item

@@ -57,5 +57,7 @@ data class TvSeries(
     val totalEpisodes: Int,
     val genres: List<String>,
     val posterPath: String?,
-    val bannerPath: String?
+    val bannerPath: String?,
+    val tmdbPosterUrl: String? = null,
+    val tmdbBackdropUrl: String? = null
 )

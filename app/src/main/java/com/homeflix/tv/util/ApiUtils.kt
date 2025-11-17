@@ -5,7 +5,7 @@ import com.homeflix.tv.domain.model.Media
 
 object ApiUtils {
     
-    private fun getBaseUrl(): String {
+    fun getBaseUrl(): String {
         return BuildConfig.BASE_URL.removeSuffix("/")
     }
     
@@ -34,6 +34,10 @@ object ApiUtils {
     }
     
     fun getBannerUrl(media: Media): String {
+        return getBackdropUrl(media)
+    }
+    
+    fun getBackdropUrl(media: Media): String {
         return when {
             // TMDB backdrop URL (highest priority) - EXACTLY like web app
             !media.tmdbBackdropUrl.isNullOrEmpty() && media.tmdbBackdropUrl.trim().isNotEmpty() -> {
@@ -43,14 +47,14 @@ object ApiUtils {
             !media.bannerPath.isNullOrEmpty() && media.bannerPath.trim().isNotEmpty() -> {
                 val fileName = media.bannerPath.split("/").lastOrNull()
                 if (!fileName.isNullOrEmpty() && fileName.trim().isNotEmpty()) {
-                    "${getBaseUrl()}/api/admin/assets/$fileName"
+                    "${getBaseUrl()}/admin/assets/$fileName"
                 } else {
-                    "${getBaseUrl()}/api/backdrops/${media.id}"
+                    "${getBaseUrl()}/backdrops/${media.id}"
                 }
             }
             // Fallback to server thumbnail endpoint (not poster for backdrop)
             else -> {
-                "${getBaseUrl()}/api/thumbnails/${media.id}"
+                "${getBaseUrl()}/thumbnails/${media.id}"
             }
         }
     }
@@ -86,7 +90,7 @@ object ApiUtils {
         tcp: String? = null,
         response: String? = null
     ): String {
-        val baseUrl = "${getBaseUrl()}/api/stream/$mediaId"
+        val baseUrl = "${getBaseUrl()}/stream/$mediaId"
         val params = mutableListOf<String>()
         
         // ULTRA-INSTANT LAN STREAMING PARAMETERS - Sub-millisecond response
@@ -137,48 +141,71 @@ object ApiUtils {
     }
     
     fun getPreviewClipUrl(mediaId: Int): String {
-        return "${getBaseUrl()}/api/preview-clips/$mediaId"
+        return "${getBaseUrl()}/preview-clips/$mediaId"
     }
     
     fun getSubtitleUrl(mediaId: Int, trackId: Int): String {
-        return "${getBaseUrl()}/api/media/$mediaId/subtitles/$trackId/file"
+        return "${getBaseUrl()}/media/$mediaId/subtitles/$trackId/file"
     }
     
     fun getAudioTracksUrl(mediaId: Int): String {
-        return "${getBaseUrl()}/api/media/$mediaId/audio"
+        return "${getBaseUrl()}/media/$mediaId/audio"
     }
     
     fun getSubtitleTracksUrl(mediaId: Int): String {
-        return "${getBaseUrl()}/api/media/$mediaId/subtitles"
+        return "${getBaseUrl()}/media/$mediaId/subtitles"
     }
     
-    // TV Series specific methods
+    // TV Series specific methods - matching web app exactly
     fun getSeriesPosterUrl(series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {
-        // Always use the series poster endpoint like the web app
-        val url = "${getBaseUrl()}/api/series/${series.id}/poster"
-        android.util.Log.d("ApiUtils", "Series poster URL for '${series.title}': $url")
-        return url
+        // First try TMDB poster URL if available (like web app)
+        series.tmdbPosterUrl?.let { tmdbUrl ->
+            if (tmdbUrl.startsWith("http")) {
+                return tmdbUrl
+            }
+        }
+        
+        // Then try poster path if available
+        series.posterPath?.let { posterPath ->
+            if (posterPath.startsWith("http")) {
+                return posterPath
+            }
+        }
+        
+        // Use posters endpoint (matching web app exactly)
+        return "${getBaseUrl()}/posters/${series.id}"
+    }
+    
+    fun getSeriesBackdropUrl(series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {
+        // First try TMDB backdrop if available (high priority for backdrop)
+        series.tmdbBackdropUrl?.let { tmdbUrl ->
+            if (tmdbUrl.startsWith("http")) {
+                return tmdbUrl
+            }
+        }
+        
+        // Then try local banner
+        series.bannerPath?.let { bannerPath ->
+            if (bannerPath.startsWith("http")) {
+                return bannerPath
+            } else {
+                val fileName = bannerPath.split("/").lastOrNull()
+                if (!fileName.isNullOrEmpty()) {
+                    return "${getBaseUrl()}/admin/assets/$fileName"
+                }
+            }
+        }
+        
+        // Fallback to series thumbnail (matching web app)
+        return "${getBaseUrl()}/thumbnails/${series.id}"
     }
     
     fun getSeriesThumbnailUrl(seriesId: Int): String {
-        return "${getBaseUrl()}/api/thumbnails/$seriesId"
+        return "${getBaseUrl()}/thumbnails/$seriesId"
     }
     
     fun getSeriesBannerUrl(series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {
-        return if (!series.bannerPath.isNullOrEmpty()) {
-            if (series.bannerPath.startsWith("http")) {
-                series.bannerPath
-            } else {
-                val fileName = series.bannerPath.split("/").lastOrNull()
-                if (!fileName.isNullOrEmpty()) {
-                    "${getBaseUrl()}/api/admin/assets/$fileName"
-                } else {
-                    "${getBaseUrl()}/api/series/${series.id}/banner"
-                }
-            }
-        } else {
-            "${getBaseUrl()}/api/series/${series.id}/banner"
-        }
+        return getSeriesBackdropUrl(series) // Use same logic as backdrop
     }
     
     fun getEpisodeThumbnailUrl(episode: com.homeflix.tv.presentation.screens.tvshows.Episode): String {
@@ -186,10 +213,10 @@ object ApiUtils {
             if (episode.thumbnailPath.startsWith("http")) {
                 episode.thumbnailPath
             } else {
-                "${getBaseUrl()}/api/thumbnails/${episode.id}"
+                "${getBaseUrl()}/thumbnails/${episode.id}"
             }
         } else {
-            "${getBaseUrl()}/api/thumbnails/${episode.id}"
+            "${getBaseUrl()}/thumbnails/${episode.id}"
         }
     }
 }

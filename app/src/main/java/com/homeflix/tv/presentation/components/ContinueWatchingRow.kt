@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -107,9 +108,44 @@ fun ContinueWatchingRow(
                     },
                     onInfo = { onInfo(item.media) },
                     modifier = if (index == 0 && focusRequester != null) {
-                        Modifier.focusRequester(focusRequester)
-                    } else {
                         Modifier
+                            .focusRequester(focusRequester)
+                            .onKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown) {
+                                    when (keyEvent.key) {
+                                        Key.DirectionLeft -> {
+                                            // Stay on first item or handle navigation
+                                            false
+                                        }
+                                        Key.DirectionRight -> {
+                                            // Navigate to next item if available
+                                            if (validItems.size > 1) {
+                                                // Focus would naturally move to next item
+                                                false
+                                            } else {
+                                                false
+                                            }
+                                        }
+                                        else -> false
+                                    }
+                                } else false
+                            }
+                    } else {
+                        Modifier.onKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                when (keyEvent.key) {
+                                    Key.DirectionLeft -> {
+                                        // Navigate to previous item
+                                        false // Let LazyRow handle it
+                                    }
+                                    Key.DirectionRight -> {
+                                        // Navigate to next item
+                                        false // Let LazyRow handle it
+                                    }
+                                    else -> false
+                                }
+                            } else false
+                        }
                     }
                 )
             }
@@ -126,9 +162,9 @@ private fun ContinueWatchingCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    // Scale animation on focus
+    // Scale animation on focus (reduced scale)
     val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isFocused) 1.5f else 1.0f,
+        targetValue = if (isFocused) 1.08f else 1.0f,
         animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
         label = "continue_watching_scale"
     )
@@ -143,6 +179,13 @@ private fun ContinueWatchingCard(
                 isFocused = focusState.isFocused
             }
             .clickable { onPlay() }
+            .then(
+                if (isFocused) {
+                    Modifier.zIndex(10f) // Bring focused card to front
+                } else {
+                    Modifier.zIndex(1f)
+                }
+            )
     ) {
         // Card content with focus border
         Card(
@@ -175,9 +218,9 @@ private fun ContinueWatchingCard(
             } else null
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-        // Background Image
+        // Background Image - use backdrop (TMDB backdrop first, then thumbnail fallback)
         AsyncImage(
-            model = ApiUtils.getThumbnailUrl(item.media),
+            model = ApiUtils.getBackdropUrl(item.media),
             contentDescription = item.media.title,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop

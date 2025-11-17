@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
@@ -196,14 +197,14 @@ private fun NetflixRecommendationCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    // Scale animation on focus
+    // Scale animation on focus (reduced scale)
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.5f else 1.0f,
+        targetValue = if (isFocused) 1.08f else 1.0f,
         animationSpec = tween(durationMillis = 200),
         label = "recommendation_card_scale"
     )
     
-    // Netflix-style card with scale animation
+    // Netflix-style card with scale animation and proper z-index
     Box(
         modifier = modifier
             .width(220.dp)
@@ -213,8 +214,14 @@ private fun NetflixRecommendationCard(
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
-
             .clickable { onInfo() }
+            .then(
+                if (isFocused) {
+                    Modifier.zIndex(10f) // Bring focused card to front
+                } else {
+                    Modifier.zIndex(1f)
+                }
+            )
     ) {
         Card(
             modifier = Modifier.fillMaxSize(),

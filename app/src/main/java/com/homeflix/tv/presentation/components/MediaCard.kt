@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
@@ -40,14 +41,14 @@ fun NetflixMediaCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    // Netflix-style scale animation on focus
+    // Netflix-style scale animation on focus (reduced scale)
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.5f else 1.0f,
+        targetValue = if (isFocused) 1.1f else 1.0f,
         animationSpec = tween(durationMillis = 200),
         label = "netflix_card_scale"
     )
     
-    // Netflix-style card with scale animation
+    // Netflix-style card with scale animation and proper z-index
     Box(
         modifier = modifier
             .aspectRatio(2f / 3f)
@@ -56,16 +57,17 @@ fun NetflixMediaCard(
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
-
             .clickable { onClick() }
             .then(
                 if (isFocused) {
-                    Modifier.background(
-                        Color.White.copy(alpha = 0.1f),
-                        RoundedCornerShape(8.dp)
-                    )
-                } else {
                     Modifier
+                        .background(
+                            Color.White.copy(alpha = 0.1f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .zIndex(10f) // Bring focused card to front
+                } else {
+                    Modifier.zIndex(1f)
                 }
             )
     ) {

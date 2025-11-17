@@ -33,6 +33,8 @@ import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
 
+
+
 @Composable
 fun TvSeriesDetailsScreen(
     seriesId: String,
@@ -304,6 +306,7 @@ fun TvSeriesDetailsScreen(
                                 currentState.seasons.forEach { season ->
                                     SeasonCard(
                                         season = season,
+                                        series = series,
                                         onClick = {
                                             navController.navigate(
                                                 Screen.TvSeriesSeason.createRoute(seriesId, season.seasonNumber)
@@ -323,6 +326,7 @@ fun TvSeriesDetailsScreen(
 @Composable
 private fun SeasonCard(
     season: Season,
+    series: com.homeflix.tv.presentation.screens.tvshows.TvSeries,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -359,24 +363,44 @@ private fun SeasonCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Season Thumbnail
+            // Season Backdrop Thumbnail (like web app)
             Box(
                 modifier = Modifier
-                    .width(120.dp)
+                    .width(160.dp)
                     .aspectRatio(16f / 9f)
                     .background(
                         Color.Gray.copy(alpha = 0.3f),
-                        RoundedCornerShape(6.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "S${season.seasonNumber}",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        RoundedCornerShape(8.dp)
                     )
+            ) {
+                // Use series backdrop (seasons don't have their own)
+                AsyncImage(
+                    model = ApiUtils.getSeriesBackdropUrl(series),
+                    contentDescription = season.name,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
                 )
+                
+                // Season number overlay
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .background(
+                            Color.Black.copy(alpha = 0.7f),
+                            RoundedCornerShape(4.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "S${season.seasonNumber}",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    )
+                }
             }
             
             // Season Info

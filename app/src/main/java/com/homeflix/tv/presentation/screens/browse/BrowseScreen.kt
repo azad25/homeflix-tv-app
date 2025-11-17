@@ -23,6 +23,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.zIndex
 import com.homeflix.tv.domain.model.MediaType
 import kotlinx.coroutines.delay
 import androidx.compose.ui.layout.ContentScale
@@ -260,14 +261,14 @@ private fun NetflixMovieCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    // Scale animation on focus
+    // Netflix-style scale animation on focus (reduced scale like MediaCard)
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.5f else 1.0f,
+        targetValue = if (isFocused) 1.1f else 1.0f,
         animationSpec = tween(durationMillis = 200),
         label = "browse_movie_card_scale"
     )
     
-    // Netflix-style card with scale animation
+    // Netflix-style card with proper z-index management
     Box(
         modifier = modifier
             .aspectRatio(2f / 3f) // Netflix poster aspect ratio
@@ -276,8 +277,14 @@ private fun NetflixMovieCard(
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
-
             .clickable { onClick() }
+            .then(
+                if (isFocused) {
+                    Modifier.zIndex(10f) // Bring focused card to front
+                } else {
+                    Modifier.zIndex(1f)
+                }
+            )
     ) {
         Card(
             modifier = Modifier.fillMaxSize(),

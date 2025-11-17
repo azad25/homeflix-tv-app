@@ -37,6 +37,27 @@ import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
 
+
+
+private fun getEpisodeBackdropUrl(episode: Episode, series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {
+    val apiUrl = ApiUtils.getBaseUrl()
+    
+    // First try episode thumbnail if available
+    episode.thumbnailPath?.let { thumbnailPath ->
+        if (thumbnailPath.startsWith("http")) {
+            return thumbnailPath
+        }
+    }
+    
+    // Try episode thumbnail endpoint first
+    val episodeThumbnailUrl = "$apiUrl/thumbnails/${episode.id}"
+    
+    // If episode thumbnail fails, fallback to series backdrop
+    // Note: In practice, we should check if episode thumbnail exists
+    // For now, we'll try episode first, then series as fallback in onError
+    return episodeThumbnailUrl
+}
+
 @Composable
 fun TvSeriesSeasonScreen(
     seriesId: String,
@@ -119,21 +140,37 @@ fun TvSeriesSeasonScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     item {
-                        // Hero Section with Series Banner
+                        // Hero Section with Backdrop and Poster (matching web app)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(300.dp)
+                                .height(480.dp)
                         ) {
-                            // Background Banner Image
+                            // Background Backdrop Image
                             AsyncImage(
-                                model = ApiUtils.getSeriesBannerUrl(series),
+                                model = ApiUtils.getSeriesBackdropUrl(series),
                                 contentDescription = series.title,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
                             
-                            // Gradient Overlay
+                            // Gradient Overlays (matching web app)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(
+                                                Color.Black.copy(alpha = 0.8f),
+                                                Color.Transparent,
+                                                Color.Black.copy(alpha = 0.4f)
+                                            ),
+                                            startX = 0f,
+                                            endX = 1200f
+                                        )
+                                    )
+                            )
+                            
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -141,69 +178,161 @@ fun TvSeriesSeasonScreen(
                                         Brush.verticalGradient(
                                             colors = listOf(
                                                 Color.Transparent,
-                                                Color.Black.copy(alpha = 0.8f)
-                                            )
+                                                Color.Black.copy(alpha = 0.6f)
+                                            ),
+                                            startY = 400f
                                         )
                                     )
                             )
                             
-                            // Content
-                            Column(
+                            // Hero Content with Poster (TMDB Style)
+                            Row(
                                 modifier = Modifier
                                     .align(Alignment.BottomStart)
-                                    .padding(32.dp)
+                                    .padding(48.dp)
                                     .fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                                verticalAlignment = Alignment.Bottom
                             ) {
-                                // Back Button
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
+                                // Series Poster
+                                Box(
                                     modifier = Modifier
-                                        .clickable {
-                                            navController.navigate(Screen.TvSeriesDetails.createRoute(seriesId))
-                                        }
-                                        .padding(bottom = 8.dp)
+                                        .width(200.dp)
+                                        .aspectRatio(2f / 3f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.Gray.copy(alpha = 0.3f))
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowBack,
-                                        contentDescription = "Back",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Back to ${series.title}",
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            color = Color.White.copy(alpha = 0.8f)
-                                        )
+                                    AsyncImage(
+                                        model = ApiUtils.getSeriesPosterUrl(series),
+                                        contentDescription = series.title,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
                                     )
                                 }
                                 
-                                // Series Title
-                                Text(
-                                    text = series.title,
-                                    style = MaterialTheme.typography.displaySmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
+                                // Series Details
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Back Button
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clickable {
+                                                navController.navigate(Screen.TvSeriesDetails.createRoute(seriesId))
+                                            }
+                                            .padding(bottom = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowBack,
+                                            contentDescription = "Back",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Back to ${series.title}",
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                color = Color.White.copy(alpha = 0.8f)
+                                            )
+                                        )
+                                    }
+                                    
+                                    // TV Series Badge
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Star, // Use TV icon if available
+                                            contentDescription = null,
+                                            tint = NetflixRed,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Text(
+                                            text = "TV SERIES",
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                color = NetflixRed,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        )
+                                    }
+                                    
+                                    // Series Title
+                                    Text(
+                                        text = series.title,
+                                        style = MaterialTheme.typography.displayMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextPrimary
+                                        )
                                     )
-                                )
-                                
-                                // Season Title
-                                Text(
-                                    text = season.name,
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = NetflixRed
+                                    
+                                    // Season Title
+                                    Text(
+                                        text = season.name,
+                                        style = MaterialTheme.typography.headlineMedium.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = NetflixRed
+                                        )
                                     )
-                                )
-                                
-                                // Episode Count
-                                Text(
-                                    text = "${episodes.size} Episodes",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        color = TextSecondary
-                                    )
-                                )
+                                    
+                                    // Episode Count and Series Info
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "${episodes.size} Episodes",
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                color = TextSecondary
+                                            )
+                                        )
+                                        
+                                        if (series.rating > 0) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Star,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFFFD700),
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Text(
+                                                    text = String.format("%.1f", series.rating),
+                                                    style = MaterialTheme.typography.titleMedium.copy(
+                                                        color = TextSecondary
+                                                    )
+                                                )
+                                            }
+                                        }
+                                        
+                                        series.year?.let { year ->
+                                            Text(
+                                                text = year.toString(),
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    color = TextSecondary
+                                                )
+                                            )
+                                        }
+                                    }
+                                    
+                                    // Season Description
+                                    season.description?.let { description ->
+                                        Text(
+                                            text = description,
+                                            style = MaterialTheme.typography.bodyLarge.copy(
+                                                color = TextPrimary.copy(alpha = 0.9f),
+                                                lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2
+                                            ),
+                                            maxLines = 3,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.fillMaxWidth(0.8f)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -230,6 +359,7 @@ fun TvSeriesSeasonScreen(
                         EpisodeCard(
                             episode = episode,
                             episodeNumber = index + 1,
+                            series = series,
                             onClick = {
                                 // Play episode with autoplay for next episodes
                                 navController.navigate(
@@ -254,6 +384,7 @@ fun TvSeriesSeasonScreen(
 private fun EpisodeCard(
     episode: Episode,
     episodeNumber: Int,
+    series: com.homeflix.tv.presentation.screens.tvshows.TvSeries,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -309,23 +440,40 @@ private fun EpisodeCard(
                 )
             }
             
-            // Episode Thumbnail
+            // Episode Backdrop Thumbnail (16:9 like web app)
             Box(
                 modifier = Modifier
-                    .width(160.dp)
+                    .width(200.dp)
                     .aspectRatio(16f / 9f)
                     .background(
                         Color.Gray.copy(alpha = 0.3f),
-                        RoundedCornerShape(6.dp)
+                        RoundedCornerShape(8.dp)
                     )
             ) {
+                var episodeImageUrl by remember { mutableStateOf(getEpisodeBackdropUrl(episode, series)) }
+                var fallbackLevel by remember { mutableStateOf(0) }
+                
                 AsyncImage(
-                    model = ApiUtils.getEpisodeThumbnailUrl(episode),
+                    model = episodeImageUrl,
                     contentDescription = episode.title,
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(6.dp)),
-                    contentScale = ContentScale.Crop
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop,
+                    onError = {
+                        when (fallbackLevel) {
+                            0 -> {
+                                // Fallback to series backdrop (episodes don't have their own)
+                                episodeImageUrl = ApiUtils.getSeriesBackdropUrl(series)
+                                fallbackLevel = 1
+                            }
+                            1 -> {
+                                // Final fallback to series thumbnail
+                                episodeImageUrl = "${ApiUtils.getBaseUrl()}/thumbnails/${series.id}"
+                                fallbackLevel = 2
+                            }
+                        }
+                    }
                 )
                 
                 // Play overlay on focus
@@ -418,14 +566,7 @@ private fun EpisodeCard(
                         }
                     }
                     
-                    episode.airDate?.let { airDate ->
-                        Text(
-                            text = airDate,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = TextSecondary
-                            )
-                        )
-                    }
+
                 }
                 
                 episode.description?.let { description ->

@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +37,8 @@ import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
+
+
 
 @Composable
 fun TvShowsScreen(
@@ -188,13 +191,14 @@ private fun TvSeriesCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    // Scale animation on focus
+    // Netflix-style scale animation on focus (matching MediaCard)
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.5f else 1.0f,
+        targetValue = if (isFocused) 1.1f else 1.0f,
         animationSpec = tween(durationMillis = 200),
         label = "tv_series_card_scale"
     )
     
+    // Netflix-style card with proper z-index management
     Box(
         modifier = modifier
             .aspectRatio(2f / 3f)
@@ -204,6 +208,18 @@ private fun TvSeriesCard(
                 isFocused = focusState.isFocused
             }
             .clickable { onClick() }
+            .then(
+                if (isFocused) {
+                    Modifier
+                        .background(
+                            Color.White.copy(alpha = 0.1f),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .zIndex(10f) // Bring focused card to front
+                } else {
+                    Modifier.zIndex(1f)
+                }
+            )
     ) {
         Card(
             modifier = Modifier.fillMaxSize(),
@@ -216,7 +232,7 @@ private fun TvSeriesCard(
             )
         ) {
             Box {
-                // Series image with fallback chain (matching web app)
+                // Series image with proper fallback chain (matching web app exactly)
                 var currentImageUrl by remember { mutableStateOf(ApiUtils.getSeriesPosterUrl(series)) }
                 var fallbackLevel by remember { mutableStateOf(0) }
                 
@@ -259,7 +275,7 @@ private fun TvSeriesCard(
                         }
                     }
                 } else {
-                    // Try poster, then thumbnail fallback
+                    // Try poster with proper fallback chain (matching web app)
                     AsyncImage(
                         model = currentImageUrl,
                         contentDescription = series.title,
@@ -270,13 +286,15 @@ private fun TvSeriesCard(
                         onError = {
                             when (fallbackLevel) {
                                 0 -> {
-                                    // Fallback to series thumbnail
-                                    currentImageUrl = ApiUtils.getSeriesThumbnailUrl(series.id)
+                                    // First fallback: Try thumbnail endpoint (matching web app)
+                                    currentImageUrl = "${ApiUtils.getBaseUrl()}/thumbnails/${series.id}"
                                     fallbackLevel = 1
+                                    android.util.Log.d("TvSeriesCard", "Fallback to thumbnail: $currentImageUrl")
                                 }
                                 1 -> {
                                     // Final fallback to gradient
                                     fallbackLevel = 2
+                                    android.util.Log.d("TvSeriesCard", "All image sources failed, showing gradient")
                                 }
                             }
                         }

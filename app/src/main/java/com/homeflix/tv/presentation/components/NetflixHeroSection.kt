@@ -428,6 +428,24 @@ fun NetflixHeroSection(
                                             onNavigateDown?.invoke()
                                             true
                                         }
+                                        Key.DirectionLeft -> {
+                                            // Navigate to previous slide
+                                            if (mediaList.size > 1) {
+                                                val prevIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
+                                                onIndexChange(prevIndex)
+                                                isUserInteracting = true
+                                            }
+                                            true
+                                        }
+                                        Key.DirectionUp -> {
+                                            // Navigate to next slide
+                                            if (mediaList.size > 1) {
+                                                val nextIndex = (currentIndex + 1) % mediaList.size
+                                                onIndexChange(nextIndex)
+                                                isUserInteracting = true
+                                            }
+                                            true
+                                        }
                                         else -> false
                                     }
                                 } else false
@@ -489,6 +507,24 @@ fun NetflixHeroSection(
                                         }
                                         Key.DirectionDown -> {
                                             onNavigateDown?.invoke()
+                                            true
+                                        }
+                                        Key.DirectionRight -> {
+                                            // Navigate to next slide
+                                            if (mediaList.size > 1) {
+                                                val nextIndex = (currentIndex + 1) % mediaList.size
+                                                onIndexChange(nextIndex)
+                                                isUserInteracting = true
+                                            }
+                                            true
+                                        }
+                                        Key.DirectionUp -> {
+                                            // Navigate to previous slide
+                                            if (mediaList.size > 1) {
+                                                val prevIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
+                                                onIndexChange(prevIndex)
+                                                isUserInteracting = true
+                                            }
                                             true
                                         }
                                         else -> false

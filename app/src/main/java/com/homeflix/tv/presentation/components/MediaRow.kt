@@ -76,9 +76,15 @@ fun MediaRow(
                         .onFocusChanged { focusState ->
                             if (focusState.isFocused) {
                                 currentFocusedIndex = index
-                                // Auto-scroll to focused item - Netflix behavior
+                                // Auto-scroll to focused item with padding - Netflix behavior
                                 coroutineScope.launch {
-                                    listState.animateScrollToItem(index)
+                                    // Scroll with some padding to show neighboring items
+                                    val targetIndex = when {
+                                        index == 0 -> 0
+                                        index >= mediaList.size - 2 -> maxOf(0, mediaList.size - 3)
+                                        else -> maxOf(0, index - 1)
+                                    }
+                                    listState.animateScrollToItem(targetIndex)
                                 }
                             }
                         }
@@ -102,6 +108,9 @@ fun MediaRow(
                                             if (prevIndex < itemFocusRequesters.size) {
                                                 itemFocusRequesters[prevIndex].requestFocus()
                                             }
+                                        } else {
+                                            // At first item, try to navigate up
+                                            onNavigateUp?.invoke()
                                         }
                                         true
                                     }
@@ -112,6 +121,9 @@ fun MediaRow(
                                             if (nextIndex < itemFocusRequesters.size) {
                                                 itemFocusRequesters[nextIndex].requestFocus()
                                             }
+                                        } else {
+                                            // At last item, try to navigate down
+                                            onNavigateDown?.invoke()
                                         }
                                         true
                                     }

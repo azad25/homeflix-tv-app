@@ -67,9 +67,7 @@ import androidx.compose.ui.platform.LocalContext
  * - Supports instant seeking through backend transcoding
  * - Optimized for unlimited LAN bandwidth
  */
-private fun getBaseUrl(): String {
-    return "http://192.168.0.109:8252"
-}
+// Removed hardcoded getBaseUrl - using ApiUtils.getBaseUrl() instead
 
 @dagger.hilt.EntryPoint
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
@@ -147,6 +145,7 @@ fun VideoPlayer(
             if (totalDuration > 0 && currentTime > 5) { // Only save if watched more than 5 seconds
                 coroutineScope.launch {
                     try {
+                        // Use repository with correct API endpoint: /api/playback/progress
                         val result = repository.updatePlaybackProgress(
                             mediaId = media.id,
                             position = currentTime,
@@ -284,8 +283,7 @@ fun VideoPlayer(
 
                     // FIXED: Proper video loading with multiple URL attempts
                     val urlsToTry = listOf(
-                        "${getBaseUrl()}/api/stream/${media.id}",
-                        "${getBaseUrl()}/stream/${media.id}",
+                        "${ApiUtils.getBaseUrl()}/stream/${media.id}",
                         "file://${media.filePath}",
                         media.filePath // Direct file path
                     )
@@ -327,7 +325,7 @@ fun VideoPlayer(
                         android.util.Log.e("VideoPlayer", "Failed to load any video URL for media: ${media.id}")
                         // Try a simple test URL as final fallback
                         try {
-                            val testUrl = "${getBaseUrl()}/api/media/${media.id}/stream"
+                            val testUrl = "${ApiUtils.getBaseUrl()}/media/${media.id}/stream"
                             android.util.Log.d("VideoPlayer", "Final attempt with: $testUrl")
                             
                             val mediaItem = MediaItem.Builder()
@@ -437,33 +435,14 @@ fun VideoPlayer(
         }
     }
 
-    // Update progress for UI and save periodically
+    // Update progress for UI only (no periodic saving for better performance)
     LaunchedEffect(exoPlayer, isPlaying) {
-        var lastSaveTime = 0L
         while (isPlaying && exoPlayer != null) {
             currentPosition = exoPlayer?.currentPosition ?: 0L
             duration = exoPlayer?.duration ?: 0L
 
             if (duration > 0) {
                 onProgress(currentPosition, duration)
-                
-                // Save progress every 30 seconds during playback
-                val currentTimeSeconds = currentPosition / 1000
-                if (currentTimeSeconds - lastSaveTime >= 30 && currentTimeSeconds > 5) {
-                    coroutineScope.launch {
-                        try {
-                            repository.updatePlaybackProgress(
-                                mediaId = media.id,
-                                position = currentTimeSeconds,
-                                duration = duration / 1000
-                            )
-                            lastSaveTime = currentTimeSeconds
-                            android.util.Log.d("VideoPlayer", "Periodic progress saved: $currentTimeSeconds seconds")
-                        } catch (e: Exception) {
-                            android.util.Log.e("VideoPlayer", "Failed to save periodic progress", e)
-                        }
-                    }
-                }
             }
 
             delay(1000) // Update every second
@@ -607,7 +586,7 @@ fun VideoPlayer(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Simple red buffering indicator
+            // Netflix-style red buffering indicator - Clean loader only
             if (isBuffering) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
