@@ -238,8 +238,11 @@ class MediaRepository @Inject constructor(
         return try {
             Log.d("MediaRepository", "Fetching TV series from API...")
             
-            // First try the hierarchical series API
-            val seriesResponse = apiService.getTvSeries()
+            // First try the hierarchical series API, sorted by newest first
+            val seriesResponse = apiService.getTvSeries(
+                sort = "created_at",
+                order = "desc"
+            )
             if (seriesResponse.isSuccessful) {
                 val seriesData = seriesResponse.body() ?: emptyList()
                 Log.d("MediaRepository", "Found ${seriesData.size} series from /api/series")

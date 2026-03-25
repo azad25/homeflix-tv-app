@@ -50,17 +50,16 @@ class SearchViewModel @Inject constructor(
         }
         
         viewModelScope.launch {
-            // Load top searches (popular movies)
-            mediaRepository.getMovies(limit = 8, offset = 0)
+            // Load top searches (recently added movies — dynamic content)
+            mediaRepository.getMovies(limit = 20, offset = 0)
                 .collect { result ->
                     result.fold(
                         onSuccess = { movies ->
-                            // Sort by rating and view count for "top searches"
-                            val topMovies = movies
-                                .sortedWith(compareByDescending<Media> { it.rating }
-                                    .thenByDescending { it.viewCount })
+                            // Sort by ID descending for recently added content
+                            val recentMovies = movies
+                                .sortedByDescending { it.id }
                                 .take(8)
-                            _topSearches.value = topMovies
+                            _topSearches.value = recentMovies
                         },
                         onFailure = { error ->
                             android.util.Log.e("SearchViewModel", "Failed to load top searches", error)

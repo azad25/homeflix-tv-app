@@ -108,11 +108,11 @@ fun MediaRow(
                                             if (prevIndex < itemFocusRequesters.size) {
                                                 itemFocusRequesters[prevIndex].requestFocus()
                                             }
+                                            true
                                         } else {
-                                            // At first item, try to navigate up
-                                            onNavigateUp?.invoke()
+                                            // At first item, let system handle (moves to sidebar)
+                                            false
                                         }
-                                        true
                                     }
                                     Key.DirectionRight -> {
                                         // Navigate to next item in row

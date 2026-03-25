@@ -3,6 +3,7 @@ package com.homeflix.tv.presentation.screens.details
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.components.RecommendationSection
 import com.homeflix.tv.presentation.navigation.Screen
@@ -56,6 +59,9 @@ fun DetailsScreen(
                     popUpTo(Screen.Home.route) { inclusive = false }
                     launchSingleTop = true
                 }
+            },
+            onNavigateToContent = {
+                // Let Compose focus system move focus to content naturally
             }
         )
         
@@ -166,13 +172,33 @@ fun DetailsScreen(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                // Title
-                                Text(
-                                    text = media.title,
-                                    style = MaterialTheme.typography.displayMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
+                                // Movie Logo (from local assets, text fallback)
+                                var logoLoaded by remember { mutableStateOf(false) }
+                                
+                                if (!logoLoaded) {
+                                    Text(
+                                        text = media.title,
+                                        style = MaterialTheme.typography.displayMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = TextPrimary
+                                        )
                                     )
+                                }
+                                
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(ApiUtils.getLogoUrl(media))
+                                        .memoryCacheKey("logo_${media.id}")
+                                        .diskCacheKey("logo_${media.id}")
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "${media.title} logo",
+                                    modifier = Modifier
+                                        .heightIn(max = 80.dp)
+                                        .fillMaxWidth(0.5f),
+                                    contentScale = ContentScale.Fit,
+                                    onSuccess = { logoLoaded = true },
+                                    onError = { logoLoaded = false }
                                 )
                                 
                                 // Metadata Row

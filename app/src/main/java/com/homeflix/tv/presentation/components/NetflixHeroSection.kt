@@ -216,15 +216,39 @@ fun NetflixHeroSection(
                         initialOffsetY = { it / 4 }
                     )
                 ) {
-                    Text(
-                        text = media.title,
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.Black,
-                            color = TextPrimary
-                        ),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth(0.8f)
+                    // Movie logo (loaded from local assets, matching web app)
+                    // Falls back to title text if no logo available
+                    var logoLoaded by remember { mutableStateOf(false) }
+                    
+                    if (!logoLoaded) {
+                        // Fallback: Text title
+                        Text(
+                            text = media.title,
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                color = TextPrimary
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(0.8f)
+                        )
+                    }
+                    
+                    // Try to load logo image
+                    AsyncImage(
+                        model = coil.request.ImageRequest.Builder(LocalContext.current)
+                            .data(ApiUtils.getLogoUrl(media))
+                            .memoryCacheKey("logo_${media.id}")
+                            .diskCacheKey("logo_${media.id}")
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "${media.title} logo",
+                        modifier = Modifier
+                            .heightIn(max = 100.dp)
+                            .fillMaxWidth(0.5f),
+                        contentScale = ContentScale.Fit,
+                        onSuccess = { logoLoaded = true },
+                        onError = { logoLoaded = false }
                     )
                 }
                 
@@ -420,10 +444,6 @@ fun NetflixHeroSection(
                             .onKeyEvent { keyEvent ->
                                 if (keyEvent.type == KeyEventType.KeyDown) {
                                     when (keyEvent.key) {
-                                        Key.DirectionRight -> {
-                                            infoButtonFocusRequester.requestFocus()
-                                            true
-                                        }
                                         Key.DirectionDown -> {
                                             onNavigateDown?.invoke()
                                             true
@@ -437,13 +457,17 @@ fun NetflixHeroSection(
                                             }
                                             true
                                         }
-                                        Key.DirectionUp -> {
+                                        Key.DirectionRight -> {
                                             // Navigate to next slide
                                             if (mediaList.size > 1) {
                                                 val nextIndex = (currentIndex + 1) % mediaList.size
                                                 onIndexChange(nextIndex)
                                                 isUserInteracting = true
                                             }
+                                            true
+                                        }
+                                        Key.DirectionUp -> {
+                                            // No navigation up from hero play button
                                             true
                                         }
                                         else -> false
@@ -463,87 +487,9 @@ fun NetflixHeroSection(
                                 style = MaterialTheme.typography.titleMedium
                             )
                             Text(
-                                text = "Play",
+                                text = "Play Now",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold
-                                )
-                            )
-                        }
-                    }
-                    
-                    // More Info Button - PROPER TV NAVIGATION
-                    OutlinedButton(
-                        onClick = { onDetailsClick(media) },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = TextPrimary,
-                            containerColor = Color.Black.copy(alpha = 0.5f)
-                        ),
-                        border = ButtonDefaults.outlinedButtonBorder.copy(
-                            width = 1.dp,
-                            brush = Brush.linearGradient(
-                                colors = if (infoButtonFocused) {
-                                    listOf(Color.White, Color.White.copy(alpha = 0.8f))
-                                } else {
-                                    listOf(Color.Gray, Color.Gray.copy(alpha = 0.6f))
-                                }
-                            )
-                        ),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier
-                            .height(44.dp)
-                            .focusRequester(infoButtonFocusRequester)
-                            .onFocusChanged { 
-                                infoButtonFocused = it.isFocused
-                                if (it.isFocused) {
-                                    isUserInteracting = true
-                                }
-                            }
-                            .onKeyEvent { keyEvent ->
-                                if (keyEvent.type == KeyEventType.KeyDown) {
-                                    when (keyEvent.key) {
-                                        Key.DirectionLeft -> {
-                                            playButtonFocusRequester?.requestFocus()
-                                            true
-                                        }
-                                        Key.DirectionDown -> {
-                                            onNavigateDown?.invoke()
-                                            true
-                                        }
-                                        Key.DirectionRight -> {
-                                            // Navigate to next slide
-                                            if (mediaList.size > 1) {
-                                                val nextIndex = (currentIndex + 1) % mediaList.size
-                                                onIndexChange(nextIndex)
-                                                isUserInteracting = true
-                                            }
-                                            true
-                                        }
-                                        Key.DirectionUp -> {
-                                            // Navigate to previous slide
-                                            if (mediaList.size > 1) {
-                                                val prevIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
-                                                onIndexChange(prevIndex)
-                                                isUserInteracting = true
-                                            }
-                                            true
-                                        }
-                                        else -> false
-                                    }
-                                } else false
-                            }
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "ⓘ",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                text = "More Info",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.SemiBold
                                 )
                             )
                         }

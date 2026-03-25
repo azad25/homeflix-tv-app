@@ -79,9 +79,9 @@ class StreamingRepository @Inject constructor(
         }
     }
     
-    fun getSubtitleFile(mediaId: String): Flow<Result<String>> = flow {
+    fun getSubtitleFile(mediaId: String, trackId: String): Flow<Result<String>> = flow {
         try {
-            val response = apiService.getSubtitleFile(mediaId)
+            val response = apiService.getSubtitleFile(mediaId, trackId)
             if (response.isSuccessful) {
                 val subtitleContent = response.body()
                 if (subtitleContent != null) {

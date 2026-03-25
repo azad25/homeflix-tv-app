@@ -40,7 +40,7 @@ class HomeViewModel @Inject constructor(
     init {
         // Clear expired cache on startup (24-hour expiration)
         viewModelScope.launch {
-            com.homeflix.tv.data.cache.ContentCache.clearExpiredCache(context)
+            com.homeflix.tv.data.persistence.ContentCache.clearExpiredCache(context)
         }
         loadHomeContent()
     }
@@ -51,7 +51,7 @@ class HomeViewModel @Inject constructor(
             
             try {
                 // Try to load from cache first for instant display
-                val cachedMovies = com.homeflix.tv.data.cache.ContentCache.getMediaList(context, "movies")
+                val cachedMovies = com.homeflix.tv.data.persistence.ContentCache.getMediaList(context, "movies")
                 if (cachedMovies != null && cachedMovies.isNotEmpty()) {
                     Log.d("HomeViewModel", "Loading from cache: ${cachedMovies.size} movies")
                     displayCachedContent(cachedMovies)
@@ -86,14 +86,61 @@ class HomeViewModel @Inject constructor(
                             val featuredMedia = sortedByDate.take(8) // Top 8 latest movies for hero slider
                             Log.d("HomeViewModel", "Hero slider: Showing ${featuredMedia.size} latest movies")
                             
-                            // Use the sorted lists from above
-                            val trendingMovies = sortedByRating.take(20) // Top rated as trending
-                            val popularMovies = sortedByViews.take(20) // Most viewed as popular
+                            // Fetch trending from dedicated API endpoint
+                            val trendingMovies = try {
+                                val trendingResponse = mediaRepository.getTrendingRecommendations(20)
+                                if (trendingResponse.isSuccessful) {
+                                    trendingResponse.body()?.map { it.toDomain() } ?: sortedByRating.take(20)
+                                } else sortedByRating.take(20)
+                            } catch (e: Exception) {
+                                Log.w("HomeViewModel", "Trending API failed, using fallback", e)
+                                sortedByRating.take(20)
+                            }
+                            
+                            // Fetch popular from dedicated API endpoint
+                            val popularMovies = try {
+                                val popularResponse = mediaRepository.getPopularRecommendations(20)
+                                if (popularResponse.isSuccessful) {
+                                    popularResponse.body()?.map { it.toDomain() } ?: sortedByViews.take(20)
+                                } else sortedByViews.take(20)
+                            } catch (e: Exception) {
+                                Log.w("HomeViewModel", "Popular API failed, using fallback", e)
+                                sortedByViews.take(20)
+                            }
+                            
                             val latestMovies = sortedByDate.take(20) // Latest by creation date
+                            
+                            // Fetch genre rows from dedicated API endpoints
+                            val actionMovies = try {
+                                val r = mediaRepository.getMediaByGenre("action", 15, 0)
+                                var result = emptyList<Media>()
+                                r.collect { res -> if (res.isSuccess) result = res.getOrNull() ?: emptyList() }
+                                result.ifEmpty { sortedByDate.filter { m -> m.genres.any { it.name.contains("Action", ignoreCase = true) } }.take(15) }
+                            } catch (e: Exception) {
+                                sortedByDate.filter { m -> m.genres.any { it.name.contains("Action", ignoreCase = true) } }.take(15)
+                            }
+                            
+                            val dramaMovies = try {
+                                val r = mediaRepository.getMediaByGenre("drama", 15, 0)
+                                var result = emptyList<Media>()
+                                r.collect { res -> if (res.isSuccess) result = res.getOrNull() ?: emptyList() }
+                                result.ifEmpty { sortedByDate.filter { m -> m.genres.any { it.name.contains("Drama", ignoreCase = true) } }.take(15) }
+                            } catch (e: Exception) {
+                                sortedByDate.filter { m -> m.genres.any { it.name.contains("Drama", ignoreCase = true) } }.take(15)
+                            }
+                            
+                            val sciFiMovies = try {
+                                val r = mediaRepository.getMediaByGenre("sci-fi", 15, 0)
+                                var result = emptyList<Media>()
+                                r.collect { res -> if (res.isSuccess) result = res.getOrNull() ?: emptyList() }
+                                result.ifEmpty { sortedByDate.filter { m -> m.genres.any { it.name.contains("Science Fiction", ignoreCase = true) || it.name.contains("Sci-Fi", ignoreCase = true) } }.take(15) }
+                            } catch (e: Exception) {
+                                sortedByDate.filter { m -> m.genres.any { it.name.contains("Science Fiction", ignoreCase = true) || it.name.contains("Sci-Fi", ignoreCase = true) } }.take(15)
+                            }
                             
                             // Cache the movies for next time
                             viewModelScope.launch {
-                                com.homeflix.tv.data.cache.ContentCache.saveMediaList(context, "movies", movies)
+                                com.homeflix.tv.data.persistence.ContentCache.saveMediaList(context, "movies", movies)
                                 Log.d("HomeViewModel", "Cached ${movies.size} movies")
                             }
                             
@@ -109,11 +156,10 @@ class HomeViewModel @Inject constructor(
                                 trendingMovies = trendingMovies,
                                 popularMovies = popularMovies,
                                 latestMovies = latestMovies,
-                                // Genre filtering from latest content first
-                                actionMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Action", ignoreCase = true) } }.take(15),
+                                actionMovies = actionMovies,
                                 comedyMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Comedy", ignoreCase = true) } }.take(15),
-                                dramaMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Drama", ignoreCase = true) } }.take(15),
-                                sciFiMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Science Fiction", ignoreCase = true) || genre.name.contains("Sci-Fi", ignoreCase = true) } }.take(15),
+                                dramaMovies = dramaMovies,
+                                sciFiMovies = sciFiMovies,
                                 horrorMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Horror", ignoreCase = true) } }.take(15),
                                 romanceMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Romance", ignoreCase = true) } }.take(15),
                                 thrillerMovies = sortedByDate.filter { media -> media.genres.any { genre -> genre.name.contains("Thriller", ignoreCase = true) } }.take(15),

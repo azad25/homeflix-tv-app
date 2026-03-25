@@ -3,6 +3,7 @@ package com.homeflix.tv.presentation.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
@@ -208,16 +209,26 @@ private fun NetflixRecommendationCard(
     Box(
         modifier = modifier
             .width(220.dp)
-            .aspectRatio(16f / 9f) // Netflix landscape card ratio
+            .aspectRatio(16f / 9f)
             .scale(scale)
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
+                    onInfo()
+                    true
+                } else false
             }
             .clickable { onInfo() }
             .then(
                 if (isFocused) {
-                    Modifier.zIndex(10f) // Bring focused card to front
+                    Modifier
+                        .border(2.dp, Color.White, RoundedCornerShape(8.dp))
+                        .zIndex(10f)
                 } else {
                     Modifier.zIndex(1f)
                 }

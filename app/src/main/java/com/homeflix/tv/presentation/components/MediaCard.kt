@@ -53,19 +53,24 @@ fun NetflixMediaCard(
         modifier = modifier
             .aspectRatio(2f / 3f)
             .scale(scale)
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
+                    onClick()
+                    true
+                } else false
             }
             .clickable { onClick() }
             .then(
                 if (isFocused) {
                     Modifier
-                        .background(
-                            Color.White.copy(alpha = 0.1f),
-                            RoundedCornerShape(8.dp)
-                        )
-                        .zIndex(10f) // Bring focused card to front
+                        .border(2.dp, Color.White, RoundedCornerShape(8.dp))
+                        .zIndex(10f)
                 } else {
                     Modifier.zIndex(1f)
                 }

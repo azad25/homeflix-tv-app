@@ -3,6 +3,7 @@ package com.homeflix.tv.presentation.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
@@ -49,7 +50,9 @@ fun ContinueWatchingRow(
     onPlay: (Media, Long) -> Unit, // Pass media and progressMs (milliseconds)
     onInfo: (Media) -> Unit,
     modifier: Modifier = Modifier,
-    focusRequester: FocusRequester? = null
+    focusRequester: FocusRequester? = null,
+    onNavigateUp: (() -> Unit)? = null,
+    onNavigateDown: (() -> Unit)? = null
 ) {
     if (continueWatchingItems.isNullOrEmpty()) {
         return
@@ -107,45 +110,12 @@ fun ContinueWatchingRow(
                         onPlay(item.media, item.progressSeconds * 1000)
                     },
                     onInfo = { onInfo(item.media) },
+                    onNavigateUp = onNavigateUp,
+                    onNavigateDown = onNavigateDown,
                     modifier = if (index == 0 && focusRequester != null) {
-                        Modifier
-                            .focusRequester(focusRequester)
-                            .onKeyEvent { keyEvent ->
-                                if (keyEvent.type == KeyEventType.KeyDown) {
-                                    when (keyEvent.key) {
-                                        Key.DirectionLeft -> {
-                                            // Stay on first item or handle navigation
-                                            false
-                                        }
-                                        Key.DirectionRight -> {
-                                            // Navigate to next item if available
-                                            if (validItems.size > 1) {
-                                                // Focus would naturally move to next item
-                                                false
-                                            } else {
-                                                false
-                                            }
-                                        }
-                                        else -> false
-                                    }
-                                } else false
-                            }
+                        Modifier.focusRequester(focusRequester)
                     } else {
-                        Modifier.onKeyEvent { keyEvent ->
-                            if (keyEvent.type == KeyEventType.KeyDown) {
-                                when (keyEvent.key) {
-                                    Key.DirectionLeft -> {
-                                        // Navigate to previous item
-                                        false // Let LazyRow handle it
-                                    }
-                                    Key.DirectionRight -> {
-                                        // Navigate to next item
-                                        false // Let LazyRow handle it
-                                    }
-                                    else -> false
-                                }
-                            } else false
-                        }
+                        Modifier
                     }
                 )
             }
@@ -158,7 +128,9 @@ private fun ContinueWatchingCard(
     item: ContinueWatchingItem,
     onPlay: () -> Unit,
     onInfo: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateUp: (() -> Unit)? = null,
+    onNavigateDown: (() -> Unit)? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
@@ -174,14 +146,44 @@ private fun ContinueWatchingCard(
             .width(320.dp)
             .height(180.dp)
             .scale(scale)
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.key) {
+                        Key.Enter, Key.DirectionCenter -> {
+                            onPlay()
+                            true
+                        }
+                        Key.DirectionUp -> {
+                            onNavigateUp?.invoke()
+                            onNavigateUp != null
+                        }
+                        Key.DirectionDown -> {
+                            onNavigateDown?.invoke()
+                            onNavigateDown != null
+                        }
+                        else -> {
+                            if (keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER) {
+                                onPlay()
+                                true
+                            } else false
+                        }
+                    }
+                } else false
             }
             .clickable { onPlay() }
             .then(
                 if (isFocused) {
-                    Modifier.zIndex(10f) // Bring focused card to front
+                    Modifier
+                        .border(
+                            width = 3.dp,
+                            color = Color.White,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .zIndex(10f)
                 } else {
                     Modifier.zIndex(1f)
                 }

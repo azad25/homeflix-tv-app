@@ -3,12 +3,14 @@ package com.homeflix.tv.presentation.screens.browse
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -55,12 +57,17 @@ fun BrowseScreen(
     
     // NETFLIX-LEVEL focus management
     val sideNavFocusRequester = remember { FocusRequester() }
+    val contentFocusRequester = remember { FocusRequester() }
     var currentFocusArea by remember { mutableStateOf(FocusArea.CONTENT) }
     
-    // NO AUTO-FOCUS - Let system handle focus naturally
-    LaunchedEffect(Unit) {
-        currentFocusArea = FocusArea.CONTENT
-        // No forced focus - let the grid handle it naturally
+    // Auto-focus content when loaded
+    LaunchedEffect(uiState) {
+        if (uiState is BrowseUiState.Success) {
+            delay(300)
+            try {
+                contentFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
     }
     
     // SIMPLIFIED Layout - let components handle their own focus
@@ -80,6 +87,9 @@ fun BrowseScreen(
             },
             onNavigateToContent = {
                 currentFocusArea = FocusArea.CONTENT
+                try {
+                    contentFocusRequester.requestFocus()
+                } catch (_: Exception) {}
             }
         )
         
@@ -191,19 +201,31 @@ fun BrowseScreen(
                         }
                     }
                     
-                    // PAGINATED movie grid with latest content first
+                    // PAGINATED movie grid with scroll-triggered auto-loading
+                    val gridState = rememberLazyGridState()
+                    
+                    // Auto-load more when near the end of the grid
+                    LaunchedEffect(gridState.firstVisibleItemIndex, currentState.movies.size) {
+                        val totalItems = currentState.movies.size
+                        val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                        if (lastVisible >= totalItems - 6 && currentState.hasMore && !currentState.isLoadingMore) {
+                            viewModel.loadMoreMovies()
+                        }
+                    }
+                    
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 160.dp),
+                        state = gridState,
                         contentPadding = PaddingValues(24.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         userScrollEnabled = true,
                         modifier = Modifier.fillMaxSize()
+                            .focusRequester(contentFocusRequester)
                     ) {
-                        // Show paginated movies (already sorted by latest in ViewModel)
                         items(
                             items = currentState.movies,
-                            key = { media -> media.id } // Use stable key for better performance
+                            key = { media -> media.id }
                         ) { media ->
                             NetflixMovieCard(
                                 media = media,
@@ -213,8 +235,8 @@ fun BrowseScreen(
                             )
                         }
                         
-                        // Load more button
-                        if (currentState.hasMore && !currentState.isLoadingMore) {
+                        // Loading indicator at bottom
+                        if (currentState.isLoadingMore) {
                             item {
                                 Box(
                                     modifier = Modifier
@@ -222,27 +244,11 @@ fun BrowseScreen(
                                         .padding(16.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Button(
-                                        onClick = { viewModel.loadMoreMovies() },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = NetflixRed
-                                        ),
-                                        modifier = Modifier
-                                            .focusable()
-                                            .onFocusChanged { focused ->
-                                                if (focused.isFocused) {
-                                                    // Auto-load when focused for TV navigation
-                                                    viewModel.loadMoreMovies()
-                                                }
-                                            }
-                                    ) {
-                                        Text(
-                                            text = "Load More Movies",
-                                            style = MaterialTheme.typography.titleMedium.copy(
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        )
-                                    }
+                                    CircularProgressIndicator(
+                                        color = NetflixRed,
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp
+                                    )
                                 }
                             }
                         }
@@ -271,16 +277,26 @@ private fun NetflixMovieCard(
     // Netflix-style card with proper z-index management
     Box(
         modifier = modifier
-            .aspectRatio(2f / 3f) // Netflix poster aspect ratio
+            .aspectRatio(2f / 3f)
             .scale(scale)
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
+                    onClick()
+                    true
+                } else false
             }
             .clickable { onClick() }
             .then(
                 if (isFocused) {
-                    Modifier.zIndex(10f) // Bring focused card to front
+                    Modifier
+                        .border(2.dp, Color.White, RoundedCornerShape(6.dp))
+                        .zIndex(10f)
                 } else {
                     Modifier.zIndex(1f)
                 }

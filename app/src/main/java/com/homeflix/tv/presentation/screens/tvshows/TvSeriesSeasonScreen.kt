@@ -3,10 +3,13 @@ package com.homeflix.tv.presentation.screens.tvshows
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,7 +25,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -215,26 +220,31 @@ fun TvSeriesSeasonScreen(
                                     modifier = Modifier.weight(1f),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    // Back Button
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
+                                    // Back Button (TV-friendly)
+                                    Button(
+                                        onClick = {
+                                            navController.navigate(Screen.TvSeriesDetails.createRoute(seriesId))
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color.White.copy(alpha = 0.15f),
+                                            contentColor = Color.White
+                                        ),
+                                        shape = RoundedCornerShape(6.dp),
                                         modifier = Modifier
-                                            .clickable {
-                                                navController.navigate(Screen.TvSeriesDetails.createRoute(seriesId))
-                                            }
-                                            .padding(bottom = 8.dp)
+                                            .height(36.dp)
+                                            .padding(bottom = 4.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.ArrowBack,
                                             contentDescription = "Back",
                                             tint = Color.White,
-                                            modifier = Modifier.size(20.dp)
+                                            modifier = Modifier.size(16.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = "Back to ${series.title}",
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                color = Color.White.copy(alpha = 0.8f)
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = Color.White.copy(alpha = 0.9f)
                                             )
                                         )
                                     }
@@ -259,13 +269,36 @@ fun TvSeriesSeasonScreen(
                                         )
                                     }
                                     
-                                    // Series Title
-                                    Text(
-                                        text = series.title,
-                                        style = MaterialTheme.typography.displayMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = TextPrimary
+                                    // Series Logo + text fallback
+                                    var logoLoaded by remember { mutableStateOf(false) }
+                                    
+                                    if (!logoLoaded) {
+                                        Text(
+                                            text = series.title,
+                                            style = MaterialTheme.typography.displayMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = TextPrimary
+                                            )
                                         )
+                                    }
+                                    
+                                    // Try series logo from local assets
+                                    val seriesLogoUrl = series.bannerPath?.split("/")?.lastOrNull()?.substringBeforeLast(".")?.let {
+                                        "${ApiUtils.getBaseUrl()}/admin/assets/${it}_logo.png"
+                                    } ?: "${ApiUtils.getBaseUrl()}/admin/assets/logo_${series.id}.png"
+                                    
+                                    coil.compose.AsyncImage(
+                                        model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                            .data(seriesLogoUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "${series.title} logo",
+                                        modifier = Modifier
+                                            .heightIn(max = 80.dp)
+                                            .fillMaxWidth(0.5f),
+                                        contentScale = ContentScale.Fit,
+                                        onSuccess = { logoLoaded = true },
+                                        onError = { logoLoaded = false }
                                     )
                                     
                                     // Season Title
@@ -337,12 +370,66 @@ fun TvSeriesSeasonScreen(
                         }
                     }
                     
+                    // Season Navigation Row
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 32.dp, vertical = 16.dp)
+                        ) {
+                            Text(
+                                text = "Seasons",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextSecondary
+                                ),
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                            
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(series.totalSeasons) { index ->
+                                    val sNum = index + 1
+                                    var btnFocused by remember { mutableStateOf(false) }
+                                    val isCurrentSeason = sNum == seasonNumber
+                                    
+                                    Button(
+                                        onClick = {
+                                            if (!isCurrentSeason) {
+                                                navController.navigate(
+                                                    Screen.TvSeriesSeason.createRoute(seriesId, sNum)
+                                                )
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isCurrentSeason) NetflixRed
+                                                else if (btnFocused) Color.White.copy(alpha = 0.2f)
+                                                else Color.White.copy(alpha = 0.1f),
+                                            contentColor = Color.White
+                                        ),
+                                        shape = RoundedCornerShape(6.dp),
+                                        modifier = Modifier
+                                            .onFocusChanged { btnFocused = it.isFocused }
+                                    ) {
+                                        Text(
+                                            text = "Season $sNum",
+                                            style = MaterialTheme.typography.titleSmall.copy(
+                                                fontWeight = if (isCurrentSeason) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
                     // Episodes List
                     item {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(32.dp)
+                                .padding(horizontal = 32.dp)
                         ) {
                             Text(
                                 text = "Episodes",
@@ -401,16 +488,24 @@ private fun EpisodeCard(
         modifier = modifier
             .fillMaxWidth()
             .scale(scale)
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
+                    onClick()
+                    true
+                } else false
             }
             .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = if (isFocused) Color.White.copy(alpha = 0.1f) else Color.Transparent
         ),
         border = if (isFocused) {
-            androidx.compose.foundation.BorderStroke(2.dp, NetflixRed)
+            androidx.compose.foundation.BorderStroke(2.dp, Color.White)
         } else null,
         shape = RoundedCornerShape(8.dp)
     ) {

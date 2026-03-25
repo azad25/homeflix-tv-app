@@ -101,6 +101,9 @@ fun SearchScreen(
             },
             onNavigateToContent = {
                 currentFocusArea = FocusArea.KEYBOARD
+                try {
+                    keyboardFocusRequester.requestFocus()
+                } catch (_: Exception) {}
             }
         )
         
@@ -375,9 +378,17 @@ private fun VirtualKey(
         modifier = modifier
             .height(32.dp)
             .scale(scale)
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
+                    onClick()
+                    true
+                } else false
             }
             .clickable { onClick() },
         colors = CardDefaults.cardColors(
@@ -413,9 +424,17 @@ private fun GenreItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
+                    onClick()
+                    true
+                } else false
             }
             .clickable { onClick() }
             .padding(vertical = 8.dp, horizontal = 12.dp)
@@ -453,11 +472,24 @@ private fun TopSearchCard(
         modifier = Modifier
             .aspectRatio(2f / 3f)
             .scale(scale)
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
+                    onClick()
+                    true
+                } else false
+            }
             .clickable { onClick() }
+            .then(
+                if (isFocused) {
+                    Modifier.border(2.dp, Color.White, RoundedCornerShape(8.dp))
+                } else Modifier
+            )
     ) {
         Card(
             modifier = Modifier.fillMaxSize(),
@@ -571,13 +603,26 @@ private fun NetflixMovieCard(
     // Netflix-style card with scale animation
     Box(
         modifier = modifier
-            .aspectRatio(2f / 3f) // Netflix poster aspect ratio
+            .aspectRatio(2f / 3f)
             .scale(scale)
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
+                    onClick()
+                    true
+                } else false
+            }
             .clickable { onClick() }
+            .then(
+                if (isFocused) {
+                    Modifier.border(2.dp, Color.White, RoundedCornerShape(6.dp))
+                } else Modifier
+            )
     ) {
         Card(
             modifier = Modifier.fillMaxSize(),

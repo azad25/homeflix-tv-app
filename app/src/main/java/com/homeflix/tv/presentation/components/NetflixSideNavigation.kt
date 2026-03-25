@@ -121,16 +121,25 @@ private fun NetflixNavIcon(
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
             )
             .focusRequester(focusRequester)
-            .focusable()
             .onFocusChanged { isFocused = it.isFocused }
-            .clickable(onClick = onClick)
+            .focusable()
             .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionRight) {
-                    // Only handle RIGHT arrow to exit sidebar
-                    onNavigateRight?.invoke()
-                    true
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when {
+                        keyEvent.key == Key.DirectionRight -> {
+                            onNavigateRight?.invoke()
+                            true
+                        }
+                        keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                        keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER -> {
+                            onClick()
+                            true
+                        }
+                        else -> false
+                    }
                 } else false
-            },
+            }
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(

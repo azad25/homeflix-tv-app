@@ -9,6 +9,14 @@ object ApiUtils {
         return BuildConfig.BASE_URL.removeSuffix("/")
     }
     
+    /**
+     * Root URL without /api path - for endpoints served at root level
+     * e.g. /logos/{filename}, /static/backdrops, etc.
+     */
+    fun getRootUrl(): String {
+        return getBaseUrl().removeSuffix("/api")
+    }
+    
     fun getThumbnailUrl(media: Media): String {
         return if (!media.thumbnailPath.isNullOrEmpty()) {
             if (media.thumbnailPath.startsWith("http")) {
@@ -22,6 +30,10 @@ object ApiUtils {
     }
     
     fun getPosterUrl(media: Media): String {
+        // For TV series episodes, use series poster endpoint
+        media.seriesId?.let { seriesId ->
+            return "${getBaseUrl()}/series/$seriesId/poster"
+        }
         return if (!media.posterPath.isNullOrEmpty()) {
             if (media.posterPath.startsWith("http")) {
                 media.posterPath
@@ -39,24 +51,42 @@ object ApiUtils {
     
     fun getBackdropUrl(media: Media): String {
         return when {
-            // TMDB backdrop URL (highest priority) - EXACTLY like web app
+            // TMDB backdrop URL (highest priority)
             !media.tmdbBackdropUrl.isNullOrEmpty() && media.tmdbBackdropUrl.trim().isNotEmpty() -> {
                 media.tmdbBackdropUrl
             }
-            // Local banner path - use server endpoint like web app
+            // Local banner path - use /api/admin/assets/{filename} endpoint
             !media.bannerPath.isNullOrEmpty() && media.bannerPath.trim().isNotEmpty() -> {
-                val fileName = media.bannerPath.split("/").lastOrNull()
-                if (!fileName.isNullOrEmpty() && fileName.trim().isNotEmpty()) {
-                    "${getBaseUrl()}/admin/assets/$fileName"
+                if (media.bannerPath.startsWith("http")) {
+                    media.bannerPath
                 } else {
-                    "${getBaseUrl()}/backdrops/${media.id}"
+                    val fileName = media.bannerPath.split("/").lastOrNull()
+                    if (!fileName.isNullOrEmpty() && fileName.trim().isNotEmpty()) {
+                        "${getBaseUrl()}/admin/assets/$fileName"
+                    } else {
+                        "${getBaseUrl()}/thumbnails/${media.id}"
+                    }
                 }
             }
-            // Fallback to server thumbnail endpoint (not poster for backdrop)
+            // Fallback to thumbnail
             else -> {
                 "${getBaseUrl()}/thumbnails/${media.id}"
             }
         }
+    }
+    
+    fun getLogoUrl(media: Media): String {
+        // Movies: logos are served from /logos/{filename} at root level (not under /api/)
+        val bannerFileName = media.bannerPath?.split("/")?.lastOrNull()?.substringBeforeLast(".")
+        if (!bannerFileName.isNullOrEmpty()) {
+            return "${getRootUrl()}/logos/${bannerFileName}_logo.png"
+        }
+        // Fallback: try media ID based logo
+        return "${getRootUrl()}/logos/logo_${media.id}.png"
+    }
+    
+    fun getSeriesLogoUrl(seriesId: Int): String {
+        return "${getBaseUrl()}/series/$seriesId/logo"
     }
     
     fun getImageUrl(media: Media, preferBanner: Boolean = false): String {
@@ -158,46 +188,27 @@ object ApiUtils {
     
     // TV Series specific methods - matching web app exactly
     fun getSeriesPosterUrl(series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {
-        // First try TMDB poster URL if available (like web app)
+        // First try TMDB poster URL if available
         series.tmdbPosterUrl?.let { tmdbUrl ->
-            if (tmdbUrl.startsWith("http")) {
+            if (tmdbUrl.startsWith("http") && tmdbUrl.trim().isNotEmpty()) {
                 return tmdbUrl
             }
         }
         
-        // Then try poster path if available
-        series.posterPath?.let { posterPath ->
-            if (posterPath.startsWith("http")) {
-                return posterPath
-            }
-        }
-        
-        // Use series poster endpoint (matching web app exactly)
+        // Use local series poster endpoint: /api/series/{id}/poster
         return "${getBaseUrl()}/series/${series.id}/poster"
     }
     
     fun getSeriesBackdropUrl(series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {
         // First try TMDB backdrop if available (high priority for backdrop)
         series.tmdbBackdropUrl?.let { tmdbUrl ->
-            if (tmdbUrl.startsWith("http")) {
+            if (tmdbUrl.startsWith("http") && tmdbUrl.trim().isNotEmpty()) {
                 return tmdbUrl
             }
         }
         
-        // Then try local banner
-        series.bannerPath?.let { bannerPath ->
-            if (bannerPath.startsWith("http")) {
-                return bannerPath
-            } else {
-                val fileName = bannerPath.split("/").lastOrNull()
-                if (!fileName.isNullOrEmpty()) {
-                    return "${getBaseUrl()}/admin/assets/$fileName"
-                }
-            }
-        }
-        
-        // Fallback to series thumbnail (matching web app)
-        return "${getBaseUrl()}/thumbnails/${series.id}"
+        // Use local series backdrop endpoint: /api/series/{id}/backdrop
+        return "${getBaseUrl()}/series/${series.id}/backdrop"
     }
     
     fun getSeriesThumbnailUrl(seriesId: Int): String {

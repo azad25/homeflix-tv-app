@@ -3,9 +3,11 @@ package com.homeflix.tv.presentation.screens.tvshows
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,7 +20,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -166,13 +170,36 @@ fun TvSeriesDetailsScreen(
                                     modifier = Modifier.weight(1f),
                                     verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    // Title
-                                    Text(
-                                        text = series.title,
-                                        style = MaterialTheme.typography.displayMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = TextPrimary
+                                    // Series Logo + text fallback
+                                    var logoLoaded by remember { mutableStateOf(false) }
+                                    
+                                    if (!logoLoaded) {
+                                        Text(
+                                            text = series.title,
+                                            style = MaterialTheme.typography.displayMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = TextPrimary
+                                            )
                                         )
+                                    }
+                                    
+                                    // Try series logo from local assets
+                                    val seriesLogoUrl = series.bannerPath?.split("/")?.lastOrNull()?.substringBeforeLast(".")?.let {
+                                        "${ApiUtils.getBaseUrl()}/admin/assets/${it}_logo.png"
+                                    } ?: "${ApiUtils.getBaseUrl()}/admin/assets/logo_${series.id}.png"
+                                    
+                                    coil.compose.AsyncImage(
+                                        model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                            .data(seriesLogoUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "${series.title} logo",
+                                        modifier = Modifier
+                                            .heightIn(max = 80.dp)
+                                            .fillMaxWidth(0.5f),
+                                        contentScale = ContentScale.Fit,
+                                        onSuccess = { logoLoaded = true },
+                                        onError = { logoLoaded = false }
                                     )
                                     
                                     // Metadata Row
@@ -343,16 +370,24 @@ private fun SeasonCard(
         modifier = modifier
             .fillMaxWidth()
             .scale(scale)
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
+                    onClick()
+                    true
+                } else false
             }
             .clickable { onClick() },
         colors = CardDefaults.cardColors(
             containerColor = if (isFocused) Color.White.copy(alpha = 0.1f) else Color.Transparent
         ),
         border = if (isFocused) {
-            androidx.compose.foundation.BorderStroke(2.dp, NetflixRed)
+            androidx.compose.foundation.BorderStroke(2.dp, Color.White)
         } else null,
         shape = RoundedCornerShape(8.dp)
     ) {

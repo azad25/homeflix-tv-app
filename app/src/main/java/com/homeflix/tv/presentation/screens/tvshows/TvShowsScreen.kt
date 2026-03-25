@@ -3,12 +3,11 @@ package com.homeflix.tv.presentation.screens.tvshows
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -18,8 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +40,7 @@ import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
+import kotlinx.coroutines.delay
 
 
 
@@ -46,9 +50,20 @@ fun TvShowsScreen(
     viewModel: TvShowsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val contentFocusRequester = remember { FocusRequester() }
     
     LaunchedEffect(Unit) {
         viewModel.loadTvShows()
+    }
+    
+    // Auto-focus content when loaded
+    LaunchedEffect(uiState) {
+        if (uiState is TvShowsUiState.Success) {
+            delay(300)
+            try {
+                contentFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
     }
     
     Row(
@@ -64,6 +79,11 @@ fun TvShowsScreen(
                     popUpTo(Screen.Home.route) { inclusive = false }
                     launchSingleTop = true
                 }
+            },
+            onNavigateToContent = {
+                try {
+                    contentFocusRequester.requestFocus()
+                } catch (_: Exception) {}
             }
         )
         
@@ -139,44 +159,227 @@ fun TvShowsScreen(
                 }
                 
                 is TvShowsUiState.Success -> {
-                    // Series count indicator
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 32.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "Showing ${currentState.series.size} TV series",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = NetflixRed,
-                                fontWeight = FontWeight.Medium
-                            )
-                        )
-                    }
-                    
-                    // TV Series grid
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 160.dp),
-                        contentPadding = PaddingValues(24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        userScrollEnabled = true,
+                    LazyColumn(
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(
-                            items = currentState.series,
-                            key = { series -> series.id }
-                        ) { series ->
-                            TvSeriesCard(
-                                series = series,
-                                onClick = {
-                                    navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
+                        // Hero slider section for featured series
+                        if (currentState.featuredSeries.isNotEmpty()) {
+                            item {
+                                TvShowsHeroSlider(
+                                    featuredSeries = currentState.featuredSeries,
+                                    onSeriesClick = { series ->
+                                        navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
+                                    }
+                                )
+                            }
+                        }
+                        
+                        // Series count indicator
+                        item {
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 32.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = "Showing ${currentState.series.size} TV series",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = NetflixRed,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            }
+                        }
+                        
+                        // TV Series grid items (rendered as rows in LazyColumn)
+                        val chunkedSeries = currentState.series.chunked(4)
+                        items(chunkedSeries.size) { rowIndex ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                            ) {
+                                chunkedSeries[rowIndex].forEachIndexed { colIndex, series ->
+                                    TvSeriesCard(
+                                        series = series,
+                                        onClick = {
+                                            navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                            .then(
+                                                if (rowIndex == 0 && colIndex == 0) {
+                                                    Modifier.focusRequester(contentFocusRequester)
+                                                } else Modifier
+                                            )
+                                    )
                                 }
-                            )
+                                // Fill remaining space with empty boxes if row is not full
+                                repeat(4 - chunkedSeries[rowIndex].size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                        
+                        item {
+                            Spacer(modifier = Modifier.height(48.dp))
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvShowsHeroSlider(
+    featuredSeries: List<TvSeries>,
+    onSeriesClick: (TvSeries) -> Unit
+) {
+    if (featuredSeries.isEmpty()) return
+    
+    var currentIndex by remember { mutableStateOf(0) }
+    val currentSeries = featuredSeries[currentIndex]
+    
+    // Auto-slide every 6 seconds
+    LaunchedEffect(currentIndex) {
+        delay(6000)
+        currentIndex = (currentIndex + 1) % featuredSeries.size
+    }
+    
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(360.dp)
+    ) {
+        // Backdrop image
+        AsyncImage(
+            model = ApiUtils.getSeriesBackdropUrl(currentSeries),
+            contentDescription = currentSeries.title,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        
+        // Gradient overlays
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.9f),
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.4f)
+                        )
+                    )
+                )
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.8f)
+                        ),
+                        startY = 300f
+                    )
+                )
+        )
+        
+        // Content
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 48.dp, end = 200.dp, bottom = 32.dp, top = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Title
+            Text(
+                text = currentSeries.title,
+                style = MaterialTheme.typography.displaySmall.copy(
+                    fontWeight = FontWeight.Black,
+                    color = TextPrimary
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            
+            // Metadata row
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                currentSeries.year?.let { year ->
+                    Text(
+                        text = year.toString(),
+                        style = MaterialTheme.typography.titleMedium.copy(color = TextSecondary)
+                    )
+                }
+                if (currentSeries.rating > 0) {
+                    Text(
+                        text = "★ ${String.format("%.1f", currentSeries.rating)}",
+                        style = MaterialTheme.typography.titleMedium.copy(color = Color(0xFFFFD700))
+                    )
+                }
+                Text(
+                    text = "${currentSeries.totalSeasons} Season${if (currentSeries.totalSeasons != 1) "s" else ""}",
+                    style = MaterialTheme.typography.titleMedium.copy(color = TextSecondary)
+                )
+            }
+            
+            // Description
+            currentSeries.description?.let { desc ->
+                Text(
+                    text = desc,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = TextPrimary.copy(alpha = 0.9f)
+                    ),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                )
+            }
+            
+            // View Details button
+            Button(
+                onClick = { onSeriesClick(currentSeries) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = Color.Black
+                ),
+                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier.height(44.dp)
+            ) {
+                Text(
+                    text = "View Details",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        }
+        
+        // Slide indicators
+        if (featuredSeries.size > 1) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(32.dp)
+            ) {
+                featuredSeries.forEachIndexed { index, _ ->
+                    Box(
+                        modifier = Modifier
+                            .size(if (index == currentIndex) 10.dp else 6.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                if (index == currentIndex) Color.White else Color.White.copy(alpha = 0.4f)
+                            )
+                    )
                 }
             }
         }
@@ -203,19 +406,24 @@ private fun TvSeriesCard(
         modifier = modifier
             .aspectRatio(2f / 3f)
             .scale(scale)
-            .focusable()
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
+            }
+            .focusable()
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
+                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
+                    onClick()
+                    true
+                } else false
             }
             .clickable { onClick() }
             .then(
                 if (isFocused) {
                     Modifier
-                        .background(
-                            Color.White.copy(alpha = 0.1f),
-                            RoundedCornerShape(6.dp)
-                        )
-                        .zIndex(10f) // Bring focused card to front
+                        .border(2.dp, Color.White, RoundedCornerShape(6.dp))
+                        .zIndex(10f)
                 } else {
                     Modifier.zIndex(1f)
                 }

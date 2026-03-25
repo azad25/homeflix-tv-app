@@ -72,8 +72,11 @@ interface HomeFlixApiService {
     @GET("media/{id}/audio")
     suspend fun getAudioTracks(@Path("id") id: String): Response<List<AudioTrackDto>>
     
-    @GET("subtitles/{id}/file")
-    suspend fun getSubtitleFile(@Path("id") id: String): Response<String>
+    @GET("media/{mediaId}/subtitles/{trackId}/file")
+    suspend fun getSubtitleFile(
+        @Path("mediaId") mediaId: String,
+        @Path("trackId") trackId: String
+    ): Response<String>
     
     // Playback endpoints
     @POST("track-view/{id}")
@@ -169,7 +172,12 @@ interface HomeFlixApiService {
     
     // TV Series endpoints (hierarchical API matching web app)
     @GET("series")
-    suspend fun getTvSeries(): Response<List<MediaDto>>
+    suspend fun getTvSeries(
+        @Query("sort") sort: String? = null,
+        @Query("order") order: String? = null,
+        @Query("limit") limit: Int? = null,
+        @Query("offset") offset: Int? = null
+    ): Response<List<MediaDto>>
     
     @GET("series/{id}")
     suspend fun getTvSeriesById(@Path("id") id: Int): Response<MediaDto>

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
@@ -73,6 +74,7 @@ import androidx.compose.ui.platform.LocalContext
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
 interface VideoPlayerEntryPoint {
     fun getMediaRepository(): com.homeflix.tv.domain.repository.MediaRepository
+    fun getStreamingRepository(): com.homeflix.tv.data.repository.StreamingRepository
 }
 
 @UnstableApi
@@ -93,13 +95,14 @@ fun VideoPlayer(
     val coroutineScope = rememberCoroutineScope()
     
     // Get MediaRepository from Hilt if not provided
-    val repository = mediaRepository ?: remember {
-        val hiltEntryPoint = EntryPointAccessors.fromApplication(
+    val hiltEntryPoint = remember {
+        EntryPointAccessors.fromApplication(
             context.applicationContext,
             VideoPlayerEntryPoint::class.java
         )
-        hiltEntryPoint.getMediaRepository()
     }
+    val repository = mediaRepository ?: remember { hiltEntryPoint.getMediaRepository() }
+    val streamingRepository = remember { hiltEntryPoint.getStreamingRepository() }
     
     var exoPlayer by remember { mutableStateOf<ExoPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -124,6 +127,9 @@ fun VideoPlayer(
     var trackSelector by remember { mutableStateOf<DefaultTrackSelector?>(null) }
     var showSubtitleToast by remember { mutableStateOf(false) }
     var subtitleToastMessage by remember { mutableStateOf("") }
+    
+    // External subtitle tracks fetched from API
+    var externalSubtitleTracks by remember { mutableStateOf<List<com.homeflix.tv.domain.model.SubtitleTrack>>(emptyList()) }
 
     // Next episode state for autoplay
     var nextEpisode by remember(media.id) { mutableStateOf<Media?>(null) }
@@ -259,6 +265,22 @@ fun VideoPlayer(
             
             // Reset seek flag for new media
             resumeSeekAttempted = false
+            
+            // Fetch external subtitle tracks from API
+            var fetchedSubtitles = emptyList<com.homeflix.tv.domain.model.SubtitleTrack>()
+            try {
+                streamingRepository.getSubtitleTracks(media.id.toString()).collect { result ->
+                    if (result.isSuccess) {
+                        fetchedSubtitles = result.getOrNull() ?: emptyList()
+                        externalSubtitleTracks = fetchedSubtitles
+                        android.util.Log.d("VideoPlayer", "Found ${fetchedSubtitles.size} external subtitle tracks")
+                    } else {
+                        android.util.Log.w("VideoPlayer", "Failed to fetch subtitles: ${result.exceptionOrNull()?.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("VideoPlayer", "Error fetching external subtitles", e)
+            }
 
             // Create track selector with subtitle support
             val newTrackSelector = DefaultTrackSelector(context)
@@ -288,6 +310,29 @@ fun VideoPlayer(
                         media.filePath // Direct file path
                     )
                     
+                    // Build SubtitleConfigurations from external subtitle tracks
+                    val subtitleConfigs = fetchedSubtitles.map { track ->
+                        val subtitleUri = android.net.Uri.parse(
+                            ApiUtils.getSubtitleUrl(media.id, track.id)
+                        )
+                        val mimeType = when (track.format.lowercase()) {
+                            "srt", "subrip" -> MimeTypes.APPLICATION_SUBRIP
+                            "ass", "ssa" -> MimeTypes.TEXT_SSA
+                            "vtt", "webvtt" -> MimeTypes.TEXT_VTT
+                            else -> MimeTypes.APPLICATION_SUBRIP // Default to SRT
+                        }
+                        MediaItem.SubtitleConfiguration.Builder(subtitleUri)
+                            .setMimeType(mimeType)
+                            .setLanguage(track.language)
+                            .setLabel(track.title ?: track.language)
+                            .setSelectionFlags(if (track.isDefault) C.SELECTION_FLAG_DEFAULT else 0)
+                            .build()
+                    }
+                    
+                    if (subtitleConfigs.isNotEmpty()) {
+                        android.util.Log.d("VideoPlayer", "Adding ${subtitleConfigs.size} external subtitle tracks to MediaItem")
+                    }
+                    
                     var mediaLoaded = false
                     for (streamUrl in urlsToTry) {
                         try {
@@ -295,6 +340,7 @@ fun VideoPlayer(
                             
                             val mediaItem = MediaItem.Builder()
                                 .setUri(streamUrl)
+                                .setSubtitleConfigurations(subtitleConfigs)
                                 .build()
                             
                             if (shouldResumePlayback && startTime > 0) {
@@ -330,6 +376,7 @@ fun VideoPlayer(
                             
                             val mediaItem = MediaItem.Builder()
                                 .setUri(testUrl)
+                                .setSubtitleConfigurations(subtitleConfigs)
                                 .build()
                             
                             if (shouldResumePlayback && startTime > 0) {

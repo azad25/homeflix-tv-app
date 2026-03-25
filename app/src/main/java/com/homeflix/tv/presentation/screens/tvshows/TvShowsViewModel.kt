@@ -31,7 +31,15 @@ class TvShowsViewModel @Inject constructor(
                     android.util.Log.d("TvShowsViewModel", "Series: ${tvSeries.title}, Poster: ${tvSeries.posterPath}")
                 }
                 
-                _uiState.value = TvShowsUiState.Success(series = series)
+                // Separate featured series for hero slider (first 5)
+                val featuredSeries = series.take(5)
+                // Cap grid display at 10 items
+                val gridSeries = series.take(10)
+                
+                _uiState.value = TvShowsUiState.Success(
+                    featuredSeries = featuredSeries,
+                    series = gridSeries
+                )
             } catch (e: Exception) {
                 _uiState.value = TvShowsUiState.Error(
                     message = e.message ?: "Failed to load TV shows"
@@ -43,7 +51,10 @@ class TvShowsViewModel @Inject constructor(
 
 sealed class TvShowsUiState {
     object Loading : TvShowsUiState()
-    data class Success(val series: List<TvSeries>) : TvShowsUiState()
+    data class Success(
+        val featuredSeries: List<TvSeries>,
+        val series: List<TvSeries>
+    ) : TvShowsUiState()
     data class Error(val message: String) : TvShowsUiState()
 }
 
