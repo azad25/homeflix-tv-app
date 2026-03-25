@@ -66,11 +66,11 @@ fun TvShowsScreen(
     
     LaunchedEffect(uiState) {
         if (uiState is TvShowsUiState.Success) {
-            delay(500)
+            delay(100)
             try {
-                contentFocusRequester.requestFocus()
-                // Scroll to top after focus to prevent auto-scroll past hero
+                // Scroll to top first, then request focus
                 scrollState.scrollToItem(0)
+                // Don't auto-request focus on hero button to avoid unwanted scrolling
             } catch (_: Exception) {}
         }
     }
@@ -358,7 +358,7 @@ private fun TvShowsHeroSlider(
             currentSeries.description?.let { desc ->
                 Text(
                     text = desc,
-                    style = MaterialTheme.typography.bodyLarge.copy(
+                    style = MaterialTheme.typography.bodyMedium.copy(
                         color = TextPrimary.copy(alpha = 0.9f)
                     ),
                     maxLines = 3,
@@ -445,7 +445,7 @@ private fun TvSeriesRow(
         // Horizontal scrollable row
         LazyRow(
             state = listState,
-            contentPadding = PaddingValues(horizontal = 24.dp),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             userScrollEnabled = true,
             modifier = Modifier.fillMaxWidth()
@@ -457,7 +457,7 @@ private fun TvSeriesRow(
                     series = series,
                     onClick = { onSeriesClick(series) },
                     modifier = Modifier
-                        .width(160.dp)
+                        .width(110.dp)
                         .then(
                             if (itemFocusRequester != null) {
                                 Modifier.focusRequester(itemFocusRequester)
@@ -524,11 +524,11 @@ private fun TvSeriesCard(
     Box(
         modifier = modifier
             .aspectRatio(2f / 3f)
-            .scale(scale)
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
             .focusable()
+            .scale(scale)
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown &&
                     (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||

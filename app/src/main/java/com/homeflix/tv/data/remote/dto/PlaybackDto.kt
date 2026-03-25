@@ -180,11 +180,14 @@ fun RecentlyWatchedItemDto.toDomain(): RecentlyWatchedItem {
     // Handle multiple date formats from API
     val parsedDate = try {
         // Try with timezone offset first (e.g., "2025-11-13T07:20:52+06:00")
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).parse(lastWatchedAt)
+        // Use Z pattern for API 23 compatibility, manually handle timezone offset
+        val dateStr = lastWatchedAt.replace(Regex("[+-]\\d{2}:\\d{2}$"), "Z")
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).parse(dateStr)
     } catch (e: Exception) {
         try {
-            // Fallback to Z format
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).parse(lastWatchedAt)
+            // Fallback to parsing without timezone for API 23
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                .parse(lastWatchedAt.substringBefore("+").substringBefore("Z"))
         } catch (e2: Exception) {
             // Final fallback to current date
             Date()

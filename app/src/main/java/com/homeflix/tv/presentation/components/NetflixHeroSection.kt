@@ -393,9 +393,9 @@ fun NetflixHeroSection(
                         media.description?.let { description ->
                             Text(
                                 text = description,
-                                style = MaterialTheme.typography.bodyLarge.copy(
+                                style = MaterialTheme.typography.bodyMedium.copy(
                                     color = TextPrimary.copy(alpha = 0.9f),
-                                    lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2
+                                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
                                 ),
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,

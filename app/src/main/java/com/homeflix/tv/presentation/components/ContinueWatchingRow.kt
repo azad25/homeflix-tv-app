@@ -58,7 +58,7 @@ fun ContinueWatchingRow(
         return
     }
     
-    // Additional validation - filter out any invalid items and show only movies
+    // Additional validation - filter out any invalid items and show ONLY movies
     val validItems = remember(continueWatchingItems) {
         continueWatchingItems.filterNotNull().filter { item ->
             try {
@@ -67,10 +67,8 @@ fun ContinueWatchingRow(
                 !item.media.title.isNullOrBlank() &&
                 item.progress >= 0f &&
                 item.progress <= 1f &&
-                // Only show movies, not TV episodes
-                (item.media.type == com.homeflix.tv.domain.model.MediaType.MOVIE || 
-                 item.media.type?.name?.equals("MOVIE", ignoreCase = true) == true ||
-                 item.media.type == null) // Include items without type specified (assume movies)
+                // STRICT FILTER: Only show movies, exclude all TV episodes
+                item.media.type == com.homeflix.tv.domain.model.MediaType.MOVIE
             } catch (e: Exception) {
                 false
             }
@@ -143,8 +141,8 @@ private fun ContinueWatchingCard(
     
     Box(
         modifier = modifier
-            .width(320.dp)
-            .height(180.dp)
+            .width(300.dp)
+            .height(170.dp)
             .scale(scale)
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused

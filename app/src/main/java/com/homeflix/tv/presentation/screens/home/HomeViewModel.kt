@@ -370,8 +370,17 @@ class HomeViewModel @Inject constructor(
     private fun formatLastWatched(dateString: String): String {
         return try {
             // Parse the date string (handles timezone offset)
-            val date = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.getDefault())
-                .parse(dateString) ?: return "Unknown"
+            // Use multiple format patterns for API 23 compatibility
+            val date = try {
+                // Try ISO 8601 with timezone (API 24+)
+                java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", java.util.Locale.getDefault())
+                    .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+                    .parse(dateString.replace("+06:00", "+0600"))
+            } catch (e: Exception) {
+                // Fallback: Parse without timezone for API 23
+                java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.getDefault())
+                    .parse(dateString.substringBefore("+").substringBefore("Z"))
+            } ?: return "Unknown"
             
             val now = java.util.Date()
             val diffMs = now.time - date.time

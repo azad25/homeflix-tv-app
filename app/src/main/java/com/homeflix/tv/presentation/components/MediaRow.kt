@@ -63,7 +63,7 @@ fun MediaRow(
                     media = media,
                     onClick = { onMediaClick(media) },
                     modifier = Modifier
-                        .width(160.dp)
+                        .width(130.dp)
                         .then(
                             if (itemFocusRequester != null && index == 0 && focusRequester != null) {
                                 Modifier.focusRequester(focusRequester)
@@ -108,7 +108,7 @@ fun MediaRow(
                                         }
                                     }
                                     Key.DirectionLeft -> {
-                                        // Navigate to previous item in row
+                                        // Navigate to previous item in row - MUST consume to prevent parent scroll
                                         if (index > 0) {
                                             val prevIndex = index - 1
                                             if (prevIndex < itemFocusRequesters.size) {
@@ -121,17 +121,18 @@ fun MediaRow(
                                         }
                                     }
                                     Key.DirectionRight -> {
-                                        // Navigate to next item in row
+                                        // Navigate to next item in row - MUST consume to prevent parent scroll
                                         if (index < mediaList.size - 1) {
                                             val nextIndex = index + 1
                                             if (nextIndex < itemFocusRequesters.size) {
                                                 itemFocusRequesters[nextIndex].requestFocus()
                                             }
+                                            true
                                         } else {
                                             // At last item, try to navigate down
                                             onNavigateDown?.invoke()
+                                            true
                                         }
-                                        true
                                     }
                                     else -> false
                                 }
