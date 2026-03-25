@@ -81,6 +81,8 @@ data class MediaDto(
     val posterPath: String? = null,
     @SerializedName("banner_path")
     val bannerPath: String? = null,
+    @SerializedName("logo_path")
+    val logoPath: String? = null,
     @SerializedName("trailer_path")
     val trailerPath: String? = null,
     
@@ -101,6 +103,10 @@ data class MediaDto(
     val seasonNumber: Int? = null,
     @SerializedName("episode_number")
     val episodeNumber: Int? = null,
+    @SerializedName("episode_title")
+    val episodeTitle: String? = null,
+    @SerializedName("episode_still_path")
+    val episodeStillPath: String? = null,
     @SerializedName("season_number_legacy")
     val seasonNumberLegacy: Int? = null,
     val episode: Int? = null,
@@ -198,6 +204,7 @@ fun MediaDto.toDomain(): Media {
         previewClipPath = previewClipPath,
         posterPath = posterPath,
         bannerPath = bannerPath,
+        logoPath = logoPath,
         trailerPath = trailerPath,
         
         // TMDB assets - exactly like web app

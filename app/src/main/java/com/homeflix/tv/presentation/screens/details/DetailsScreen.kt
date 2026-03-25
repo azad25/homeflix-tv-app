@@ -25,6 +25,8 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.components.RecommendationSection
 import com.homeflix.tv.presentation.navigation.Screen
@@ -32,6 +34,7 @@ import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
+import kotlinx.coroutines.delay
 
 @Composable
 fun DetailsScreen(
@@ -40,9 +43,25 @@ fun DetailsScreen(
     viewModel: DetailsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val contentFocusRequester = remember { FocusRequester() }
+    val scrollState = rememberLazyListState()
     
     LaunchedEffect(mediaId) {
         viewModel.loadMediaDetails(mediaId)
+    }
+    
+    // Auto-focus content when loaded, but keep scroll at top
+    LaunchedEffect(uiState) {
+        if (uiState is DetailsUiState.Success) {
+            delay(400)
+            try {
+                contentFocusRequester.requestFocus()
+                // Scroll back to top after focus — focusing the play button
+                // causes LazyColumn to auto-scroll down to make it visible
+                delay(100)
+                scrollState.scrollToItem(0)
+            } catch (_: Exception) {}
+        }
     }
     
     // Netflix-style layout with BLACK background
@@ -61,7 +80,9 @@ fun DetailsScreen(
                 }
             },
             onNavigateToContent = {
-                // Let Compose focus system move focus to content naturally
+                try {
+                    contentFocusRequester.requestFocus()
+                } catch (_: Exception) {}
             }
         )
         
@@ -108,8 +129,6 @@ fun DetailsScreen(
         
         is DetailsUiState.Success -> {
             val media = currentState.media
-            
-            val scrollState = rememberLazyListState()
             
             // NO AUTO-SCROLL - Let user control navigation
             // LaunchedEffect removed to prevent interference with D-pad navigation
@@ -172,8 +191,9 @@ fun DetailsScreen(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                // Movie Logo (from local assets, text fallback)
+                                // Movie Logo (from API logo_path, text fallback)
                                 var logoLoaded by remember { mutableStateOf(false) }
+                                val logoUrl = ApiUtils.getLogoUrl(media)
                                 
                                 if (!logoLoaded) {
                                     Text(
@@ -185,21 +205,23 @@ fun DetailsScreen(
                                     )
                                 }
                                 
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(ApiUtils.getLogoUrl(media))
-                                        .memoryCacheKey("logo_${media.id}")
-                                        .diskCacheKey("logo_${media.id}")
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = "${media.title} logo",
-                                    modifier = Modifier
-                                        .heightIn(max = 80.dp)
-                                        .fillMaxWidth(0.5f),
-                                    contentScale = ContentScale.Fit,
-                                    onSuccess = { logoLoaded = true },
-                                    onError = { logoLoaded = false }
-                                )
+                                if (logoUrl != null) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(logoUrl)
+                                            .memoryCacheKey("logo_${media.id}")
+                                            .diskCacheKey("logo_${media.id}")
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "${media.title} logo",
+                                        modifier = Modifier
+                                            .heightIn(max = 80.dp)
+                                            .fillMaxWidth(0.5f),
+                                        contentScale = ContentScale.Fit,
+                                        onSuccess = { logoLoaded = true },
+                                        onError = { logoLoaded = false }
+                                    )
+                                }
                                 
                                 // Metadata Row
                                 Row(
@@ -311,6 +333,7 @@ fun DetailsScreen(
                                             ),
                                             shape = RoundedCornerShape(4.dp),
                                             modifier = Modifier.height(44.dp)
+                                                .focusRequester(contentFocusRequester)
                                         ) {
                                             Text(
                                                 text = "▶ Continue Watching",
@@ -349,6 +372,7 @@ fun DetailsScreen(
                                             ),
                                             shape = RoundedCornerShape(4.dp),
                                             modifier = Modifier.height(44.dp)
+                                                .focusRequester(contentFocusRequester)
                                         ) {
                                             Text(
                                                 text = "▶ Play",

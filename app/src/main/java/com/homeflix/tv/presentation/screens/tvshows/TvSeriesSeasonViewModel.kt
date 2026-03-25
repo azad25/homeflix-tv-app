@@ -55,9 +55,11 @@ sealed class TvSeriesSeasonUiState {
 data class Episode(
     val id: Int,
     val title: String,
+    val episodeTitle: String? = null, // episode_title from API, more specific than title
     val description: String?,
     val duration: Int?, // in minutes
     val rating: Double,
     val airDate: String?,
-    val thumbnailPath: String?
+    val thumbnailPath: String?,
+    val episodeStillPath: String? = null // episode_still_path from API for still images
 )

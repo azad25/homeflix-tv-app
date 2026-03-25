@@ -36,6 +36,9 @@ import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
+import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 
 
 
@@ -46,9 +49,20 @@ fun TvSeriesDetailsScreen(
     viewModel: TvSeriesDetailsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val contentFocusRequester = remember { FocusRequester() }
     
     LaunchedEffect(seriesId) {
         viewModel.loadSeriesDetails(seriesId)
+    }
+    
+    // Auto-focus content when loaded
+    LaunchedEffect(uiState) {
+        if (uiState is TvSeriesDetailsUiState.Success) {
+            delay(400)
+            try {
+                contentFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
     }
     
     Row(
@@ -183,10 +197,8 @@ fun TvSeriesDetailsScreen(
                                         )
                                     }
                                     
-                                    // Try series logo from local assets
-                                    val seriesLogoUrl = series.bannerPath?.split("/")?.lastOrNull()?.substringBeforeLast(".")?.let {
-                                        "${ApiUtils.getBaseUrl()}/admin/assets/${it}_logo.png"
-                                    } ?: "${ApiUtils.getBaseUrl()}/admin/assets/logo_${series.id}.png"
+                                    // Try series logo from API
+                                    val seriesLogoUrl = ApiUtils.getSeriesLogoUrl(series.id)
                                     
                                     coil.compose.AsyncImage(
                                         model = coil.request.ImageRequest.Builder(LocalContext.current)
@@ -278,6 +290,7 @@ fun TvSeriesDetailsScreen(
                                             ),
                                             shape = RoundedCornerShape(4.dp),
                                             modifier = Modifier.height(44.dp)
+                                                .focusRequester(contentFocusRequester)
                                         ) {
                                             Text(
                                                 text = "▶ Play",

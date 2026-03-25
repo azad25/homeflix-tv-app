@@ -7,7 +7,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -41,6 +45,7 @@ import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 
 
@@ -56,10 +61,9 @@ fun TvShowsScreen(
         viewModel.loadTvShows()
     }
     
-    // Auto-focus content when loaded
     LaunchedEffect(uiState) {
         if (uiState is TvShowsUiState.Success) {
-            delay(300)
+            delay(500)
             try {
                 contentFocusRequester.requestFocus()
             } catch (_: Exception) {}
@@ -169,7 +173,8 @@ fun TvShowsScreen(
                                     featuredSeries = currentState.featuredSeries,
                                     onSeriesClick = { series ->
                                         navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
-                                    }
+                                    },
+                                    contentFocusRequester = contentFocusRequester
                                 )
                             }
                         }
@@ -193,34 +198,15 @@ fun TvShowsScreen(
                             }
                         }
                         
-                        // TV Series grid items (rendered as rows in LazyColumn)
-                        val chunkedSeries = currentState.series.chunked(4)
-                        items(chunkedSeries.size) { rowIndex ->
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 24.dp, vertical = 8.dp)
-                            ) {
-                                chunkedSeries[rowIndex].forEachIndexed { colIndex, series ->
-                                    TvSeriesCard(
-                                        series = series,
-                                        onClick = {
-                                            navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                            .then(
-                                                if (rowIndex == 0 && colIndex == 0) {
-                                                    Modifier.focusRequester(contentFocusRequester)
-                                                } else Modifier
-                                            )
-                                    )
+                        // TV Series horizontal slider row
+                        item {
+                            TvSeriesRow(
+                                title = "All TV Series",
+                                seriesList = currentState.series,
+                                onSeriesClick = { series ->
+                                    navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
                                 }
-                                // Fill remaining space with empty boxes if row is not full
-                                repeat(4 - chunkedSeries[rowIndex].size) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
+                            )
                         }
                         
                         item {
@@ -236,7 +222,8 @@ fun TvShowsScreen(
 @Composable
 private fun TvShowsHeroSlider(
     featuredSeries: List<TvSeries>,
-    onSeriesClick: (TvSeries) -> Unit
+    onSeriesClick: (TvSeries) -> Unit,
+    contentFocusRequester: FocusRequester? = null
 ) {
     if (featuredSeries.isEmpty()) return
     
@@ -252,7 +239,7 @@ private fun TvShowsHeroSlider(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(360.dp)
+            .height(400.dp)
     ) {
         // Backdrop image
         AsyncImage(
@@ -297,15 +284,30 @@ private fun TvShowsHeroSlider(
                 .padding(start = 48.dp, end = 200.dp, bottom = 32.dp, top = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Title
-            Text(
-                text = currentSeries.title,
-                style = MaterialTheme.typography.displaySmall.copy(
-                    fontWeight = FontWeight.Black,
-                    color = TextPrimary
-                ),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+            // Series Logo with text fallback
+            var logoLoaded by remember(currentSeries.id) { mutableStateOf(false) }
+            
+            if (!logoLoaded) {
+                Text(
+                    text = currentSeries.title,
+                    style = MaterialTheme.typography.displaySmall.copy(
+                        fontWeight = FontWeight.Black,
+                        color = TextPrimary
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            AsyncImage(
+                model = ApiUtils.getSeriesLogoUrl(currentSeries.id),
+                contentDescription = "${currentSeries.title} logo",
+                modifier = Modifier
+                    .heightIn(max = 80.dp)
+                    .fillMaxWidth(0.4f),
+                contentScale = ContentScale.Fit,
+                onSuccess = { logoLoaded = true },
+                onError = { logoLoaded = false }
             )
             
             // Metadata row
@@ -353,6 +355,11 @@ private fun TvShowsHeroSlider(
                 ),
                 shape = RoundedCornerShape(4.dp),
                 modifier = Modifier.height(44.dp)
+                    .then(
+                        if (contentFocusRequester != null) {
+                            Modifier.focusRequester(contentFocusRequester)
+                        } else Modifier
+                    )
             ) {
                 Text(
                     text = "View Details",
@@ -381,6 +388,97 @@ private fun TvShowsHeroSlider(
                             )
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvSeriesRow(
+    title: String,
+    seriesList: List<TvSeries>,
+    onSeriesClick: (TvSeries) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val itemFocusRequesters = remember(seriesList.size) {
+        List(minOf(seriesList.size, 20)) { FocusRequester() }
+    }
+    
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        // Section Title
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary
+            ),
+            modifier = Modifier.padding(start = 24.dp, bottom = 8.dp)
+        )
+        
+        // Horizontal scrollable row
+        LazyRow(
+            state = listState,
+            contentPadding = PaddingValues(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            userScrollEnabled = true,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            itemsIndexed(seriesList) { index, series ->
+                val itemFocusRequester = if (index < itemFocusRequesters.size) itemFocusRequesters[index] else null
+                
+                TvSeriesCard(
+                    series = series,
+                    onClick = { onSeriesClick(series) },
+                    modifier = Modifier
+                        .width(160.dp)
+                        .then(
+                            if (itemFocusRequester != null) {
+                                Modifier.focusRequester(itemFocusRequester)
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
+                                // Auto-scroll to focused item
+                                coroutineScope.launch {
+                                    val targetIndex = when {
+                                        index == 0 -> 0
+                                        index >= seriesList.size - 2 -> maxOf(0, seriesList.size - 3)
+                                        else -> maxOf(0, index - 1)
+                                    }
+                                    listState.animateScrollToItem(targetIndex)
+                                }
+                            }
+                        }
+                        .onKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown) {
+                                when (keyEvent.key) {
+                                    Key.DirectionLeft -> {
+                                        if (index > 0 && index - 1 < itemFocusRequesters.size) {
+                                            itemFocusRequesters[index - 1].requestFocus()
+                                            true
+                                        } else {
+                                            false // Let system handle (moves to sidebar)
+                                        }
+                                    }
+                                    Key.DirectionRight -> {
+                                        if (index < seriesList.size - 1 && index + 1 < itemFocusRequesters.size) {
+                                            itemFocusRequesters[index + 1].requestFocus()
+                                        }
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            } else false
+                        }
+                )
             }
         }
     }

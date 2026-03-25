@@ -75,14 +75,19 @@ object ApiUtils {
         }
     }
     
-    fun getLogoUrl(media: Media): String {
-        // Movies: logos are served from /logos/{filename} at root level (not under /api/)
-        val bannerFileName = media.bannerPath?.split("/")?.lastOrNull()?.substringBeforeLast(".")
-        if (!bannerFileName.isNullOrEmpty()) {
-            return "${getRootUrl()}/logos/${bannerFileName}_logo.png"
+    fun getLogoUrl(media: Media): String? {
+        // Movies: use logo_path from API if available (matching web frontend)
+        // Web frontend pattern: `${apiUrl}/api/${movie.logo_path}`
+        val logoPath = media.logoPath
+        if (!logoPath.isNullOrEmpty() && logoPath.trim().isNotEmpty()) {
+            return if (logoPath.startsWith("http")) {
+                logoPath
+            } else {
+                "${getBaseUrl()}/$logoPath"
+            }
         }
-        // Fallback: try media ID based logo
-        return "${getRootUrl()}/logos/logo_${media.id}.png"
+        // No logo_path available — return null so UI shows text fallback
+        return null
     }
     
     fun getSeriesLogoUrl(seriesId: Int): String {

@@ -216,9 +216,10 @@ fun NetflixHeroSection(
                         initialOffsetY = { it / 4 }
                     )
                 ) {
-                    // Movie logo (loaded from local assets, matching web app)
+                    // Movie logo (loaded from API logo_path, matching web app)
                     // Falls back to title text if no logo available
                     var logoLoaded by remember { mutableStateOf(false) }
+                    val logoUrl = ApiUtils.getLogoUrl(media)
                     
                     if (!logoLoaded) {
                         // Fallback: Text title
@@ -234,22 +235,24 @@ fun NetflixHeroSection(
                         )
                     }
                     
-                    // Try to load logo image
-                    AsyncImage(
-                        model = coil.request.ImageRequest.Builder(LocalContext.current)
-                            .data(ApiUtils.getLogoUrl(media))
-                            .memoryCacheKey("logo_${media.id}")
-                            .diskCacheKey("logo_${media.id}")
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = "${media.title} logo",
-                        modifier = Modifier
-                            .heightIn(max = 100.dp)
-                            .fillMaxWidth(0.5f),
-                        contentScale = ContentScale.Fit,
-                        onSuccess = { logoLoaded = true },
-                        onError = { logoLoaded = false }
-                    )
+                    // Only try to load logo if URL exists
+                    if (logoUrl != null) {
+                        AsyncImage(
+                            model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                .data(logoUrl)
+                                .memoryCacheKey("logo_${media.id}")
+                                .diskCacheKey("logo_${media.id}")
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "${media.title} logo",
+                            modifier = Modifier
+                                .heightIn(max = 100.dp)
+                                .fillMaxWidth(0.5f),
+                            contentScale = ContentScale.Fit,
+                            onSuccess = { logoLoaded = true },
+                            onError = { logoLoaded = false }
+                        )
+                    }
                 }
                 
                 // Animated metadata row

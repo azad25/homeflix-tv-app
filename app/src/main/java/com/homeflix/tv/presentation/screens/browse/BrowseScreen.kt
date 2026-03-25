@@ -214,7 +214,7 @@ fun BrowseScreen(
                     }
                     
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 160.dp),
+                        columns = GridCells.Adaptive(minSize = 120.dp),
                         state = gridState,
                         contentPadding = PaddingValues(24.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -267,14 +267,14 @@ private fun NetflixMovieCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    // Netflix-style scale animation on focus (reduced scale like MediaCard)
+    // Subtle scale animation on focus
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.1f else 1.0f,
+        targetValue = if (isFocused) 1.05f else 1.0f,
         animationSpec = tween(durationMillis = 200),
         label = "browse_movie_card_scale"
     )
     
-    // Netflix-style card with proper z-index management
+    // Border-only focus style (matching home page)
     Box(
         modifier = modifier
             .aspectRatio(2f / 3f)
@@ -309,119 +309,59 @@ private fun NetflixMovieCard(
                 containerColor = Color.Transparent
             ),
             elevation = CardDefaults.cardElevation(
-                defaultElevation = if (isFocused) 8.dp else 2.dp
+                defaultElevation = if (isFocused) 6.dp else 2.dp
             )
         ) {
-        Box {
-            // Movie Poster
-            AsyncImage(
-                model = ApiUtils.getPosterUrl(media),
-                contentDescription = media.title,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(6.dp)),
-                contentScale = ContentScale.Crop
-            )
-            
-            // Netflix-style overlay on focus
-            if (isFocused) {
-                Box(
+            Box {
+                // Movie Poster
+                AsyncImage(
+                    model = ApiUtils.getPosterUrl(media),
+                    contentDescription = media.title,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Color.Black.copy(alpha = 0.7f),
-                            RoundedCornerShape(6.dp)
-                        )
-                ) {
-                    // Play button
+                        .clip(RoundedCornerShape(6.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                
+                // Title at bottom (always visible, no full overlay)
+                if (isFocused) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(48.dp)
+                            .fillMaxWidth()
+                            .align(Alignment.BottomCenter)
                             .background(
-                                NetflixRed,
-                                RoundedCornerShape(24.dp)
-                            ),
-                        contentAlignment = Alignment.Center
+                                Color.Black.copy(alpha = 0.8f),
+                                RoundedCornerShape(bottomStart = 6.dp, bottomEnd = 6.dp)
+                            )
+                            .padding(6.dp)
                     ) {
-                        Text(
-                            text = "▶",
-                            color = Color.White,
-                            style = MaterialTheme.typography.headlineSmall
-                        )
-                    }
-                    
-                    // Movie info at bottom
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(8.dp)
-                    ) {
-                        Text(
-                            text = media.title,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            ),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(top = 4.dp)
-                        ) {
-                            media.year?.let { year ->
-                                Text(
-                                    text = year.toString(),
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = TextSecondary
-                                    )
-                                )
-                            }
-                            
-                            if (media.rating > 0) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = Color(0xFFFFD700), // Gold
-                                        modifier = Modifier.size(12.dp)
-                                    )
+                        Column {
+                            Text(
+                                text = media.title,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White
+                                ),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                media.year?.let { year ->
                                     Text(
-                                        text = String.format("%.1f", media.rating),
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = TextSecondary
-                                        )
+                                        text = year.toString(),
+                                        style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
                                     )
                                 }
-                            }
-                        }
-                        
-                        // Quality badge
-                        media.quality?.let { quality ->
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = Color.Gray.copy(alpha = 0.8f),
-                                modifier = Modifier.padding(top = 4.dp)
-                            ) {
-                                Text(
-                                    text = when {
-                                        quality.contains("4K", ignoreCase = true) -> "4K"
-                                        quality.contains("1080", ignoreCase = true) -> "HD"
-                                        quality.contains("720", ignoreCase = true) -> "720p"
-                                        else -> "HD"
-                                    },
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
+                                if (media.rating > 0) {
+                                    Text(
+                                        text = "★ ${String.format("%.1f", media.rating)}",
+                                        style = MaterialTheme.typography.labelSmall.copy(color = TextSecondary)
+                                    )
+                                }
                             }
                         }
                     }
@@ -429,5 +369,4 @@ private fun NetflixMovieCard(
             }
         }
     }
-}
 }

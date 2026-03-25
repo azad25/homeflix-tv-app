@@ -444,12 +444,14 @@ class MediaRepository @Inject constructor(
                 episodes.mapIndexed { index, dto ->
                     com.homeflix.tv.presentation.screens.tvshows.Episode(
                         id = dto.id,
-                        title = dto.title ?: "Episode ${index + 1}",
+                        title = dto.episodeTitle ?: dto.title ?: "Episode ${index + 1}",
+                        episodeTitle = dto.episodeTitle,
                         description = dto.description ?: "Episode ${index + 1} of Season $seasonNumber",
                         duration = dto.duration?.div(60) ?: 45, // Convert seconds to minutes
                         rating = dto.rating ?: 0.0,
                         airDate = dto.releaseDate,
-                        thumbnailPath = dto.thumbnailPath
+                        thumbnailPath = dto.thumbnailPath,
+                        episodeStillPath = dto.episodeStillPath
                     )
                 }
             } else {

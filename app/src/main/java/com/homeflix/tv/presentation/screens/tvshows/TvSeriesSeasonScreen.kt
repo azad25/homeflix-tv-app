@@ -41,26 +41,30 @@ import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
+import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 
 
 
 private fun getEpisodeBackdropUrl(episode: Episode, series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {
     val apiUrl = ApiUtils.getBaseUrl()
     
-    // First try episode thumbnail if available
+    // Use episode_still_path if available (matching web frontend)
+    // Web pattern: episode.media?.episode_still_path ? `${getApiUrl()}/api/episode-stills/${episode.media.id}`
+    if (!episode.episodeStillPath.isNullOrEmpty()) {
+        return "$apiUrl/episode-stills/${episode.id}"
+    }
+    
+    // Fallback to episode thumbnail path
     episode.thumbnailPath?.let { thumbnailPath ->
         if (thumbnailPath.startsWith("http")) {
             return thumbnailPath
         }
     }
     
-    // Try episode thumbnail endpoint first
-    val episodeThumbnailUrl = "$apiUrl/thumbnails/${episode.id}"
-    
-    // If episode thumbnail fails, fallback to series backdrop
-    // Note: In practice, we should check if episode thumbnail exists
-    // For now, we'll try episode first, then series as fallback in onError
-    return episodeThumbnailUrl
+    // Fallback to thumbnails endpoint
+    return "$apiUrl/thumbnails/${episode.id}"
 }
 
 @Composable
@@ -71,9 +75,20 @@ fun TvSeriesSeasonScreen(
     viewModel: TvSeriesSeasonViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val contentFocusRequester = remember { FocusRequester() }
     
     LaunchedEffect(seriesId, seasonNumber) {
         viewModel.loadSeasonDetails(seriesId, seasonNumber)
+    }
+    
+    // Auto-focus content when loaded
+    LaunchedEffect(uiState) {
+        if (uiState is TvSeriesSeasonUiState.Success) {
+            delay(400)
+            try {
+                contentFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
     }
     
     Row(
@@ -233,6 +248,7 @@ fun TvSeriesSeasonScreen(
                                         modifier = Modifier
                                             .height(36.dp)
                                             .padding(bottom = 4.dp)
+                                            .focusRequester(contentFocusRequester)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.ArrowBack,
@@ -282,10 +298,8 @@ fun TvSeriesSeasonScreen(
                                         )
                                     }
                                     
-                                    // Try series logo from local assets
-                                    val seriesLogoUrl = series.bannerPath?.split("/")?.lastOrNull()?.substringBeforeLast(".")?.let {
-                                        "${ApiUtils.getBaseUrl()}/admin/assets/${it}_logo.png"
-                                    } ?: "${ApiUtils.getBaseUrl()}/admin/assets/logo_${series.id}.png"
+                                    // Try series logo from API
+                                    val seriesLogoUrl = ApiUtils.getSeriesLogoUrl(series.id)
                                     
                                     coil.compose.AsyncImage(
                                         model = coil.request.ImageRequest.Builder(LocalContext.current)

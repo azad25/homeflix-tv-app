@@ -92,14 +92,20 @@ fun MediaRow(
                             if (keyEvent.type == KeyEventType.KeyDown) {
                                 when (keyEvent.key) {
                                     Key.DirectionUp -> {
-                                        // Navigate up from any card in the row
-                                        onNavigateUp?.invoke()
-                                        true
+                                        if (onNavigateUp != null) {
+                                            onNavigateUp.invoke()
+                                            true
+                                        } else {
+                                            false // Let Compose focus system handle navigation
+                                        }
                                     }
                                     Key.DirectionDown -> {
-                                        // Navigate down from any card in the row
-                                        onNavigateDown?.invoke()
-                                        true
+                                        if (onNavigateDown != null) {
+                                            onNavigateDown.invoke()
+                                            true
+                                        } else {
+                                            false // Let Compose focus system handle navigation
+                                        }
                                     }
                                     Key.DirectionLeft -> {
                                         // Navigate to previous item in row

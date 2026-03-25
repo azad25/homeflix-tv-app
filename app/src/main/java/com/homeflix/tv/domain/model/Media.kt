@@ -66,6 +66,7 @@ data class Media(
     val previewClipPath: String? = null,
     val posterPath: String? = null,
     val bannerPath: String? = null,
+    val logoPath: String? = null,
     val trailerPath: String? = null,
     
     // TMDB assets - exactly like web app

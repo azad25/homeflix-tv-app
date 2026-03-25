@@ -26,6 +26,7 @@ class TvSeriesDetailsViewModel @Inject constructor(
                 // Get series details and seasons
                 val series = mediaRepository.getTvSeriesById(seriesId.toInt())
                 val seasons = mediaRepository.getTvSeriesSeasons(seriesId.toInt())
+                    .sortedBy { it.seasonNumber }
                 
                 _uiState.value = TvSeriesDetailsUiState.Success(
                     series = series,
