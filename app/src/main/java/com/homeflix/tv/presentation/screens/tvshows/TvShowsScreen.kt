@@ -33,12 +33,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.domain.model.MediaType
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
+import com.homeflix.tv.presentation.components.ContinueWatchingRow
 import com.homeflix.tv.presentation.navigation.Screen
 import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
@@ -56,6 +58,7 @@ fun TvShowsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val contentFocusRequester = remember { FocusRequester() }
+    val scrollState = rememberLazyListState()
     
     LaunchedEffect(Unit) {
         viewModel.loadTvShows()
@@ -66,6 +69,8 @@ fun TvShowsScreen(
             delay(500)
             try {
                 contentFocusRequester.requestFocus()
+                // Scroll to top after focus to prevent auto-scroll past hero
+                scrollState.scrollToItem(0)
             } catch (_: Exception) {}
         }
     }
@@ -164,6 +169,7 @@ fun TvShowsScreen(
                 
                 is TvShowsUiState.Success -> {
                     LazyColumn(
+                        state = scrollState,
                         modifier = Modifier.fillMaxSize()
                     ) {
                         // Hero slider section for featured series
@@ -194,6 +200,21 @@ fun TvShowsScreen(
                                         color = NetflixRed,
                                         fontWeight = FontWeight.Medium
                                     )
+                                )
+                            }
+                        }
+                        
+                        // Continue Watching Episodes section
+                        if (currentState.continueWatchingEpisodes.isNotEmpty()) {
+                            item {
+                                ContinueWatchingRow(
+                                    continueWatchingItems = currentState.continueWatchingEpisodes,
+                                    onPlay = { media, startTimeMs ->
+                                        navController.navigate(Screen.VideoPlayer.createRoute(media.id, startTime = startTimeMs))
+                                    },
+                                    onInfo = { media ->
+                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                    }
                                 )
                             }
                         }

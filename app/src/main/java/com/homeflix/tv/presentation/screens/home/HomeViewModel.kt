@@ -277,15 +277,17 @@ class HomeViewModel @Inject constructor(
                                         .filter { item ->
                                             try {
                                                 // Comprehensive validation with null safety
+                                                // ONLY show MOVIES on homepage (episodes shown on TV series page)
                                                 val isValid = item.media != null &&
                                                              item.media.id > 0 && 
                                                              !item.media.title.isNullOrBlank() && 
                                                              item.durationSeconds > 0 &&
                                                              item.progressSeconds >= 0 && // Allow 0 progress
-                                                             item.lastWatchedAt != null
+                                                             item.lastWatchedAt != null &&
+                                                             item.media.type == MediaType.MOVIE // Only movies on homepage
                                                 
                                                 if (!isValid) {
-                                                    Log.w("HomeViewModel", "Filtering out invalid item: mediaId=${item.mediaId}, title='${item.media?.title}', duration=${item.durationSeconds}, progress=${item.progressSeconds}")
+                                                    Log.w("HomeViewModel", "Filtering out item: mediaId=${item.mediaId}, title='${item.media?.title}', type=${item.media?.type}")
                                                 }
                                                 
                                                 isValid

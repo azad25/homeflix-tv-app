@@ -1,8 +1,11 @@
 package com.homeflix.tv.presentation.screens.tvshows
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.homeflix.tv.domain.model.MediaType
 import com.homeflix.tv.domain.repository.MediaRepository
+import com.homeflix.tv.presentation.components.ContinueWatchingItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,19 +29,24 @@ class TvShowsViewModel @Inject constructor(
                 // Get all TV series from the repository
                 val series = mediaRepository.getTvSeries()
                 
-                android.util.Log.d("TvShowsViewModel", "Loaded ${series.size} TV series")
+                Log.d("TvShowsViewModel", "Loaded ${series.size} TV series")
                 series.forEach { tvSeries ->
-                    android.util.Log.d("TvShowsViewModel", "Series: ${tvSeries.title}, Poster: ${tvSeries.posterPath}")
+                    Log.d("TvShowsViewModel", "Series: ${tvSeries.title}, Poster: ${tvSeries.posterPath}")
                 }
                 
+                // Sort by createdAt descending (latest first)
+                val sortedSeries = series.sortedByDescending { it.createdAt }
+                
                 // Separate featured series for hero slider (first 5)
-                val featuredSeries = series.take(5)
-                // Cap grid display at 10 items
-                val gridSeries = series.take(10)
+                val featuredSeries = sortedSeries.take(5)
+                
+                // Fetch continue watching episodes
+                val continueWatchingEpisodes = fetchContinueWatchingEpisodes()
                 
                 _uiState.value = TvShowsUiState.Success(
                     featuredSeries = featuredSeries,
-                    series = gridSeries
+                    series = sortedSeries,
+                    continueWatchingEpisodes = continueWatchingEpisodes
                 )
             } catch (e: Exception) {
                 _uiState.value = TvShowsUiState.Error(
@@ -47,13 +55,83 @@ class TvShowsViewModel @Inject constructor(
             }
         }
     }
+    
+    private suspend fun fetchContinueWatchingEpisodes(): List<ContinueWatchingItem> {
+        return try {
+            var items = emptyList<ContinueWatchingItem>()
+            
+            kotlinx.coroutines.withTimeout(10000) {
+                mediaRepository.getRecentlyWatchedWithProgress().collect { result ->
+                    result.fold(
+                        onSuccess = { recentlyWatchedItems ->
+                            items = recentlyWatchedItems
+                                .filterNotNull()
+                                .filter { item ->
+                                    item.media != null &&
+                                    item.media.id > 0 &&
+                                    !item.media.title.isNullOrBlank() &&
+                                    item.durationSeconds > 0 &&
+                                    item.progressSeconds >= 0 &&
+                                    item.lastWatchedAt != null &&
+                                    item.media.type == MediaType.EPISODE // Only episodes on TV series page
+                                }
+                                .sortedByDescending { it.lastWatchedAt?.time ?: 0L }
+                                .take(10)
+                                .mapNotNull { item ->
+                                    try {
+                                        val progressPercent = if (item.durationSeconds > 0) {
+                                            (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
+                                        } else 0f
+                                        
+                                        val lastWatchedText = formatLastWatched(item.lastWatchedAt)
+                                        
+                                        ContinueWatchingItem(
+                                            media = item.media,
+                                            progress = progressPercent,
+                                            progressSeconds = item.progressSeconds,
+                                            lastWatched = lastWatchedText
+                                        )
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                }
+                            Log.d("TvShowsViewModel", "Continue watching episodes: ${items.size}")
+                        },
+                        onFailure = { error ->
+                            Log.e("TvShowsViewModel", "Error fetching continue watching: ${error.message}")
+                            items = emptyList()
+                        }
+                    )
+                }
+            }
+            items
+        } catch (e: Exception) {
+            Log.e("TvShowsViewModel", "Exception fetching continue watching episodes: ${e.message}")
+            emptyList()
+        }
+    }
+    
+    private fun formatLastWatched(date: java.util.Date): String {
+        val now = java.util.Date()
+        val diffMs = now.time - date.time
+        val diffHours = diffMs / (1000 * 60 * 60)
+        val diffDays = diffHours / 24
+        
+        return when {
+            diffHours < 1 -> "Just now"
+            diffHours < 24 -> "${diffHours}h ago"
+            diffDays < 7 -> "${diffDays}d ago"
+            else -> java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault()).format(date)
+        }
+    }
 }
 
 sealed class TvShowsUiState {
     object Loading : TvShowsUiState()
     data class Success(
         val featuredSeries: List<TvSeries>,
-        val series: List<TvSeries>
+        val series: List<TvSeries>,
+        val continueWatchingEpisodes: List<ContinueWatchingItem> = emptyList()
     ) : TvShowsUiState()
     data class Error(val message: String) : TvShowsUiState()
 }
@@ -70,5 +148,6 @@ data class TvSeries(
     val posterPath: String?,
     val bannerPath: String?,
     val tmdbPosterUrl: String? = null,
-    val tmdbBackdropUrl: String? = null
+    val tmdbBackdropUrl: String? = null,
+    val createdAt: String? = null
 )

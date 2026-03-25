@@ -245,14 +245,31 @@ private fun NetflixRecommendationCard(
         )
     ) {
         Box {
-            // Background Image
+            // Background Image with fallback chain (banner → poster → thumbnail)
+            var currentImageUrl by remember { mutableStateOf(ApiUtils.getBannerUrl(media)) }
+            var fallbackLevel by remember { mutableStateOf(0) }
+            
             AsyncImage(
-                model = ApiUtils.getBannerUrl(media),
+                model = currentImageUrl,
                 contentDescription = media.title,
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                onError = {
+                    when (fallbackLevel) {
+                        0 -> {
+                            // Fallback to poster
+                            currentImageUrl = ApiUtils.getPosterUrl(media)
+                            fallbackLevel = 1
+                        }
+                        1 -> {
+                            // Fallback to thumbnail
+                            currentImageUrl = ApiUtils.getThumbnailUrl(media)
+                            fallbackLevel = 2
+                        }
+                    }
+                }
             )
             
             // Gradient overlay

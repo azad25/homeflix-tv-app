@@ -28,6 +28,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.zIndex
 import com.homeflix.tv.domain.model.MediaType
 import kotlinx.coroutines.delay
 import androidx.compose.ui.layout.ContentScale
@@ -479,14 +480,14 @@ private fun TopSearchCard(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     
-    // Scale animation on focus
+    // Scale animation on focus (matching homepage NetflixMediaCard)
     val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isFocused) 1.5f else 1.0f,
+        targetValue = if (isFocused) 1.1f else 1.0f,
         animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
         label = "top_search_card_scale"
     )
     
-    // Netflix-style card with scale animation
+    // Netflix-style card with border focus (matching homepage)
     Box(
         modifier = Modifier
             .aspectRatio(2f / 3f)
@@ -506,8 +507,12 @@ private fun TopSearchCard(
             .clickable { onClick() }
             .then(
                 if (isFocused) {
-                    Modifier.border(2.dp, Color.White, RoundedCornerShape(8.dp))
-                } else Modifier
+                    Modifier
+                        .border(2.dp, Color.White, RoundedCornerShape(8.dp))
+                        .zIndex(10f)
+                } else {
+                    Modifier.zIndex(1f)
+                }
             )
     ) {
         Card(

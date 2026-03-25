@@ -258,7 +258,8 @@ class MediaRepository @Inject constructor(
                         totalEpisodes = 0, // Will be calculated from episodes
                         genres = dto.genres?.map { it.name } ?: dto.genreNames ?: emptyList(),
                         posterPath = dto.posterPath,
-                        bannerPath = dto.bannerPath
+                        bannerPath = dto.bannerPath,
+                        createdAt = dto.createdAt
                     )
                     Log.d("MediaRepository", "Series: ${series.title}, ID: ${series.id}, PosterPath: ${series.posterPath}")
                     series
@@ -303,9 +304,10 @@ class MediaRepository @Inject constructor(
                         totalEpisodes = episodeList.size,
                         genres = firstEpisode.genres?.map { it.name } ?: firstEpisode.genreNames ?: emptyList(),
                         posterPath = firstEpisode.posterPath ?: firstEpisode.thumbnailPath,
-                        bannerPath = firstEpisode.bannerPath
+                        bannerPath = firstEpisode.bannerPath,
+                        createdAt = firstEpisode.createdAt
                     )
-                }.sortedByDescending { it.totalEpisodes }
+                }.sortedByDescending { it.createdAt }
             }
             
             Log.w("MediaRepository", "No TV series data available")

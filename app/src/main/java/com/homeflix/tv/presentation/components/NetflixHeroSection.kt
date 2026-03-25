@@ -111,15 +111,19 @@ fun NetflixHeroSection(
                 )
             },
             label = "hero_background"
-        ) { mediaId ->
+        ) { targetMediaId ->
+            // Derive the correct media for this animation state
+            // CRITICAL: Must use targetMediaId (not currentMedia) to avoid showing wrong backdrop
+            val targetMedia = mediaList.find { it.id == targetMediaId } ?: currentMedia
+            
             AsyncImage(
                 model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                    .data(ApiUtils.getBannerUrl(currentMedia))
-                    .memoryCacheKey("banner_${mediaId}")
-                    .diskCacheKey("banner_${mediaId}")
+                    .data(ApiUtils.getBannerUrl(targetMedia))
+                    .memoryCacheKey("banner_${targetMediaId}")
+                    .diskCacheKey("banner_${targetMediaId}")
                     .crossfade(true)
                     .build(),
-                contentDescription = currentMedia.title,
+                contentDescription = targetMedia.title,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )

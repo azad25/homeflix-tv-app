@@ -210,34 +210,46 @@ fun VideoPlayer(
     }
 
     // Subtitle toggle function
+    // IMPORTANT: Only use setTrackTypeDisabled() — NOT setRendererDisabled()
+    // setRendererDisabled takes a RENDERER INDEX (0,1,2), not a track type constant
+    // C.TRACK_TYPE_TEXT = 3, which is NOT the text renderer index (usually 2)
     fun toggleSubtitles() {
         trackSelector?.let { selector ->
             if (availableSubtitleTracks.isNotEmpty()) {
                 if (subtitlesEnabled) {
                     // Disable subtitles
                     selector.parameters = selector.parameters.buildUpon()
-                        .setRendererDisabled(C.TRACK_TYPE_TEXT, true)
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
                         .build()
                     subtitlesEnabled = false
                     currentSubtitleTrack = null
                     subtitleToastMessage = "Subtitles OFF"
+                    android.util.Log.d("VideoPlayer", "Subtitles disabled via setTrackTypeDisabled(TEXT, true)")
                 } else {
-                    // Enable first available subtitle track
-                    val firstTrack = availableSubtitleTracks.firstOrNull()
-                    if (firstTrack != null) {
+                    // Enable subtitles with explicit track selection
+                    val firstGroup = availableSubtitleTracks.firstOrNull()
+                    if (firstGroup != null && firstGroup.length > 0) {
+                        val trackGroup = firstGroup.mediaTrackGroup
+                        val format = firstGroup.getTrackFormat(0)
                         selector.parameters = selector.parameters.buildUpon()
-                            .setRendererDisabled(C.TRACK_TYPE_TEXT, false)
                             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                            .setOverrideForType(
+                                androidx.media3.common.TrackSelectionOverride(trackGroup, listOf(0))
+                            )
                             .build()
                         subtitlesEnabled = true
                         currentSubtitleTrack = 0
-                        subtitleToastMessage = "Subtitles ON"
+                        val trackLabel = format.label ?: format.language ?: "Track 1"
+                        subtitleToastMessage = "Subtitles ON: $trackLabel"
+                        android.util.Log.d("VideoPlayer", "Subtitles enabled via setTrackTypeDisabled(TEXT, false) + override: lang=${format.language}, label=${format.label}, mime=${format.sampleMimeType}")
                     }
                 }
                 showSubtitleToast = true
             } else {
                 subtitleToastMessage = "No subtitles available"
                 showSubtitleToast = true
+                android.util.Log.d("VideoPlayer", "No subtitle tracks available to toggle")
             }
         }
     }
@@ -284,10 +296,10 @@ fun VideoPlayer(
 
             // Create track selector with subtitle support
             val newTrackSelector = DefaultTrackSelector(context)
-            // Initially disable subtitles but keep renderer enabled for toggling
+            // Subtitles enabled by default — do NOT disable text track type
+            // ExoPlayer will auto-select subtitle tracks from SubtitleConfiguration
             newTrackSelector.parameters = newTrackSelector.parameters.buildUpon()
-                .setRendererDisabled(C.TRACK_TYPE_TEXT, false) // Keep text renderer enabled
-                .setSelectUndeterminedTextLanguage(false) // Don't auto-select unknown language subtitles
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                 .build()
             trackSelector = newTrackSelector
 
@@ -443,6 +455,30 @@ fun VideoPlayer(
                                 group.type == C.TRACK_TYPE_TEXT
                             }
                             availableSubtitleTracks = subtitleGroups
+                            android.util.Log.d("VideoPlayer", "Tracks changed: ${subtitleGroups.size} subtitle groups detected")
+                            subtitleGroups.forEachIndexed { i, group ->
+                                for (j in 0 until group.length) {
+                                    val format = group.getTrackFormat(j)
+                                    android.util.Log.d("VideoPlayer", "  Subtitle track [$i][$j]: lang=${format.language}, label=${format.label}, mime=${format.sampleMimeType}")
+                                }
+                            }
+                            
+                            // Auto-enable subtitles when tracks are first detected
+                            if (subtitleGroups.isNotEmpty() && !subtitlesEnabled) {
+                                val firstGroup = subtitleGroups.first()
+                                if (firstGroup.length > 0) {
+                                    val trackGroup = firstGroup.mediaTrackGroup
+                                    newTrackSelector.parameters = newTrackSelector.parameters.buildUpon()
+                                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                                        .setOverrideForType(
+                                            androidx.media3.common.TrackSelectionOverride(trackGroup, listOf(0))
+                                        )
+                                        .build()
+                                    subtitlesEnabled = true
+                                    currentSubtitleTrack = 0
+                                    android.util.Log.d("VideoPlayer", "Subtitles auto-enabled (default ON)")
+                                }
+                            }
                         }
                         
                         override fun onPositionDiscontinuity(
@@ -458,7 +494,8 @@ fun VideoPlayer(
                     })
 
                     // Auto-play with audio enabled
-                    prepare()
+                    // NOTE: prepare() already called above, do NOT call again
+                    // Double prepare() can reset subtitle configurations
                     playWhenReady = true
                     volume = 1f
                     setAudioAttributes(

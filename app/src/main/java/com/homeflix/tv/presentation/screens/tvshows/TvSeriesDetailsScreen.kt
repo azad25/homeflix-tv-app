@@ -55,12 +55,16 @@ fun TvSeriesDetailsScreen(
         viewModel.loadSeriesDetails(seriesId)
     }
     
-    // Auto-focus content when loaded
+    // Auto-focus content when loaded, then scroll to top
+    val scrollState = rememberLazyListState()
+    
     LaunchedEffect(uiState) {
         if (uiState is TvSeriesDetailsUiState.Success) {
             delay(400)
             try {
                 contentFocusRequester.requestFocus()
+                // Scroll back to top after focus to prevent auto-scroll past hero
+                scrollState.scrollToItem(0)
             } catch (_: Exception) {}
         }
     }
@@ -124,7 +128,6 @@ fun TvSeriesDetailsScreen(
             
             is TvSeriesDetailsUiState.Success -> {
                 val series = currentState.series
-                val scrollState = rememberLazyListState()
                 
                 LazyColumn(
                     state = scrollState,
