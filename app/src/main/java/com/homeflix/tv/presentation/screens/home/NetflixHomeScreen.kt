@@ -175,19 +175,6 @@ fun NetflixHomeScreen(
                 
                 when (currentState) {
                     is HomeUiState.Success -> {
-                        // FIXED: LazyColumn with state to ensure it starts at top and STAYS there
-                        // listState is hoisted to top-level for scroll-to-top on focus
-                        
-                        // Ensure scroll starts at top and NEVER auto-scrolls
-                        LaunchedEffect(currentState) {
-                            try {
-                                // Force scroll to top and keep it there
-                                listState.scrollToItem(0, 0)
-                            } catch (e: Exception) {
-                                // Ignore scroll errors
-                            }
-                        }
-                        
                         LazyColumn(
                             state = listState,
                             modifier = Modifier

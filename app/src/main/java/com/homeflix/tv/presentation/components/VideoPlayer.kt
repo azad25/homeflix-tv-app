@@ -41,7 +41,6 @@ import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.domain.model.MediaType
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
@@ -283,24 +282,25 @@ fun VideoPlayer(
             // Fetch external subtitle tracks from API
             var fetchedSubtitles = emptyList<com.homeflix.tv.domain.model.SubtitleTrack>()
             try {
-                val result = streamingRepository.getSubtitleTracks(media.id.toString()).first()
-                if (result.isSuccess) {
-                    fetchedSubtitles = result.getOrNull() ?: emptyList()
-                    externalSubtitleTracks = fetchedSubtitles
-                    android.util.Log.d("VideoPlayer", "Found ${fetchedSubtitles.size} external subtitle tracks")
-                } else {
-                    android.util.Log.w("VideoPlayer", "Failed to fetch subtitles: ${result.exceptionOrNull()?.message}")
+                streamingRepository.getSubtitleTracks(media.id.toString()).collect { result ->
+                    if (result.isSuccess) {
+                        fetchedSubtitles = result.getOrNull() ?: emptyList()
+                        externalSubtitleTracks = fetchedSubtitles
+                        android.util.Log.d("VideoPlayer", "Found ${fetchedSubtitles.size} external subtitle tracks")
+                    } else {
+                        android.util.Log.w("VideoPlayer", "Failed to fetch subtitles: ${result.exceptionOrNull()?.message}")
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.w("VideoPlayer", "Error fetching external subtitles", e)
             }
 
-            // Create track selector with subtitle support
+            // Create track selector with subtitle support and auto-selection
             val newTrackSelector = DefaultTrackSelector(context)
-            // Subtitles enabled by default — do NOT disable text track type
-            // ExoPlayer will auto-select subtitle tracks from SubtitleConfiguration
+            // Enable text tracks and set default parameters for auto-selection
             newTrackSelector.parameters = newTrackSelector.parameters.buildUpon()
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setPreferredTextLanguage("en") // Prefer English subtitles
                 .build()
             trackSelector = newTrackSelector
 
@@ -344,6 +344,9 @@ fun VideoPlayer(
                     
                     if (subtitleConfigs.isNotEmpty()) {
                         android.util.Log.d("VideoPlayer", "Adding ${subtitleConfigs.size} external subtitle tracks to MediaItem")
+                        subtitleConfigs.forEach { config ->
+                            android.util.Log.d("VideoPlayer", "Subtitle config: uri=${config.uri}, language=${config.language}")
+                        }
                     }
                     
                     var mediaLoaded = false
@@ -356,19 +359,19 @@ fun VideoPlayer(
                                 .setSubtitleConfigurations(subtitleConfigs)
                                 .build()
                             
-                            // ALWAYS use setMediaItem to preserve SubtitleConfigurations
-                            // setMediaItems() can drop subtitle configs in some ExoPlayer versions
-                            setMediaItem(mediaItem)
+                            if (shouldResumePlayback && startTime > 0) {
+                                setMediaItems(listOf(mediaItem), 0, startTime)
+                            } else {
+                                setMediaItem(mediaItem)
+                            }
                             prepare()
-                            
-                            // Don't seek here - wait for STATE_READY for reliable seeking
                             
                             // Enable audio and auto-play
                             volume = 1f
                             playWhenReady = true
                             mediaLoaded = true
                             
-                            android.util.Log.d("VideoPlayer", "Successfully loaded URL: $streamUrl")
+                            android.util.Log.d("VideoPlayer", "Successfully loaded URL: $streamUrl with ${subtitleConfigs.size} subtitle configs")
                             break // Success, exit loop
                             
                         } catch (e: Exception) {
@@ -389,8 +392,12 @@ fun VideoPlayer(
                                 .setSubtitleConfigurations(subtitleConfigs)
                                 .build()
                             
-                            // ALWAYS use setMediaItem to preserve SubtitleConfigurations  
-                            setMediaItem(mediaItem)
+                            if (shouldResumePlayback && startTime > 0) {
+                                setMediaItems(listOf(mediaItem), 0, startTime)
+                            } else {
+                                setMediaItem(mediaItem)
+                            }
+                            
                             prepare()
                             playWhenReady = true
                         } catch (e: Exception) {
@@ -415,35 +422,49 @@ fun VideoPlayer(
                                     isBuffering = false
                                     isMediaLoading = false // Media with subtitles is now ready
                                     
-                                    // Resume seek: since we use setMediaItem() (not setMediaItems with position)
-                                    // to preserve subtitle configs, we seek here on STATE_READY
-                                    if (shouldResumePlayback && startTime > 0 && !resumeSeekAttempted) {
-                                        resumeSeekAttempted = true
-                                        this@apply.seekTo(startTime)
-                                        android.util.Log.d("VideoPlayer", "Resume seek to $startTime ms on STATE_READY")
-                                    }
+                                    // IMMEDIATE subtitle check - detect tracks right after ready
+                                    val currentTracks = this@apply.currentTracks
+                                    val subtitleGroups = currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+                                    android.util.Log.d("VideoPlayer", "Immediate subtitle check: ${subtitleGroups.size} groups found")
                                     
-                                    // Delayed subtitle re-check: ExoPlayer may detect external subtitle
-                                    // tracks after the initial STATE_READY, since they download separately
-                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                                        kotlinx.coroutines.delay(2000)
-                                        val currentTracks = this@apply.currentTracks
-                                        val subtitleGroups = currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
-                                        android.util.Log.d("VideoPlayer", "Delayed subtitle re-check: ${subtitleGroups.size} groups found")
-                                        if (subtitleGroups.isNotEmpty() && !subtitlesEnabled) {
-                                            availableSubtitleTracks = subtitleGroups
-                                            val firstGroup = subtitleGroups.first()
-                                            if (firstGroup.length > 0) {
-                                                val trackGroup = firstGroup.mediaTrackGroup
-                                                newTrackSelector.parameters = newTrackSelector.parameters.buildUpon()
-                                                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-                                                    .setOverrideForType(
-                                                        androidx.media3.common.TrackSelectionOverride(trackGroup, listOf(0))
-                                                    )
-                                                    .build()
-                                                subtitlesEnabled = true
-                                                currentSubtitleTrack = 0
-                                                android.util.Log.d("VideoPlayer", "Subtitles enabled via delayed re-check")
+                                    if (subtitleGroups.isNotEmpty()) {
+                                        availableSubtitleTracks = subtitleGroups
+                                        val firstGroup = subtitleGroups.first()
+                                        if (firstGroup.length > 0 && !subtitlesEnabled) {
+                                            val trackGroup = firstGroup.mediaTrackGroup
+                                            newTrackSelector.parameters = newTrackSelector.parameters.buildUpon()
+                                                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                                                .setOverrideForType(
+                                                    androidx.media3.common.TrackSelectionOverride(trackGroup, listOf(0))
+                                                )
+                                                .build()
+                                            subtitlesEnabled = true
+                                            currentSubtitleTrack = 0
+                                            android.util.Log.d("VideoPlayer", "Subtitles enabled via immediate check")
+                                        }
+                                    } else {
+                                        // Delayed subtitle re-check: ExoPlayer may detect external subtitle
+                                        // tracks after the initial STATE_READY, since they download separately
+                                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                            kotlinx.coroutines.delay(2000)
+                                            val delayedTracks = this@apply.currentTracks
+                                            val delayedSubtitleGroups = delayedTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+                                            android.util.Log.d("VideoPlayer", "Delayed subtitle re-check: ${delayedSubtitleGroups.size} groups found")
+                                            if (delayedSubtitleGroups.isNotEmpty() && !subtitlesEnabled) {
+                                                availableSubtitleTracks = delayedSubtitleGroups
+                                                val firstGroup = delayedSubtitleGroups.first()
+                                                if (firstGroup.length > 0) {
+                                                    val trackGroup = firstGroup.mediaTrackGroup
+                                                    newTrackSelector.parameters = newTrackSelector.parameters.buildUpon()
+                                                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                                                        .setOverrideForType(
+                                                            androidx.media3.common.TrackSelectionOverride(trackGroup, listOf(0))
+                                                        )
+                                                        .build()
+                                                    subtitlesEnabled = true
+                                                    currentSubtitleTrack = 0
+                                                    android.util.Log.d("VideoPlayer", "Subtitles enabled via delayed re-check")
+                                                }
                                             }
                                         }
                                     }

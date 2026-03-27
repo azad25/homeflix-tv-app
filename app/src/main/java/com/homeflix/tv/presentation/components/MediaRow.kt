@@ -76,15 +76,18 @@ fun MediaRow(
                         .onFocusChanged { focusState ->
                             if (focusState.isFocused) {
                                 currentFocusedIndex = index
-                                // Auto-scroll to focused item with padding - Netflix behavior
+                                // Only scroll LazyRow if item is outside visible range
                                 coroutineScope.launch {
-                                    // Scroll with some padding to show neighboring items
-                                    val targetIndex = when {
-                                        index == 0 -> 0
-                                        index >= mediaList.size - 2 -> maxOf(0, mediaList.size - 3)
-                                        else -> maxOf(0, index - 1)
+                                    val layoutInfo = listState.layoutInfo
+                                    val visibleItems = layoutInfo.visibleItemsInfo
+                                    if (visibleItems.isNotEmpty()) {
+                                        val firstVisible = visibleItems.first().index
+                                        val lastVisible = visibleItems.last().index
+                                        // Only scroll if item is outside visible range
+                                        if (index < firstVisible || index > lastVisible) {
+                                            listState.scrollToItem(maxOf(0, index - 1))
+                                        }
                                     }
-                                    listState.scrollToItem(targetIndex)
                                 }
                             }
                         }
@@ -96,7 +99,7 @@ fun MediaRow(
                                             onNavigateUp.invoke()
                                             true
                                         } else {
-                                            false // Let Compose focus system handle navigation
+                                            false // Let focus system handle
                                         }
                                     }
                                     Key.DirectionDown -> {
@@ -104,35 +107,28 @@ fun MediaRow(
                                             onNavigateDown.invoke()
                                             true
                                         } else {
-                                            false // Let Compose focus system handle navigation
+                                            false // Let focus system handle
                                         }
                                     }
                                     Key.DirectionLeft -> {
-                                        // Navigate to previous item in row - MUST consume to prevent parent scroll
+                                        // Navigate to previous item in row
                                         if (index > 0) {
                                             val prevIndex = index - 1
                                             if (prevIndex < itemFocusRequesters.size) {
                                                 itemFocusRequesters[prevIndex].requestFocus()
                                             }
-                                            true
-                                        } else {
-                                            // At first item, let system handle (moves to sidebar)
-                                            false
                                         }
+                                        true // Consume to prevent parent scroll
                                     }
                                     Key.DirectionRight -> {
-                                        // Navigate to next item in row - MUST consume to prevent parent scroll
+                                        // Navigate to next item in row
                                         if (index < mediaList.size - 1) {
                                             val nextIndex = index + 1
                                             if (nextIndex < itemFocusRequesters.size) {
                                                 itemFocusRequesters[nextIndex].requestFocus()
                                             }
-                                            true
-                                        } else {
-                                            // At last item, try to navigate down
-                                            onNavigateDown?.invoke()
-                                            true
                                         }
+                                        true // Consume to prevent parent scroll
                                     }
                                     else -> false
                                 }

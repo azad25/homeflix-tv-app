@@ -59,22 +59,12 @@ fun NetflixHeroSection(
     var playButtonFocused by remember { mutableStateOf(false) }
     var infoButtonFocused by remember { mutableStateOf(false) }
     val infoButtonFocusRequester = remember { FocusRequester() }
-    var isUserInteracting by remember { mutableStateOf(false) }
     
-    // Auto-slide functionality - Netflix style (re-enabled)
-    LaunchedEffect(currentIndex, isUserInteracting) {
-        if (!isUserInteracting && mediaList.size > 1) {
+    LaunchedEffect(currentIndex, mediaList.size) {
+        if (mediaList.size > 1) {
             delay(10000) // 10 seconds per slide
             val nextIndex = (currentIndex + 1) % mediaList.size
             onIndexChange(nextIndex)
-        }
-    }
-    
-    // Reset user interaction after delay
-    LaunchedEffect(isUserInteracting) {
-        if (isUserInteracting) {
-            delay(10000) // Resume auto-slide after 10 seconds of no interaction
-            isUserInteracting = false
         }
     }
     
@@ -326,9 +316,7 @@ fun NetflixHeroSection(
                                 )
                                 .onFocusChanged { 
                                     playButtonFocused = it.isFocused
-                                    if (it.isFocused) {
-                                        isUserInteracting = true
-                                    }
+                                    // Don't pause auto-slide on initial focus - only pause on manual interaction
                                 }
                                 .onKeyEvent { keyEvent ->
                                     if (keyEvent.type == KeyEventType.KeyDown) {
@@ -341,7 +329,6 @@ fun NetflixHeroSection(
                                                 if (mediaList.size > 1) {
                                                     val prevIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
                                                     onIndexChange(prevIndex)
-                                                    isUserInteracting = true
                                                 }
                                                 true
                                             }
@@ -349,7 +336,6 @@ fun NetflixHeroSection(
                                                 if (mediaList.size > 1) {
                                                     val nextIndex = (currentIndex + 1) % mediaList.size
                                                     onIndexChange(nextIndex)
-                                                    isUserInteracting = true
                                                 }
                                                 true
                                             }
@@ -397,22 +383,6 @@ fun NetflixHeroSection(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Auto-slide status indicator
-                if (isUserInteracting) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.Black.copy(alpha = 0.7f)
-                    ) {
-                        Text(
-                            text = "Auto-slide paused",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = Color.White.copy(alpha = 0.8f)
-                            ),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-                
                 // Slide indicators
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)

@@ -3,9 +3,8 @@ package com.homeflix.tv.presentation.screens.mylist
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +30,7 @@ import com.homeflix.tv.presentation.navigation.Screen
 import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
+import com.homeflix.tv.presentation.components.ContinueWatchingRow
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
 
@@ -40,14 +40,20 @@ fun MyListScreen(
     viewModel: MyListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val contentFocusRequester = remember { FocusRequester() }
+    val continueWatchingFocusRequester = remember { FocusRequester() }
+    val myListFocusRequester = remember { FocusRequester() }
     
     // Auto-focus content when loaded
     LaunchedEffect(uiState) {
         if (uiState is MyListUiState.Success) {
+            val successState = uiState as MyListUiState.Success
             delay(300)
             try {
-                contentFocusRequester.requestFocus()
+                if (successState.continueWatching.isNotEmpty()) {
+                    continueWatchingFocusRequester.requestFocus()
+                } else if (successState.movies.isNotEmpty()) {
+                    myListFocusRequester.requestFocus()
+                }
             } catch (_: Exception) {}
         }
     }
@@ -68,7 +74,12 @@ fun MyListScreen(
             },
             onNavigateToContent = {
                 try {
-                    contentFocusRequester.requestFocus()
+                    val successState = uiState as? MyListUiState.Success
+                    if (successState?.continueWatching?.isNotEmpty() == true) {
+                        continueWatchingFocusRequester.requestFocus()
+                    } else {
+                        myListFocusRequester.requestFocus()
+                    }
                 } catch (_: Exception) {}
             }
         )
@@ -110,50 +121,84 @@ fun MyListScreen(
             }
             
             is MyListUiState.Success -> {
-                Column(
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(start = 24.dp, top = 24.dp, end = 24.dp)
                 ) {
                     // Title
-                    Text(
-                        text = "My List",
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        ),
-                        modifier = Modifier.padding(bottom = 24.dp)
-                    )
+                    item {
+                        Text(
+                            text = "My List",
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            ),
+                            modifier = Modifier.padding(bottom = 24.dp)
+                        )
+                    }
                     
-                    if (currentState.movies.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Your list is empty.\nBrowse movies and add them to your list!",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = TextSecondary
+                    // Continue Watching Section
+                    if (currentState.continueWatching.isNotEmpty()) {
+                        item {
+                            ContinueWatchingRow(
+                                continueWatchingItems = currentState.continueWatching,
+                                onPlay = { media, startTimeMs ->
+                                    navController.navigate(Screen.VideoPlayer.createRoute(media.id, startTime = startTimeMs))
+                                },
+                                onInfo = { media ->
+                                    navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                },
+                                focusRequester = continueWatchingFocusRequester,
+                                mediaTypeFilter = null, // Allow both movies and TV shows
+                                modifier = Modifier
+                                    .padding(bottom = 24.dp)
+                                    .offset(x = (-60).dp) // Cancel out intrinsic row horizontal padding
                             )
                         }
-                    } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Adaptive(minSize = 120.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            items(
-                                items = currentState.movies,
-                                key = { it.id }
-                            ) { media ->
-                                MyListCard(
-                                    media = media,
-                                    onClick = {
-                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                    },
-                                    focusRequester = if (media == currentState.movies.firstOrNull()) contentFocusRequester else null
+                    }
+                    
+                    // My List Grid
+                    if (currentState.movies.isEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Your list is empty.\nBrowse movies and add them to your list!",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = TextSecondary,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
+                            }
+                        }
+                    } else {
+                        // Grid items - render as individual items in LazyColumn
+                        items(
+                            items = currentState.movies.chunked(6), // 6 items per row
+                            key = { it.first().id }
+                        ) { rowItems ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                rowItems.forEach { media ->
+                                    MyListCard(
+                                        media = media,
+                                        onClick = {
+                                            navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                        },
+                                        focusRequester = if (media == currentState.movies.firstOrNull()) myListFocusRequester else null,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                // Fill empty slots
+                                repeat(6 - rowItems.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }

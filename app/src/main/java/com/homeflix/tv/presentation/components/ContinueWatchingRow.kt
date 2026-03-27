@@ -157,12 +157,24 @@ private fun ContinueWatchingCard(
                             true
                         }
                         Key.DirectionUp -> {
-                            onNavigateUp?.invoke()
-                            onNavigateUp != null
+                            if (onNavigateUp != null) {
+                                onNavigateUp.invoke()
+                                true
+                            } else {
+                                false // Let focus system handle
+                            }
                         }
                         Key.DirectionDown -> {
-                            onNavigateDown?.invoke()
-                            onNavigateDown != null
+                            if (onNavigateDown != null) {
+                                onNavigateDown.invoke()
+                                true
+                            } else {
+                                false // Let focus system handle
+                            }
+                        }
+                        Key.DirectionLeft, Key.DirectionRight -> {
+                            // Let LazyRow handle horizontal navigation
+                            false
                         }
                         else -> {
                             if (keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER) {
