@@ -1,27 +1,23 @@
 # 🎬 HomeFlix TV - Netflix-Style Android TV App
-A premium Android TV streaming application with Netflix-level UI/UX, featuring ultra-fast LAN streaming, smooth D-pad navigation, and professional-grade video playback. Built with Jetpack Compose and optimized for the big screen experience.
 
-![Android TV](https://img.shields.io/badge/Android-TV-3DDC84?style=flat&logo=android) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=flat&logo=kotlin) ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=jetpack-compose) ![ExoPlayer](https://img.shields.io/badge/ExoPlayer-FF0000?style=flat&logo=youtube) ![Material3](https://img.shields.io/badge/Material%203-1976D2?style=flat&logo=material-design)
+**Version 2.0** - Professional Android TV streaming application with modern UI/UX, featuring ultra-fast LAN streaming, intelligent caching, smooth D-pad navigation, and professional-grade video playback. Built with Jetpack Compose and optimized for the bigs screen experience.
 
-## 📱 App Screenshots
+![Android TV](https://img.shields.io/badge/Android-TV-3DDC84?style=flat&logo=android) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=flat&logo=kotlin) ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=jetpack-compose) ![ExoPlayer](https://img.shields.io/badge/ExoPlayer-FF0000?style=flat&logo=youtube) ![Material3](https://img.shields.io/badge/Material%203-1976D2?style=flat&logo=material-design) ![Version](https://img.shields.io/badge/version-2.0-blue)
 
-### Home Screen & Search
-| Home Screen | Search Screen |
-|-------------|---------------|
-| ![Home](screenshots/preview_1.jpg) | ![Search](screenshots/preview_2.jpg) |
+## 📱 App Preview
 
-### Video Player & Browse
-| Video Player | Browse Screen |
-|--------------|---------------|
-| ![Player](screenshots/preview_3.jpg) | ![Browse](screenshots/preview_4.jpg) |
+![HomeFlix TV Preview](preview-app.gif)
 
 ### 🎯 Netflix-Level Features
-- **Auto-sliding hero section** with fade animations
-- **Smooth D-pad navigation** optimized for TV remotes  
-- **Focus management** with visual feedback
-- **Continue watching** functionality
-- **Professional video player** with subtitle support
-- **Clean, modern UI** following Material Design 3
+- **Auto-sliding hero section** with crossfade animations and staggered content reveal
+- **Smooth D-pad navigation** optimized for TV remotes with professional focus management
+- **Continue Watching** with progress tracking and resume functionality
+- **Professional video player** with enhanced subtitle support and customizable styling
+- **Intelligent caching system** for instant app startup and offline support
+- **TV series support** with season/episode navigation and autoplay
+- **My List** functionality for personalized content management
+- **Smart recommendations** with multiple algorithm endpoints
+- **Clean, modern UI** following Material Design 3 with Netflix-inspired theming
 
 ## 🌟 HomeFlix Ecosystem
 
@@ -46,24 +42,29 @@ The HomeFlix ecosystem provides a professional streaming experience with:
 ## ✨ Features
 
 ### 🎥 Advanced Video Streaming
-- **Ultra-fast LAN streaming** with instant playback
-- **ExoPlayer integration** with professional-grade video rendering
-- **Multiple format support** (MP4, MKV, AVI, MOV, WMV)
-- **Adaptive streaming** with automatic quality adjustment
-- **Resume playback** from last watched position
-- **Enhanced subtitle support** with customizable styling
-- **Progress tracking** with automatic save on exit
-- **Netflix-red themed player** with smooth controls
+- **Ultra-fast LAN streaming** with instant playback and zero-copy sendfile optimization
+- **ExoPlayer 3 integration** with professional-grade video rendering and hardware acceleration
+- **Multiple format support** (MP4, MKV, AVI, MOV, WMV) with automatic transcoding
+- **Adaptive streaming** with automatic quality adjustment and buffer management
+- **Resume playback** from last watched position with progress sync
+- **Enhanced subtitle support** with multiple formats (SRT, VTT, ASS/SSA) and customizable styling
+- **Progress tracking** with automatic save on exit and real-time sync
+- **Netflix-red themed player** with smooth controls and auto-hiding UI
+- **Episode autoplay** for TV series with next episode preview
+- **Multiple audio tracks** and subtitle language selection
 
 ### 📺 Netflix-Style TV Interface
-- **Auto-sliding hero section** with fade in/out animations
-- **Staggered content animations** for professional polish
-- **Smooth D-pad navigation** between all UI elements
-- **48dp side navigation** with focus indicators
-- **Continue Watching** row for seamless resumption
-- **Multiple content rows** (Trending, Popular, Recently Added)
-- **Genre-based browsing** with clean card layouts
-- **Search functionality** with virtual keyboard
+- **Auto-sliding hero section** with crossfade animations and 10-second intervals
+- **Staggered content animations** with fade-in effects for professional polish
+- **Smooth D-pad navigation** between all UI elements with proper focus management
+- **48dp side navigation** with Netflix-red selection indicators and scale animations
+- **Continue Watching** row with progress bars and resume functionality
+- **Multiple content rows** (Trending, Popular, Latest, Action, Drama, Sci-Fi, Horror, Romance, Thriller)
+- **Genre-based browsing** with paginated grid layouts and load more functionality
+- **Search functionality** with virtual QWERTY keyboard and genre filtering
+- **My List** screen for personalized content management
+- **TV Series support** with season/episode navigation and detailed metadata
+- **Recommendation system** with multiple algorithm endpoints (mixed, trending, popular, personalized)
 
 ### 🎮 TV Remote Optimization
 - **Natural D-pad navigation** following Android TV guidelines
@@ -75,15 +76,18 @@ The HomeFlix ecosystem provides a professional streaming experience with:
 - **Auto-focus** on first content row at app launch
 
 ### 🏗️ Technical Architecture
-- **Clean Architecture** with MVVM pattern and separation of concerns
-- **Jetpack Compose** for modern declarative UI with Material Design 3
-- **Hilt dependency injection** for maintainable and testable code
-- **ExoPlayer 3** integration for professional video playback
+- **Clean Architecture** with MVVM pattern and clear separation of concerns (domain, data, presentation)
+- **Jetpack Compose** for modern declarative UI with Material Design 3 theming
+- **Hilt dependency injection** for maintainable and testable code structure
+- **ExoPlayer 3** integration with custom controls and subtitle rendering
 - **Coroutines and Flow** for reactive programming and async operations
-- **Navigation Component** with type-safe screen routing
-- **StateFlow** for reactive UI state management
-- **Coil** for efficient image loading and caching
-- **Retrofit** for REST API communication
+- **Navigation Component** with type-safe screen routing and deep linking
+- **StateFlow** for reactive UI state management and lifecycle awareness
+- **Coil** for efficient image loading with multi-tier caching (memory + disk)
+- **Retrofit** for REST API communication with GSON serialization
+- **SharedPreferences** for lightweight content caching (24-hour expiration)
+- **Room Database** ready for advanced offline storage (planned)
+- **Retry Policy** with exponential backoff for network resilience
 
 ## 🚀 Quick Start
 
@@ -123,6 +127,66 @@ The HomeFlix ecosystem provides a professional streaming experience with:
    ```
 
    Or open in Android Studio and click **Run** ▶️
+
+## 🚀 Version 2.0 - What's New
+
+### ✨ Major Features
+- **Intelligent Caching System** - 24-hour content cache for instant app startup with background refresh
+- **TV Series Support** - Full season/episode navigation with autoplay and detailed metadata
+- **My List Functionality** - Personalized watchlist management with add/remove capabilities
+- **Enhanced Continue Watching** - Progress tracking with resume from any device and time-ago display
+- **Smart Recommendations** - Multiple algorithm endpoints (mixed, trending, popular, personalized) with cycling system
+- **Paginated Browse** - Memory-efficient browsing with load more functionality (24 items per page, max 200 in memory)
+
+### 🎨 UI/UX Improvements
+- **Staggered Animations** - Professional content reveal with fade-in effects and delayed entrance
+- **Improved Focus Management** - Netflix-level D-pad navigation with no focus traps and proper sidebar exit
+- **Enhanced Hero Section** - Crossfade transitions with 10-second auto-slide and staggered content animations
+- **Better Loading States** - Smooth transitions with Netflix-red spinners and full-screen overlays
+- **Refined Card Designs** - Border-only focus indicators (2dp white) with subtle scale animations (1.05x)
+- **TV Series UI** - Season/episode cards with backdrop thumbnails and episode metadata
+
+### ⚡ Performance Enhancements
+- **Aggressive Image Caching** - 25% memory cache (256MB) + 512MB disk cache with Coil
+- **Content Caching** - Instant startup with 24-hour cached content using SharedPreferences
+- **Retry Policy** - Exponential backoff (3 attempts, 1s-10s delays) for network resilience
+- **Network Monitoring** - LAN-optimized connectivity checks (WiFi/Ethernet, no internet required)
+- **Reduced Logging** - Production-ready with minimal overhead (removed 50+ debug logs)
+- **Memory Management** - Paginated loading with max 200 items to prevent OOM on budget devices
+
+### 🐛 Bug Fixes
+- Fixed subtitle loading blocking video playback (timeout + optional subtitle config)
+- Resolved focus management issues in hero section (removed auto-focus interference)
+- Fixed progress tracking sync across screens (unified API endpoint)
+- Improved error handling for network failures (detailed error messages with server URL)
+- Fixed memory leaks in image loading (proper lifecycle management)
+- Fixed continue watching showing episodes on movie homepage (type filtering)
+- Fixed hero slider showing old content (always show latest by creation date)
+
+### 📚 Documentation
+- Added comprehensive ENHANCEMENTS.md with caching and retry policy details
+- Added PERFORMANCE_OPTIMIZATION.md with device-specific recommendations
+- Updated LAN_SETUP_GUIDE.md with troubleshooting and network requirements
+- Enhanced README with v2.0 features and accurate technical details
+
+### 🔧 Technical Improvements
+- **API Integration** - Full REST API with 30+ endpoints for media, playback, recommendations
+- **State Management** - Improved StateFlow usage with proper lifecycle handling
+- **Error Handling** - Comprehensive try-catch blocks with fallback mechanisms
+- **Code Organization** - Clean separation of concerns with domain/data/presentation layers
+- **Dependency Injection** - Hilt integration for all ViewModels and repositories
+
+### 📋 Planned Features (v2.1+)
+- Room Database integration for advanced offline storage and complex queries
+- Background sync with WorkManager for periodic content updates
+- Predictive caching for likely-to-watch content based on viewing patterns
+- Advanced error recovery with circuit breaker pattern
+- User profiles and preferences with personalized settings
+- Cast integration for multi-device streaming (Chromecast support)
+- Adaptive image cache based on device RAM (10%-25% scaling)
+- Download support for offline viewing
+
+---
 
 ## 🏗️ Architecture Overview
 
@@ -248,28 +312,37 @@ Content Navigation:
 
 ### Backend Integration
 HomeFlix TV connects to the HomeFlix web backend which provides:
-- **Media library management** with automatic metadata fetching
-- **Torrent download system** with real-time progress tracking
-- **Multi-source search** through Jackett integration
-- **Quality filtering** (4K, 1080p, 720p, 480p)
-- **Automatic transcoding** for unsupported formats
-- **Subtitle management** and streaming
+- **Media library management** with automatic TMDB metadata fetching
+- **Torrent download system** with real-time progress tracking and speed monitoring
+- **Multi-source search** through Jackett integration (600+ torrent sources)
+- **Quality filtering** (4K, 1080p, 720p, 480p) with automatic selection
+- **Automatic transcoding** for unsupported formats with hardware acceleration
+- **Subtitle management** with multiple language support and streaming
+- **Playback progress tracking** with cross-device sync
+- **Recommendation engine** with multiple algorithms (trending, popular, personalized)
+- **My List management** with add/remove functionality
+- **TV series hierarchy** with season/episode organization
 
 ### Network Configuration
 ```
 Default Port: 8252
-Protocol: HTTP (LAN only)
-Streaming: HLS/DASH support
-Transcoding: On-demand for unsupported formats
+Protocol: HTTP (LAN only - no internet required)
+Streaming: Direct file streaming with sendfile optimization
+Transcoding: On-demand for unsupported formats (MKV → MP4)
 Torrent Integration: Jackett with 600+ sources
+API Endpoints: RESTful API with JSON responses
+Caching: Multi-tier (L1/L2/L3) for sub-millisecond response
 ```
 
 ### Supported Media Formats
-- **Video**: MP4, MKV, AVI, MOV, WMV
-- **Audio**: AAC, MP3, AC3, DTS, ALAC (lossless)
-- **Subtitles**: SRT, VTT, ASS/SSA
-- **Codecs**: H.264, H.265/HEVC, VP9
+- **Video**: MP4, MKV, AVI, MOV, WMV, WebM
+- **Audio**: AAC, MP3, AC3, DTS, ALAC (lossless), Opus
+- **Subtitles**: SRT, VTT, ASS/SSA with customizable styling
+- **Codecs**: H.264, H.265/HEVC, VP9, AV1
 - **Containers**: Support for all major formats with automatic transcoding
+- **Quality**: Up to 4K UHD with HDR support (hardware dependent)
+- **Audio Tracks**: Multiple audio tracks with language selection
+- **Subtitle Tracks**: Multiple subtitle tracks with language selection
 
 ## 📱 Development
 
@@ -290,13 +363,17 @@ Torrent Integration: Jackett with 600+ sources
 
 ### Code Style
 - Follows [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html)
-- Uses [Detekt](https://detekt.github.io/detekt/) for static analysis
+- Uses [Detekt](https://detekt.github.io/detekt/) for static analysis (planned)
 - Implements [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) principles
+- MVVM pattern with StateFlow for reactive UI
+- Dependency injection with Hilt
+- Coroutines for async operations
 
 ### Testing
-- Unit tests for ViewModels and repositories
-- UI tests for critical user flows
-- Integration tests for API communication
+- Unit tests for ViewModels and repositories (planned)
+- UI tests for critical user flows (planned)
+- Integration tests for API communication (planned)
+- Manual testing on Android TV devices
 
 ## 🚀 Current Development Status
 
