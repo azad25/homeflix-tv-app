@@ -73,7 +73,6 @@ class VideoPlayerViewModel @Inject constructor(
     fun updateProgress(currentTime: Long, duration: Long) {
         // Progress updates are now handled only on player close for performance
         // No frequent API calls during playback
-        Log.d("VideoPlayerViewModel", "Progress: ${currentTime}ms / ${duration}ms")
     }
     
     fun getMediaRepository(): MediaRepository = mediaRepository

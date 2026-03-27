@@ -50,11 +50,15 @@ class MyListViewModel @Inject constructor(
                                         } else {
                                             0f
                                         }
+                                        
+                                        // Format "time ago" from lastWatchedAt
+                                        val timeAgo = formatTimeAgo(item.lastWatchedAt.time)
+                                        
                                         com.homeflix.tv.presentation.components.ContinueWatchingItem(
                                             media = item.media,
                                             progress = progress.coerceIn(0f, 1f),
                                             progressSeconds = item.progressSeconds,
-                                            lastWatched = item.lastWatchedAt.toString()
+                                            lastWatched = timeAgo
                                         )
                                     } catch (_: Exception) {
                                         null
@@ -77,7 +81,6 @@ class MyListViewModel @Inject constructor(
                             item.media.filePath.isNotBlank() && item.media.previewPath?.isNotBlank() == true
                         }.map { it.media }
                         
-                        Log.d("MyListViewModel", "Total mylist items: ${items.size}, local items: ${localItems.size}, continue watching items: ${continueWatchingList.size}")
                         _uiState.value = MyListUiState.Success(localItems, continueWatchingList)
                     },
                     onFailure = { error ->
@@ -100,4 +103,28 @@ sealed class MyListUiState {
         val continueWatching: List<com.homeflix.tv.presentation.components.ContinueWatchingItem> = emptyList()
     ) : MyListUiState()
     data class Error(val message: String) : MyListUiState()
+}
+
+// Helper function to format "time ago"
+private fun formatTimeAgo(timestamp: Long): String {
+    val now = System.currentTimeMillis()
+    val diff = now - timestamp
+    
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+    val weeks = days / 7
+    val months = days / 30
+    val years = days / 365
+    
+    return when {
+        years > 0 -> if (years == 1L) "1 year ago" else "$years years ago"
+        months > 0 -> if (months == 1L) "1 month ago" else "$months months ago"
+        weeks > 0 -> if (weeks == 1L) "1 week ago" else "$weeks weeks ago"
+        days > 0 -> if (days == 1L) "1 day ago" else "$days days ago"
+        hours > 0 -> if (hours == 1L) "1 hour ago" else "$hours hours ago"
+        minutes > 0 -> if (minutes == 1L) "1 minute ago" else "$minutes minutes ago"
+        else -> "Just now"
+    }
 }

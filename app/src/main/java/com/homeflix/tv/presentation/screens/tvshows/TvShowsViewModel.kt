@@ -22,6 +22,10 @@ class TvShowsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<TvShowsUiState>(TvShowsUiState.Loading)
     val uiState: StateFlow<TvShowsUiState> = _uiState.asStateFlow()
     
+    init {
+        loadTvShows()
+    }
+    
     fun loadTvShows() {
         viewModelScope.launch {
             try {
@@ -31,9 +35,6 @@ class TvShowsViewModel @Inject constructor(
                 val series = mediaRepository.getTvSeries()
                 
                 Log.d("TvShowsViewModel", "Loaded ${series.size} TV series")
-                series.forEach { tvSeries ->
-                    Log.d("TvShowsViewModel", "Series: ${tvSeries.title}, Poster: ${tvSeries.posterPath}")
-                }
                 
                 // Sort by createdAt descending (latest first)
                 val sortedSeries = series.sortedByDescending { it.createdAt }
@@ -90,7 +91,6 @@ class TvShowsViewModel @Inject constructor(
                                 )
                             } catch (e: Exception) { null }
                         }
-                        .also { Log.d("TvShowsViewModel", "Continue watching episodes: ${it.size}") }
                 },
                 onFailure = { error ->
                     Log.e("TvShowsViewModel", "Error fetching continue watching: ${error.message}")
@@ -114,6 +114,20 @@ class TvShowsViewModel @Inject constructor(
             diffHours < 24 -> "${diffHours}h ago"
             diffDays < 7 -> "${diffDays}d ago"
             else -> java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault()).format(date)
+        }
+    }
+    
+    fun refreshContinueWatching() {
+        viewModelScope.launch {
+            try {
+                val continueWatchingEpisodes = fetchContinueWatchingEpisodes()
+                val currentState = _uiState.value
+                if (currentState is TvShowsUiState.Success) {
+                    _uiState.value = currentState.copy(continueWatchingEpisodes = continueWatchingEpisodes)
+                }
+            } catch (e: Exception) {
+                Log.e("TvShowsViewModel", "Error refreshing continue watching", e)
+            }
         }
     }
 }

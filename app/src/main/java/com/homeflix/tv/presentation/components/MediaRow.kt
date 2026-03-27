@@ -111,14 +111,17 @@ fun MediaRow(
                                         }
                                     }
                                     Key.DirectionLeft -> {
-                                        // Navigate to previous item in row
+                                        // Navigate to previous item in row, or let focus escape to sidebar if at first item
                                         if (index > 0) {
                                             val prevIndex = index - 1
                                             if (prevIndex < itemFocusRequesters.size) {
                                                 itemFocusRequesters[prevIndex].requestFocus()
                                             }
+                                            true // Consume event
+                                        } else {
+                                            // At first item - let focus system handle (allows navigation to sidebar)
+                                            false
                                         }
-                                        true // Consume to prevent parent scroll
                                     }
                                     Key.DirectionRight -> {
                                         // Navigate to next item in row

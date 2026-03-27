@@ -53,7 +53,8 @@ fun ContinueWatchingRow(
     focusRequester: FocusRequester? = null,
     onNavigateUp: (() -> Unit)? = null,
     onNavigateDown: (() -> Unit)? = null,
-    mediaTypeFilter: Set<com.homeflix.tv.domain.model.MediaType>? = setOf(com.homeflix.tv.domain.model.MediaType.MOVIE)
+    mediaTypeFilter: Set<com.homeflix.tv.domain.model.MediaType>? = setOf(com.homeflix.tv.domain.model.MediaType.MOVIE),
+    applyHorizontalPadding: Boolean = true // New parameter to control padding
 ) {
     if (continueWatchingItems.isNullOrEmpty()) {
         return
@@ -82,7 +83,10 @@ fun ContinueWatchingRow(
     
     // Render the continue watching section
     Column(
-        modifier = modifier.padding(horizontal = 60.dp)
+        modifier = modifier.then(
+            if (applyHorizontalPadding) Modifier.padding(horizontal = 60.dp)
+            else Modifier
+        )
     ) {
         // Section Title
         Text(

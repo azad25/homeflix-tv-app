@@ -1,10 +1,13 @@
 package com.homeflix.tv.di
 
+import android.content.Context
 import com.homeflix.tv.BuildConfig
 import com.homeflix.tv.data.remote.api.HomeFlixApiService
+import com.homeflix.tv.util.NetworkMonitor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -16,6 +19,12 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
+    
+    @Provides
+    @Singleton
+    fun provideNetworkMonitor(@ApplicationContext context: Context): NetworkMonitor {
+        return NetworkMonitor(context)
+    }
     
     @Provides
     @Singleton

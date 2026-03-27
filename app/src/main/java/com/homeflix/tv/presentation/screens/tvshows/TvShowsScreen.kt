@@ -59,17 +59,39 @@ fun TvShowsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val contentFocusRequester = remember { FocusRequester() }
+    val continueWatchingFocusRequester = remember { FocusRequester() }
     val scrollState = rememberLazyListState()
     
     LaunchedEffect(Unit) {
         viewModel.loadTvShows()
     }
     
+    // Refresh continue watching when returning from video player
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
+    var hasBeenResumed by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(lifecycleState) {
+        if (lifecycleState == androidx.lifecycle.Lifecycle.State.RESUMED) {
+            if (hasBeenResumed) {
+                // Not the first resume, so we're returning from another screen
+                viewModel.refreshContinueWatching()
+            }
+            hasBeenResumed = true
+        }
+    }
+    
     LaunchedEffect(uiState) {
         if (uiState is TvShowsUiState.Success) {
             delay(100)
             try {
-                contentFocusRequester.requestFocus()
+                val successState = uiState as TvShowsUiState.Success
+                // Focus continue watching if available, otherwise focus hero slider
+                if (successState.continueWatchingEpisodes.isNotEmpty()) {
+                    continueWatchingFocusRequester.requestFocus()
+                } else {
+                    contentFocusRequester.requestFocus()
+                }
                 // Scroll back to top AFTER focus to keep hero slider visible
                 delay(150)
                 scrollState.scrollToItem(0, 0)
@@ -218,10 +240,13 @@ fun TvShowsScreen(
                                     onInfo = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
+                                    focusRequester = continueWatchingFocusRequester,
                                     mediaTypeFilter = setOf(
                                         com.homeflix.tv.domain.model.MediaType.EPISODE,
                                         com.homeflix.tv.domain.model.MediaType.TV_SHOW
-                                    )
+                                    ),
+                                    applyHorizontalPadding = false,
+                                    modifier = Modifier.padding(bottom = 24.dp, start = 32.dp)
                                 )
                             }
                         }

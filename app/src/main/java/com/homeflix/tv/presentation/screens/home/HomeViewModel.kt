@@ -53,12 +53,8 @@ class HomeViewModel @Inject constructor(
                 // Try to load from cache first for instant display
                 val cachedMovies = com.homeflix.tv.data.persistence.ContentCache.getMediaList(context, "movies")
                 if (cachedMovies != null && cachedMovies.isNotEmpty()) {
-                    Log.d("HomeViewModel", "Loading from cache: ${cachedMovies.size} movies")
                     displayCachedContent(cachedMovies)
                 }
-                
-                // Test basic connectivity first
-                Log.d("HomeViewModel", "Starting to load home content from: ${BuildConfig.BASE_URL}")
                 
                 // Load movies content first
                 mediaRepository.getMovies(limit = 100).collect { result ->
@@ -68,8 +64,6 @@ class HomeViewModel @Inject constructor(
                                 _uiState.value = HomeUiState.Error("No movies available in database")
                                 return@collect
                             }
-                        
-                            Log.d("HomeViewModel", "Movies loaded: ${movies.size}")
                             
                             // EXACTLY like web app: Sort by creation date for latest content
                             val sortedByDate = movies.sortedByDescending { 
@@ -84,7 +78,6 @@ class HomeViewModel @Inject constructor(
                             
                             // ALWAYS show latest content in hero slider (like browse screen)
                             val featuredMedia = sortedByDate.take(8) // Top 8 latest movies for hero slider
-                            Log.d("HomeViewModel", "Hero slider: Showing ${featuredMedia.size} latest movies")
                             
                             // Fetch trending from dedicated API endpoint
                             val trendingMovies = try {
@@ -141,13 +134,10 @@ class HomeViewModel @Inject constructor(
                             // Cache the movies for next time
                             viewModelScope.launch {
                                 com.homeflix.tv.data.persistence.ContentCache.saveMediaList(context, "movies", movies)
-                                Log.d("HomeViewModel", "Cached ${movies.size} movies")
                             }
                             
                             // Load recently watched data BEFORE updating UI
-                            Log.d("HomeViewModel", "Loading recently watched data...")
                             val continueWatchingItems = fetchContinueWatching()
-                            Log.d("HomeViewModel", "Continue watching items loaded: ${continueWatchingItems.size}")
                             
                             // Update UI with ALL data loaded (movies + recently watched)
                             _uiState.value = HomeUiState.Success(
@@ -206,8 +196,6 @@ class HomeViewModel @Inject constructor(
             val endpointIndex = cycleCount % recommendationEndpoints.size
             val endpoint = recommendationEndpoints[endpointIndex]
             
-            Log.d("HomeViewModel", "Fetching recommendations from: $endpoint (cycle: $cycleCount)")
-            
             val response = when (endpoint) {
                 "mixed" -> mediaRepository.getMixedRecommendations(25)
                 "trending" -> mediaRepository.getTrendingRecommendations(25)
@@ -222,7 +210,6 @@ class HomeViewModel @Inject constructor(
             
             if (response.isSuccessful) {
                 val mediaList = response.body()?.map { it.toDomain() } ?: emptyList()
-                Log.d("HomeViewModel", "Successfully fetched ${mediaList.size} recommendations from $endpoint")
                 
                 // Increment cycle count for next fetch
                 cycleCount++
@@ -247,9 +234,6 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun fetchContinueWatching(): List<ContinueWatchingItem> {
         return try {
-            Log.d("HomeViewModel", "=== FETCHING CONTINUE WATCHING ===")
-            Log.d("HomeViewModel", "API Base URL: ${BuildConfig.BASE_URL}")
-            
             var continueWatchingItems = emptyList<ContinueWatchingItem>()
             
             // Use a single collect to avoid Flow exceptions with timeout
@@ -259,17 +243,9 @@ class HomeViewModel @Inject constructor(
                     mediaRepository.getRecentlyWatchedWithProgress().collect { result ->
                     result.fold(
                         onSuccess = { recentlyWatchedItems ->
-                            Log.d("HomeViewModel", "Raw recently watched items: ${recentlyWatchedItems.size}")
-                            
-                            if (recentlyWatchedItems.isNotEmpty()) {
-                                val firstItem = recentlyWatchedItems[0]
-                                Log.d("HomeViewModel", "First item: ${firstItem.media.title} - ${firstItem.progressSeconds}s/${firstItem.durationSeconds}s")
-                            }
-                            
                             continueWatchingItems = try {
                                 // Null safety check first
                                 if (recentlyWatchedItems.isNullOrEmpty()) {
-                                    Log.d("HomeViewModel", "No recently watched items to process")
                                     emptyList()
                                 } else {
                                     recentlyWatchedItems
@@ -321,8 +297,6 @@ class HomeViewModel @Inject constructor(
                                                     "Recently" // Fallback text
                                                 }
                                                 
-                                                Log.d("HomeViewModel", "Processing: ${item.media.title} - ${(progressPercent * 100).toInt()}%")
-                                                
                                                 ContinueWatchingItem(
                                                     media = item.media,
                                                     progress = progressPercent,
@@ -339,8 +313,6 @@ class HomeViewModel @Inject constructor(
                                 Log.e("HomeViewModel", "Error processing recently watched items: ${e.message}", e)
                                 emptyList() // Return empty list if processing fails
                             }
-                            
-                            Log.d("HomeViewModel", "Successfully processed ${continueWatchingItems.size} continue watching items")
                         },
                         onFailure = { error ->
                             Log.e("HomeViewModel", "API Error fetching continue watching: ${error.message}", error)
@@ -460,7 +432,6 @@ class HomeViewModel @Inject constructor(
     fun refreshFeaturedContent() {
         // Force refresh with new cycle count like web frontend
         cycleCount++
-        Log.d("HomeViewModel", "Refreshing featured content with cycle: $cycleCount")
         loadHomeContent()
     }
     
@@ -473,10 +444,8 @@ class HomeViewModel @Inject constructor(
     
     fun refreshRecentlyWatched() {
         viewModelScope.launch {
-            Log.d("HomeViewModel", "Manual refresh of recently watched triggered")
             try {
                 val continueWatchingItems = fetchContinueWatching()
-                Log.d("HomeViewModel", "Manual refresh loaded ${continueWatchingItems.size} items")
                 
                 val currentState = _uiState.value
                 if (currentState is HomeUiState.Success) {

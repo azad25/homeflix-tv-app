@@ -151,9 +151,8 @@ fun MyListScreen(
                                 },
                                 focusRequester = continueWatchingFocusRequester,
                                 mediaTypeFilter = null, // Allow both movies and TV shows
-                                modifier = Modifier
-                                    .padding(bottom = 24.dp)
-                                    .offset(x = (-60).dp) // Cancel out intrinsic row horizontal padding
+                                applyHorizontalPadding = false, // Don't apply padding, we handle it in LazyColumn
+                                modifier = Modifier.padding(bottom = 24.dp)
                             )
                         }
                     }
@@ -183,7 +182,9 @@ fun MyListScreen(
                         ) { rowItems ->
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 16.dp) // Add spacing between rows
                             ) {
                                 rowItems.forEach { media ->
                                     MyListCard(

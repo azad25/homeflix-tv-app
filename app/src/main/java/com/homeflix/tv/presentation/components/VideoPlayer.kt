@@ -2,6 +2,7 @@ package com.homeflix.tv.presentation.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,6 +49,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.EntryPoint
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.withTimeoutOrNull
 /**
  * ULTRA-INSTANT LAN VIDEO PLAYER for Android TV
  *
@@ -123,6 +125,7 @@ fun VideoPlayer(
     
     // Subtitle state
     var subtitlesEnabled by remember { mutableStateOf(false) }
+    var userDisabledSubtitles by remember(media.id) { mutableStateOf(false) } // Track if user manually disabled
     var availableSubtitleTracks by remember { mutableStateOf<List<Tracks.Group>>(emptyList()) }
     var currentSubtitleTrack by remember { mutableStateOf<Int?>(null) }
     var trackSelector by remember { mutableStateOf<DefaultTrackSelector?>(null) }
@@ -224,9 +227,10 @@ fun VideoPlayer(
                         .clearOverridesOfType(C.TRACK_TYPE_TEXT)
                         .build()
                     subtitlesEnabled = false
+                    userDisabledSubtitles = true // Mark that user manually disabled
                     currentSubtitleTrack = null
                     subtitleToastMessage = "Subtitles OFF"
-                    android.util.Log.d("VideoPlayer", "Subtitles disabled via setTrackTypeDisabled(TEXT, true)")
+                    android.util.Log.d("VideoPlayer", "Subtitles disabled by user via setTrackTypeDisabled(TEXT, true)")
                 } else {
                     // Enable subtitles with explicit track selection
                     val firstGroup = availableSubtitleTracks.firstOrNull()
@@ -240,10 +244,11 @@ fun VideoPlayer(
                             )
                             .build()
                         subtitlesEnabled = true
+                        userDisabledSubtitles = false // User re-enabled
                         currentSubtitleTrack = 0
                         val trackLabel = format.label ?: format.language ?: "Track 1"
                         subtitleToastMessage = "Subtitles ON: $trackLabel"
-                        android.util.Log.d("VideoPlayer", "Subtitles enabled via setTrackTypeDisabled(TEXT, false) + override: lang=${format.language}, label=${format.label}, mime=${format.sampleMimeType}")
+                        android.util.Log.d("VideoPlayer", "Subtitles enabled by user via setTrackTypeDisabled(TEXT, false) + override: lang=${format.language}, label=${format.label}, mime=${format.sampleMimeType}")
                     }
                 }
                 showSubtitleToast = true
@@ -279,28 +284,61 @@ fun VideoPlayer(
             // Reset seek flag for new media
             resumeSeekAttempted = false
             
-            // Fetch external subtitle tracks from API
-            var fetchedSubtitles = emptyList<com.homeflix.tv.domain.model.SubtitleTrack>()
-            try {
-                streamingRepository.getSubtitleTracks(media.id.toString()).collect { result ->
-                    if (result.isSuccess) {
-                        fetchedSubtitles = result.getOrNull() ?: emptyList()
-                        externalSubtitleTracks = fetchedSubtitles
-                        android.util.Log.d("VideoPlayer", "Found ${fetchedSubtitles.size} external subtitle tracks")
-                    } else {
-                        android.util.Log.w("VideoPlayer", "Failed to fetch subtitles: ${result.exceptionOrNull()?.message}")
+            // CRITICAL: Aggressive safety timeout to ensure video ALWAYS starts
+            // Force loading screen off after 10 seconds if still loading
+            launch {
+                delay(10000) // 10 seconds (reduced from 30)
+                if (isMediaLoading) {
+                    android.util.Log.w("VideoPlayer", "Loading timeout reached (10s), forcing loading screen off and starting playback")
+                    isMediaLoading = false
+                    isBuffering = false
+                    // Force player to start if it hasn't already
+                    exoPlayer?.let { player ->
+                        if (!player.isPlaying && player.playbackState != Player.STATE_ENDED) {
+                            player.playWhenReady = true
+                            android.util.Log.w("VideoPlayer", "Forcing playback start after timeout")
+                        }
                     }
                 }
+            }
+            
+            // Fetch external subtitle tracks from API with TIMEOUT to prevent infinite loading
+            var fetchedSubtitles = emptyList<com.homeflix.tv.domain.model.SubtitleTrack>()
+            try {
+                // Use withTimeout to prevent blocking forever
+                withTimeoutOrNull(3000) { // 3 second timeout
+                    streamingRepository.getSubtitleTracks(media.id.toString()).collect { result ->
+                        if (result.isSuccess) {
+                            val allSubtitles = result.getOrNull() ?: emptyList()
+                            // CRITICAL FIX: Only use the FIRST subtitle to prevent loading issues
+                            fetchedSubtitles = if (allSubtitles.isNotEmpty()) {
+                                listOf(allSubtitles.first())
+                            } else {
+                                emptyList()
+                            }
+                            externalSubtitleTracks = fetchedSubtitles
+                            android.util.Log.d("VideoPlayer", "Using first subtitle track from ${allSubtitles.size} available tracks")
+                        } else {
+                            android.util.Log.w("VideoPlayer", "Failed to fetch subtitles: ${result.exceptionOrNull()?.message}")
+                        }
+                    }
+                } ?: run {
+                    android.util.Log.w("VideoPlayer", "Subtitle fetch timed out after 3 seconds, proceeding without subtitles")
+                }
             } catch (e: Exception) {
-                android.util.Log.w("VideoPlayer", "Error fetching external subtitles", e)
+                android.util.Log.w("VideoPlayer", "Error fetching external subtitles, proceeding without them", e)
             }
 
             // Create track selector with subtitle support and auto-selection
             val newTrackSelector = DefaultTrackSelector(context)
-            // Enable text tracks and set default parameters for auto-selection
+            // CRITICAL: Configure to NEVER block video playback for subtitle loading
             newTrackSelector.parameters = newTrackSelector.parameters.buildUpon()
-                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false) // Enable text tracks
                 .setPreferredTextLanguage("en") // Prefer English subtitles
+                .setIgnoredTextSelectionFlags(C.SELECTION_FLAG_FORCED) // Ignore forced subtitles if they fail
+                .setSelectUndeterminedTextLanguage(false) // Don't wait for undetermined language tracks
+                .setExceedRendererCapabilitiesIfNecessary(true) // Allow exceeding capabilities
+                .setTunnelingEnabled(false) // Disable tunneling for better compatibility
                 .build()
             trackSelector = newTrackSelector
 
@@ -308,9 +346,22 @@ fun VideoPlayer(
             val renderersFactory = DefaultRenderersFactory(context)
                 .setEnableDecoderFallback(true)
 
+            // CRITICAL: Configure LoadControl to start playback immediately
+            // Don't wait for subtitle buffer - prioritize video playback
+            val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    500,    // Min buffer to start (500ms - very low)
+                    2000,   // Max buffer (2s)
+                    250,    // Buffer for playback (250ms - very low)
+                    500     // Buffer for playback after rebuffer (500ms)
+                )
+                .setPrioritizeTimeOverSizeThresholds(true) // Prioritize time over size
+                .build()
+
             val player = ExoPlayer.Builder(context)
                 .setTrackSelector(newTrackSelector)
                 .setRenderersFactory(renderersFactory)
+                .setLoadControl(loadControl)
                 .build()
                 .apply {
                     // ULTRA-INSTANT LAN STREAMING OPTIMIZATION
@@ -323,30 +374,41 @@ fun VideoPlayer(
                         media.filePath // Direct file path
                     )
                     
-                    // Build SubtitleConfigurations from external subtitle tracks
-                    val subtitleConfigs = fetchedSubtitles.map { track ->
-                        val subtitleUri = android.net.Uri.parse(
-                            ApiUtils.getSubtitleUrl(media.id, track.id)
-                        )
-                        val mimeType = when (track.format.lowercase()) {
-                            "srt", "subrip" -> MimeTypes.APPLICATION_SUBRIP
-                            "ass", "ssa" -> MimeTypes.TEXT_SSA
-                            "vtt", "webvtt" -> MimeTypes.TEXT_VTT
-                            else -> MimeTypes.APPLICATION_SUBRIP // Default to SRT
+                    // Build SubtitleConfiguration from FIRST subtitle only (if available)
+                    // IMPORTANT: Mark subtitle as optional to prevent blocking video playback
+                    val subtitleConfig = if (fetchedSubtitles.isNotEmpty()) {
+                        try {
+                            val track = fetchedSubtitles.first()
+                            val subtitleUri = android.net.Uri.parse(
+                                ApiUtils.getSubtitleUrl(media.id, track.id)
+                            )
+                            val mimeType = when (track.format.lowercase()) {
+                                "srt", "subrip" -> MimeTypes.APPLICATION_SUBRIP
+                                "ass", "ssa" -> MimeTypes.TEXT_SSA
+                                "vtt", "webvtt" -> MimeTypes.TEXT_VTT
+                                else -> MimeTypes.APPLICATION_SUBRIP
+                            }
+                            listOf(
+                                MediaItem.SubtitleConfiguration.Builder(subtitleUri)
+                                    .setMimeType(mimeType)
+                                    .setLanguage(track.language)
+                                    .setLabel(track.title ?: track.language)
+                                    .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                                    .setRoleFlags(0) // No special role flags - optional subtitle
+                                    .build()
+                            )
+                        } catch (e: Exception) {
+                            android.util.Log.w("VideoPlayer", "Failed to build subtitle config", e)
+                            emptyList()
                         }
-                        MediaItem.SubtitleConfiguration.Builder(subtitleUri)
-                            .setMimeType(mimeType)
-                            .setLanguage(track.language)
-                            .setLabel(track.title ?: track.language)
-                            .setSelectionFlags(if (track.isDefault) C.SELECTION_FLAG_DEFAULT else 0)
-                            .build()
+                    } else {
+                        emptyList()
                     }
                     
-                    if (subtitleConfigs.isNotEmpty()) {
-                        android.util.Log.d("VideoPlayer", "Adding ${subtitleConfigs.size} external subtitle tracks to MediaItem")
-                        subtitleConfigs.forEach { config ->
-                            android.util.Log.d("VideoPlayer", "Subtitle config: uri=${config.uri}, language=${config.language}")
-                        }
+                    if (subtitleConfig.isNotEmpty()) {
+                        android.util.Log.d("VideoPlayer", "Adding 1 subtitle track to MediaItem: ${subtitleConfig[0].language}")
+                    } else {
+                        android.util.Log.d("VideoPlayer", "No subtitles available for this media")
                     }
                     
                     var mediaLoaded = false
@@ -356,7 +418,7 @@ fun VideoPlayer(
                             
                             val mediaItem = MediaItem.Builder()
                                 .setUri(streamUrl)
-                                .setSubtitleConfigurations(subtitleConfigs)
+                                .setSubtitleConfigurations(subtitleConfig)
                                 .build()
                             
                             if (shouldResumePlayback && startTime > 0) {
@@ -371,7 +433,7 @@ fun VideoPlayer(
                             playWhenReady = true
                             mediaLoaded = true
                             
-                            android.util.Log.d("VideoPlayer", "Successfully loaded URL: $streamUrl with ${subtitleConfigs.size} subtitle configs")
+                            android.util.Log.d("VideoPlayer", "Successfully loaded URL: $streamUrl with ${subtitleConfig.size} subtitle")
                             break // Success, exit loop
                             
                         } catch (e: Exception) {
@@ -389,7 +451,7 @@ fun VideoPlayer(
                             
                             val mediaItem = MediaItem.Builder()
                                 .setUri(testUrl)
-                                .setSubtitleConfigurations(subtitleConfigs)
+                                .setSubtitleConfigurations(subtitleConfig)
                                 .build()
                             
                             if (shouldResumePlayback && startTime > 0) {
@@ -419,8 +481,9 @@ fun VideoPlayer(
                                         duration = currentDuration
                                     }
                                     
+                                    // CRITICAL FIX: Always set loading flags to false when ready
                                     isBuffering = false
-                                    isMediaLoading = false // Media with subtitles is now ready
+                                    isMediaLoading = false
                                     
                                     // IMMEDIATE subtitle check - detect tracks right after ready
                                     val currentTracks = this@apply.currentTracks
@@ -430,7 +493,8 @@ fun VideoPlayer(
                                     if (subtitleGroups.isNotEmpty()) {
                                         availableSubtitleTracks = subtitleGroups
                                         val firstGroup = subtitleGroups.first()
-                                        if (firstGroup.length > 0 && !subtitlesEnabled) {
+                                        // Only auto-enable if user hasn't manually disabled
+                                        if (firstGroup.length > 0 && !subtitlesEnabled && !userDisabledSubtitles) {
                                             val trackGroup = firstGroup.mediaTrackGroup
                                             newTrackSelector.parameters = newTrackSelector.parameters.buildUpon()
                                                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
@@ -440,7 +504,7 @@ fun VideoPlayer(
                                                 .build()
                                             subtitlesEnabled = true
                                             currentSubtitleTrack = 0
-                                            android.util.Log.d("VideoPlayer", "Subtitles enabled via immediate check")
+                                            android.util.Log.d("VideoPlayer", "Subtitles auto-enabled via immediate check")
                                         }
                                     } else {
                                         // Delayed subtitle re-check: ExoPlayer may detect external subtitle
@@ -450,7 +514,8 @@ fun VideoPlayer(
                                             val delayedTracks = this@apply.currentTracks
                                             val delayedSubtitleGroups = delayedTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
                                             android.util.Log.d("VideoPlayer", "Delayed subtitle re-check: ${delayedSubtitleGroups.size} groups found")
-                                            if (delayedSubtitleGroups.isNotEmpty() && !subtitlesEnabled) {
+                                            // Only auto-enable if user hasn't manually disabled
+                                            if (delayedSubtitleGroups.isNotEmpty() && !subtitlesEnabled && !userDisabledSubtitles) {
                                                 availableSubtitleTracks = delayedSubtitleGroups
                                                 val firstGroup = delayedSubtitleGroups.first()
                                                 if (firstGroup.length > 0) {
@@ -463,7 +528,7 @@ fun VideoPlayer(
                                                         .build()
                                                     subtitlesEnabled = true
                                                     currentSubtitleTrack = 0
-                                                    android.util.Log.d("VideoPlayer", "Subtitles enabled via delayed re-check")
+                                                    android.util.Log.d("VideoPlayer", "Subtitles auto-enabled via delayed re-check")
                                                 }
                                             }
                                         }
@@ -493,6 +558,25 @@ fun VideoPlayer(
 
                         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                             isBuffering = false
+                            isMediaLoading = false // Stop loading screen on error
+                            
+                            // Check if error is subtitle-related (non-critical)
+                            val errorMessage = error.message ?: ""
+                            val isSubtitleError = errorMessage.contains("subtitle", ignoreCase = true) ||
+                                                 errorMessage.contains("text track", ignoreCase = true) ||
+                                                 error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS
+                            
+                            if (isSubtitleError) {
+                                // Subtitle loading failed - continue playback without subtitles
+                                android.util.Log.w("VideoPlayer", "Subtitle loading failed (non-critical): ${error.message}")
+                                // Clear subtitle tracks since they're not available
+                                availableSubtitleTracks = emptyList()
+                                subtitlesEnabled = false
+                                // Don't stop video playback for subtitle errors
+                            } else {
+                                // Critical video error
+                                android.util.Log.e("VideoPlayer", "Critical playback error: ${error.message}", error)
+                            }
                         }
 
                         override fun onIsPlayingChanged(playing: Boolean) {
@@ -513,8 +597,8 @@ fun VideoPlayer(
                                 }
                             }
                             
-                            // Auto-enable subtitles when tracks are first detected
-                            if (subtitleGroups.isNotEmpty() && !subtitlesEnabled) {
+                            // Only auto-enable subtitles if user hasn't manually disabled them
+                            if (subtitleGroups.isNotEmpty() && !subtitlesEnabled && !userDisabledSubtitles) {
                                 val firstGroup = subtitleGroups.first()
                                 if (firstGroup.length > 0) {
                                     val trackGroup = firstGroup.mediaTrackGroup
@@ -526,7 +610,7 @@ fun VideoPlayer(
                                         .build()
                                     subtitlesEnabled = true
                                     currentSubtitleTrack = 0
-                                    android.util.Log.d("VideoPlayer", "Subtitles auto-enabled (default ON)")
+                                    android.util.Log.d("VideoPlayer", "Subtitles auto-enabled on track change (user hasn't disabled)")
                                 }
                             }
                         }
@@ -646,10 +730,8 @@ fun VideoPlayer(
                                 true
                             }
                             Key.DirectionDown -> {
-                                // Volume down
-                                volume = (volume - 0.1f).coerceAtLeast(0f)
-                                exoPlayer?.volume = volume
-                                isMuted = volume == 0f
+                                // Toggle subtitles on DOWN key
+                                toggleSubtitles()
                                 showControls = true
                                 true
                             }
@@ -750,32 +832,26 @@ fun VideoPlayer(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(horizontal = 48.dp),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Seek backward - Netflix style
+                        // Seek backward - Netflix style with "10" text
                         var seekBackFocused by remember { mutableStateOf(false) }
-                        IconButton(
-                            onClick = {
-                                exoPlayer?.let { player ->
-                                    val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
-                                    player.seekTo(newPosition)
-                                }
-                            },
+                        Box(
                             modifier = Modifier
                                 .focusRequester(seekBackwardFocusRequester)
                                 .focusable()
                                 .onFocusChanged { seekBackFocused = it.isFocused }
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(28.dp))
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(24.dp))
                                 .background(
                                     if (seekBackFocused) Color.White.copy(alpha = 0.9f) 
-                                    else Color.Black.copy(alpha = 0.7f)
+                                    else Color.Black.copy(alpha = 0.6f)
                                 )
                                 .border(
                                     width = if (seekBackFocused) 2.dp else 0.dp,
                                     color = if (seekBackFocused) Color(0xFFE50914) else Color.Transparent,
-                                    shape = RoundedCornerShape(28.dp)
+                                    shape = RoundedCornerShape(24.dp)
                                 )
                                 .onKeyEvent { keyEvent ->
                                     if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
@@ -786,38 +862,46 @@ fun VideoPlayer(
                                         true
                                     } else false
                                 }
+                                .clickable {
+                                    exoPlayer?.let { player ->
+                                        val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
+                                        player.seekTo(newPosition)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.FastRewind,
-                                contentDescription = "Rewind 10 seconds",
-                                tint = if (seekBackFocused) Color.Black else Color.White,
-                                modifier = Modifier.size(32.dp)
-                            )
+                            // Netflix-style rewind icon with "10"
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.FastRewind,
+                                    contentDescription = "Rewind 10 seconds",
+                                    tint = if (seekBackFocused) Color.Black else Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = "10",
+                                    color = if (seekBackFocused) Color.Black else Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.offset(y = 1.dp)
+                                )
+                            }
                         }
 
-                        // Play/Pause - Netflix style
+                        // Play/Pause - Netflix RED circle with white icon
                         var playPauseFocused by remember { mutableStateOf(false) }
-                        IconButton(
-                            onClick = {
-                                exoPlayer?.let { player ->
-                                    if (player.isPlaying) {
-                                        player.pause()
-                                    } else {
-                                        player.play()
-                                    }
-                                }
-                            },
+                        Box(
                             modifier = Modifier
                                 .focusRequester(playPauseFocusRequester)
                                 .focusable()
                                 .onFocusChanged { playPauseFocused = it.isFocused }
-                                .size(72.dp)
-                                .clip(RoundedCornerShape(36.dp))
-                                .background(Color.White)
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(28.dp))
+                                .background(Color(0xFFE50914)) // Netflix red
                                 .border(
                                     width = if (playPauseFocused) 3.dp else 0.dp,
-                                    color = if (playPauseFocused) Color(0xFFE50914) else Color.Transparent,
-                                    shape = RoundedCornerShape(36.dp)
+                                    color = if (playPauseFocused) Color.White else Color.Transparent,
+                                    shape = RoundedCornerShape(28.dp)
                                 )
                                 .onKeyEvent { keyEvent ->
                                     if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
@@ -831,47 +915,51 @@ fun VideoPlayer(
                                         true
                                     } else false
                                 }
+                                .clickable {
+                                    exoPlayer?.let { player ->
+                                        if (player.isPlaying) {
+                                            player.pause()
+                                        } else {
+                                            player.play()
+                                        }
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
                             if (isPlaying) {
                                 Icon(
                                     imageVector = Icons.Rounded.Pause,
                                     contentDescription = "Pause",
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(36.dp)
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
                                 )
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
                                     contentDescription = "Play",
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(36.dp)
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
                                 )
                             }
                         }
 
-                        // Seek forward - Netflix style
+                        // Seek forward - Netflix style with "10" text
                         var seekForwardFocused by remember { mutableStateOf(false) }
-                        IconButton(
-                            onClick = {
-                                exoPlayer?.let { player ->
-                                    val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
-                                    player.seekTo(newPosition)
-                                }
-                            },
+                        Box(
                             modifier = Modifier
                                 .focusRequester(seekForwardFocusRequester)
                                 .focusable()
                                 .onFocusChanged { seekForwardFocused = it.isFocused }
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(28.dp))
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(24.dp))
                                 .background(
                                     if (seekForwardFocused) Color.White.copy(alpha = 0.9f) 
-                                    else Color.Black.copy(alpha = 0.7f)
+                                    else Color.Black.copy(alpha = 0.6f)
                                 )
                                 .border(
                                     width = if (seekForwardFocused) 2.dp else 0.dp,
                                     color = if (seekForwardFocused) Color(0xFFE50914) else Color.Transparent,
-                                    shape = RoundedCornerShape(28.dp)
+                                    shape = RoundedCornerShape(24.dp)
                                 )
                                 .onKeyEvent { keyEvent ->
                                     if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
@@ -882,38 +970,54 @@ fun VideoPlayer(
                                         true
                                     } else false
                                 }
+                                .clickable {
+                                    exoPlayer?.let { player ->
+                                        val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
+                                        player.seekTo(newPosition)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.FastForward,
-                                contentDescription = "Forward 10 seconds",
-                                tint = if (seekForwardFocused) Color.Black else Color.White,
-                                modifier = Modifier.size(32.dp)
-                            )
+                            // Netflix-style forward icon with "10"
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.FastForward,
+                                    contentDescription = "Forward 10 seconds",
+                                    tint = if (seekForwardFocused) Color.Black else Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = "10",
+                                    color = if (seekForwardFocused) Color.Black else Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.offset(y = 1.dp)
+                                )
+                            }
                         }
 
-                        // Subtitle toggle - Netflix style with enhanced focus
+                        // Subtitle toggle - Netflix style with reduced size
                         if (availableSubtitleTracks.isNotEmpty()) {
                             var subtitleButtonFocused by remember { mutableStateOf(false) }
                             
-                            IconButton(
-                                onClick = { toggleSubtitles() },
+                            Box(
                                 modifier = Modifier
                                     .focusRequester(subtitlesFocusRequester)
                                     .focusable()
                                     .onFocusChanged { subtitleButtonFocused = it.isFocused }
-                                    .size(56.dp)
-                                    .clip(RoundedCornerShape(28.dp))
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(24.dp))
                                     .background(
                                         when {
-                                            subtitleButtonFocused -> Color.White.copy(alpha = 0.9f) // White when focused
-                                            subtitlesEnabled -> Color(0xFFE50914).copy(alpha = 0.8f) // Netflix red when enabled
-                                            else -> Color.Black.copy(alpha = 0.7f) // Dark when disabled
+                                            subtitleButtonFocused -> Color.White.copy(alpha = 0.9f)
+                                            subtitlesEnabled -> Color(0xFFE50914).copy(alpha = 0.8f)
+                                            else -> Color.Black.copy(alpha = 0.6f)
                                         }
                                     )
                                     .border(
                                         width = if (subtitleButtonFocused) 2.dp else 0.dp,
                                         color = if (subtitleButtonFocused) Color(0xFFE50914) else Color.Transparent,
-                                        shape = RoundedCornerShape(28.dp)
+                                        shape = RoundedCornerShape(24.dp)
                                     )
                                     .onKeyEvent { keyEvent ->
                                         if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
@@ -921,16 +1025,18 @@ fun VideoPlayer(
                                             true
                                         } else false
                                     }
+                                    .clickable { toggleSubtitles() },
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Subtitles,
                                     contentDescription = if (subtitlesEnabled) "Disable subtitles" else "Enable subtitles",
                                     tint = when {
-                                        subtitleButtonFocused -> Color.Black // Black icon when focused (on white background)
-                                        subtitlesEnabled -> Color.White // White icon when enabled
-                                        else -> Color.White // White icon when disabled
+                                        subtitleButtonFocused -> Color.Black
+                                        subtitlesEnabled -> Color.White
+                                        else -> Color.White
                                     },
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
@@ -943,70 +1049,47 @@ fun VideoPlayer(
                             .fillMaxWidth()
                             .padding(24.dp)
                     ) {
-                        // Progress bar (Netflix red) with circular thumb
+                        // Netflix-style progress bar - thin with small thumb
                         if (duration > 0) {
                             val progress = (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
 
-                            Slider(
-                                value = progress,
-                                onValueChange = { newProgress ->
-                                    // Seek to new position when user drags the slider
-                                    exoPlayer?.let { player ->
-                                        val newPosition = (newProgress * duration).toLong()
-                                        player.seekTo(newPosition)
-                                    }
-                                },
+                            // Custom Netflix-style progress bar
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(24.dp) // Increased height to accommodate thumb
-                                    .focusable()
-                                    .onKeyEvent { keyEvent ->
-                                        if (keyEvent.type == KeyEventType.KeyDown) {
-                                            when (keyEvent.key) {
-                                                Key.DirectionLeft -> {
-                                                    // Seek backward 10 seconds when left arrow is pressed on progress bar
-                                                    exoPlayer?.let { player ->
-                                                        val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
-                                                        player.seekTo(newPosition)
-                                                    }
-                                                    true
-                                                }
-                                                Key.DirectionRight -> {
-                                                    // Seek forward 10 seconds when right arrow is pressed on progress bar
-                                                    exoPlayer?.let { player ->
-                                                        val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
-                                                        player.seekTo(newPosition)
-                                                    }
-                                                    true
-                                                }
-                                                else -> false
-                                            }
-                                        } else false
-                                    },
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White, // White circular thumb
-                                    activeTrackColor = Color(0xFFE50914), // Netflix red for progress
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.3f) // Semi-transparent white for remaining
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(Color.White.copy(alpha = 0.3f))
+                            ) {
+                                // Progress fill (Netflix red)
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(progress)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(Color(0xFFE50914))
                                 )
-                            )
+                            }
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                            // Time info
+                            // Time info - Netflix style (smaller, subtle)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
                                     text = formatTime(currentPosition),
-                                    color = Color.White,
-                                    fontSize = 16.sp
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Normal
                                 )
 
                                 Text(
                                     text = formatTime(duration),
-                                    color = Color.White,
-                                    fontSize = 16.sp
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Normal
                                 )
                             }
                         }
@@ -1031,7 +1114,7 @@ fun VideoPlayer(
                                         imageVector = Icons.Rounded.Subtitles,
                                         contentDescription = null,
                                         tint = if (subtitlesEnabled) Color(0xFFE50914) else Color.White.copy(alpha = 0.5f),
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                     
                                     Spacer(modifier = Modifier.width(4.dp))

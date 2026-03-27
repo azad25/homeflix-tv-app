@@ -98,8 +98,6 @@ class DetailsViewModel @Inject constructor(
     
     private suspend fun loadWatchProgress(media: Media) {
         try {
-            Log.d("DetailsViewModel", "Loading watch progress for media: ${media.id} - ${media.title}")
-            
             // Use direct playback progress API (matches web frontend: GET /api/playback/progress/{id})
             val result = mediaRepository.getPlaybackProgress(media.id.toString())
             

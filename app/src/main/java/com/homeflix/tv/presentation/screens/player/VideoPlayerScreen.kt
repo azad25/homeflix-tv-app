@@ -39,11 +39,15 @@ fun VideoPlayerScreen(
         }
         
         is VideoPlayerUiState.Success -> {
-            // Use saved progress from ViewModel or provided startTime
-            val actualStartTime = if (state.savedProgressSeconds != null) {
-                state.savedProgressSeconds * 1000 // Convert seconds to milliseconds
+            // CRITICAL FIX: Use the provided startTime parameter directly
+            // Don't override with savedProgressSeconds from ViewModel
+            // The startTime from navigation already contains the correct resume position
+            val actualStartTime = if (startTime > 0) {
+                startTime // Use provided startTime (already in milliseconds)
+            } else if (state.savedProgressSeconds != null) {
+                state.savedProgressSeconds * 1000 // Fallback to saved progress
             } else {
-                startTime
+                0L // Start from beginning
             }
             
             VideoPlayer(
