@@ -18,6 +18,12 @@ class DetailsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<DetailsUiState>(DetailsUiState.Loading)
     val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
     
+    private val _isInMyList = MutableStateFlow(false)
+    val isInMyList: StateFlow<Boolean> = _isInMyList.asStateFlow()
+    
+    private val _myListLoading = MutableStateFlow(false)
+    val myListLoading: StateFlow<Boolean> = _myListLoading.asStateFlow()
+    
     fun loadMediaDetails(mediaId: String) {
         viewModelScope.launch {
             _uiState.value = DetailsUiState.Loading
@@ -30,6 +36,8 @@ class DetailsViewModel @Inject constructor(
                             onSuccess = { media ->
                                 // Load watch progress for this media
                                 loadWatchProgress(media)
+                                // Check if media is in My List
+                                checkMyList(mediaId)
                             },
                             onFailure = { error ->
                                 _uiState.value = DetailsUiState.Error(
@@ -47,47 +55,72 @@ class DetailsViewModel @Inject constructor(
         }
     }
     
+    private suspend fun checkMyList(mediaId: String) {
+        try {
+            val result = mediaRepository.checkMyList(mediaId)
+            result.fold(
+                onSuccess = { inList ->
+                    _isInMyList.value = inList
+                    Log.d("DetailsViewModel", "Media $mediaId in my list: $inList")
+                },
+                onFailure = { error ->
+                    Log.w("DetailsViewModel", "Failed to check my list: ${error.message}")
+                    _isInMyList.value = false
+                }
+            )
+        } catch (e: Exception) {
+            Log.w("DetailsViewModel", "Error checking my list", e)
+            _isInMyList.value = false
+        }
+    }
+    
+    fun addToMyList(mediaId: String) {
+        viewModelScope.launch {
+            _myListLoading.value = true
+            try {
+                val result = mediaRepository.addToMyList(mediaId)
+                result.fold(
+                    onSuccess = {
+                        _isInMyList.value = true
+                        Log.d("DetailsViewModel", "Added to my list: $mediaId")
+                    },
+                    onFailure = { error ->
+                        Log.e("DetailsViewModel", "Failed to add to my list: ${error.message}")
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e("DetailsViewModel", "Error adding to my list", e)
+            } finally {
+                _myListLoading.value = false
+            }
+        }
+    }
+    
     private suspend fun loadWatchProgress(media: Media) {
         try {
             Log.d("DetailsViewModel", "Loading watch progress for media: ${media.id} - ${media.title}")
             
-            // Get recently watched items to find progress for this media
-            val result = mediaRepository.getRecentlyWatchedWithProgress().first()
+            // Use direct playback progress API (matches web frontend: GET /api/playback/progress/{id})
+            val result = mediaRepository.getPlaybackProgress(media.id.toString())
             
             result.fold(
-                onSuccess = { recentlyWatchedItems ->
-                    Log.d("DetailsViewModel", "Found ${recentlyWatchedItems.size} recently watched items")
-                    
-                    // Find progress for current media
-                    val recentlyWatchedItem = recentlyWatchedItems.find { it.mediaId == media.id }
-                    
-                    val watchProgress = recentlyWatchedItem?.let { item ->
-                        Log.d("DetailsViewModel", "Found progress for media ${media.id}: ${item.progressSeconds}/${item.durationSeconds}")
-                        
-                        if (item.durationSeconds > 0) {
-                            (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
-                        } else {
-                            0f
-                        }
-                    }
-                    
-                    if (recentlyWatchedItem == null) {
-                        Log.d("DetailsViewModel", "No watch progress found for media ${media.id}")
+                onSuccess = { progress ->
+                    if (progress != null && progress.duration > 0) {
+                        val watchProgress = (progress.progress.toFloat() / progress.duration.toFloat()).coerceIn(0f, 1f)
+                        Log.d("DetailsViewModel", "Watch progress for media ${media.id}: ${(watchProgress * 100).toInt()}% (${progress.progress}s / ${progress.duration}s)")
+                        _uiState.value = DetailsUiState.Success(media, watchProgress, progress.progress)
                     } else {
-                        Log.d("DetailsViewModel", "Watch progress for media ${media.id}: ${(watchProgress!! * 100).toInt()}%")
+                        Log.d("DetailsViewModel", "No watch progress found for media ${media.id}")
+                        _uiState.value = DetailsUiState.Success(media, null, null)
                     }
-                    
-                    _uiState.value = DetailsUiState.Success(media, watchProgress, recentlyWatchedItem?.progressSeconds)
                 },
                 onFailure = { error ->
                     Log.w("DetailsViewModel", "Failed to load watch progress: ${error.message}")
-                    // Still show media details even if progress loading fails
                     _uiState.value = DetailsUiState.Success(media, null, null)
                 }
             )
         } catch (e: Exception) {
             Log.w("DetailsViewModel", "Error loading watch progress", e)
-            // Still show media details even if progress loading fails
             _uiState.value = DetailsUiState.Success(media, null, null)
         }
     }

@@ -51,11 +51,7 @@ object ApiUtils {
     
     fun getBackdropUrl(media: Media): String {
         return when {
-            // TMDB backdrop URL (highest priority)
-            !media.tmdbBackdropUrl.isNullOrEmpty() && media.tmdbBackdropUrl.trim().isNotEmpty() -> {
-                media.tmdbBackdropUrl
-            }
-            // Local banner path - use /api/admin/assets/{filename} endpoint
+            // Local banner path(highest priority) - use /api/admin/assets/{filename} endpoint
             !media.bannerPath.isNullOrEmpty() && media.bannerPath.trim().isNotEmpty() -> {
                 if (media.bannerPath.startsWith("http")) {
                     media.bannerPath
@@ -68,9 +64,23 @@ object ApiUtils {
                     }
                 }
             }
+
+            // TMDB backdrop URL (second priority)
+            !media.tmdbBackdropUrl.isNullOrEmpty() && media.tmdbBackdropUrl.trim().isNotEmpty() -> {
+                media.tmdbBackdropUrl
+            }
+
             // Fallback to thumbnail
             else -> {
-                "${getBaseUrl()}/thumbnails/${media.id}"
+                if (!media.thumbnailPath.isNullOrEmpty()) {
+                    if (media.thumbnailPath.startsWith("http")) {
+                        media.thumbnailPath
+                    } else {
+                        "${getBaseUrl()}/thumbnails/${media.id}"
+                    }
+                } else {
+                    "${getBaseUrl()}/thumbnails/${media.id}"
+                }
             }
         }
     }

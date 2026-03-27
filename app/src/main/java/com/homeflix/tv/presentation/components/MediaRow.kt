@@ -84,7 +84,7 @@ fun MediaRow(
                                         index >= mediaList.size - 2 -> maxOf(0, mediaList.size - 3)
                                         else -> maxOf(0, index - 1)
                                     }
-                                    listState.animateScrollToItem(targetIndex)
+                                    listState.scrollToItem(targetIndex)
                                 }
                             }
                         }

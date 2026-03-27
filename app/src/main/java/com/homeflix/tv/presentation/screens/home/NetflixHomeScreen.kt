@@ -29,6 +29,8 @@ import com.homeflix.tv.presentation.navigation.Screen
 import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import kotlinx.coroutines.delay
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 /**
  * NETFLIX-LEVEL Android TV Home Screen
@@ -46,6 +48,7 @@ fun NetflixHomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var currentHeroIndex by remember { mutableStateOf(0) }
+    val listState = rememberLazyListState()
     
     // NETFLIX-LEVEL Focus Management
     val sideNavFocusRequester = remember { FocusRequester() }
@@ -66,9 +69,27 @@ fun NetflixHomeScreen(
                 heroPlayButtonFocusRequester.requestFocus()
                 currentFocusArea = FocusArea.HERO
                 isInitialized = true
+                // Scroll back to top AFTER focus to keep hero slider fully visible
+                delay(150)
+                listState.scrollToItem(0, 0)
             } catch (e: Exception) {
                 android.util.Log.e("HomeScreen", "Failed to set initial focus", e)
             }
+        }
+    }
+    
+    // Refresh continue watching when returning from video player
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
+    var hasBeenResumed by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(lifecycleState) {
+        if (lifecycleState == Lifecycle.State.RESUMED) {
+            if (hasBeenResumed) {
+                // Not the first resume, so we're returning from another screen
+                viewModel.refreshRecentlyWatched()
+            }
+            hasBeenResumed = true
         }
     }
     
@@ -102,6 +123,7 @@ fun NetflixHomeScreen(
                         "search" -> navController.navigate(Screen.Search.route)
                         "home" -> { /* Already on home */ }
                         "browse" -> navController.navigate(Screen.Browse.route)
+                        "my-list" -> navController.navigate(Screen.MyList.route)
                         "tv-shows" -> navController.navigate(Screen.TvShows.route)
                     }
                 },
@@ -154,7 +176,7 @@ fun NetflixHomeScreen(
                 when (currentState) {
                     is HomeUiState.Success -> {
                         // FIXED: LazyColumn with state to ensure it starts at top and STAYS there
-                        val listState = rememberLazyListState()
+                        // listState is hoisted to top-level for scroll-to-top on focus
                         
                         // Ensure scroll starts at top and NEVER auto-scrolls
                         LaunchedEffect(currentState) {
@@ -223,15 +245,6 @@ fun NetflixHomeScreen(
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
                                     focusRequester = firstRowFocusRequester,
-                                    onNavigateUp = {
-                                        currentFocusArea = FocusArea.HERO
-                                        try { heroPlayButtonFocusRequester.requestFocus() } catch (_: Exception) {}
-                                    },
-                                    onNavigateDown = {
-                                        if (currentState.latestMovies.isNotEmpty()) {
-                                            try { latestMoviesFocusRequester.requestFocus() } catch (_: Exception) {}
-                                        }
-                                    },
                                     modifier = Modifier.padding(bottom = 24.dp)
                                 )
                             }
@@ -247,19 +260,6 @@ fun NetflixHomeScreen(
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
                                     focusRequester = if (currentState.continueWatching.isEmpty()) firstRowFocusRequester else latestMoviesFocusRequester,
-                                    onNavigateUp = {
-                                        if (currentState.continueWatching.isNotEmpty()) {
-                                            try {
-                                                firstRowFocusRequester.requestFocus()
-                                            } catch (e: Exception) {
-                                                currentFocusArea = FocusArea.HERO
-                                                try { heroPlayButtonFocusRequester.requestFocus() } catch (_: Exception) {}
-                                            }
-                                        } else {
-                                            currentFocusArea = FocusArea.HERO
-                                            try { heroPlayButtonFocusRequester.requestFocus() } catch (_: Exception) {}
-                                        }
-                                    },
                                     modifier = Modifier.padding(bottom = 24.dp)
                                 )
                             }

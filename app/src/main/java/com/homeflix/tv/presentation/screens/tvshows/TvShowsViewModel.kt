@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
 
 @HiltViewModel
 class TvShowsViewModel @Inject constructor(
@@ -58,55 +59,46 @@ class TvShowsViewModel @Inject constructor(
     
     private suspend fun fetchContinueWatchingEpisodes(): List<ContinueWatchingItem> {
         return try {
-            var items = emptyList<ContinueWatchingItem>()
-            
-            kotlinx.coroutines.withTimeout(10000) {
-                mediaRepository.getRecentlyWatchedWithProgress().collect { result ->
-                    result.fold(
-                        onSuccess = { recentlyWatchedItems ->
-                            items = recentlyWatchedItems
-                                .filterNotNull()
-                                .filter { item ->
-                                    item.media != null &&
-                                    item.media.id > 0 &&
-                                    !item.media.title.isNullOrBlank() &&
-                                    item.durationSeconds > 0 &&
-                                    item.progressSeconds >= 0 &&
-                                    item.lastWatchedAt != null &&
-                                    item.media.type == MediaType.EPISODE // Only episodes on TV series page
-                                }
-                                .sortedByDescending { it.lastWatchedAt?.time ?: 0L }
-                                .take(10)
-                                .mapNotNull { item ->
-                                    try {
-                                        val progressPercent = if (item.durationSeconds > 0) {
-                                            (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
-                                        } else 0f
-                                        
-                                        val lastWatchedText = formatLastWatched(item.lastWatchedAt)
-                                        
-                                        ContinueWatchingItem(
-                                            media = item.media,
-                                            progress = progressPercent,
-                                            progressSeconds = item.progressSeconds,
-                                            lastWatched = lastWatchedText
-                                        )
-                                    } catch (e: Exception) {
-                                        null
-                                    }
-                                }
-                            Log.d("TvShowsViewModel", "Continue watching episodes: ${items.size}")
-                        },
-                        onFailure = { error ->
-                            Log.e("TvShowsViewModel", "Error fetching continue watching: ${error.message}")
-                            items = emptyList()
+            val result = mediaRepository.getRecentlyWatchedWithProgress().first() // ← first() not collect
+
+            result.fold(
+                onSuccess = { recentlyWatchedItems ->
+                    recentlyWatchedItems
+                        .filterNotNull()
+                        .filter { item ->
+                            item.media != null &&
+                            item.media.id > 0 &&
+                            !item.media.title.isNullOrBlank() &&
+                            item.durationSeconds > 0 &&
+                            item.progressSeconds >= 0 &&
+                            item.lastWatchedAt != null &&
+                            (item.media.type == MediaType.EPISODE ||
+                            item.media.type == MediaType.TV_SHOW)
                         }
-                    )
+                        .sortedByDescending { it.lastWatchedAt?.time ?: 0L }
+                        .take(10)
+                        .mapNotNull { item ->
+                            try {
+                                val progressPercent = if (item.durationSeconds > 0) {
+                                    (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
+                                } else 0f
+                                ContinueWatchingItem(
+                                    media = item.media,
+                                    progress = progressPercent,
+                                    progressSeconds = item.progressSeconds,
+                                    lastWatched = formatLastWatched(item.lastWatchedAt)
+                                )
+                            } catch (e: Exception) { null }
+                        }
+                        .also { Log.d("TvShowsViewModel", "Continue watching episodes: ${it.size}") }
+                },
+                onFailure = { error ->
+                    Log.e("TvShowsViewModel", "Error fetching continue watching: ${error.message}")
+                    emptyList()
                 }
-            }
-            items
+            )
         } catch (e: Exception) {
-            Log.e("TvShowsViewModel", "Exception fetching continue watching episodes: ${e.message}")
+            Log.e("TvShowsViewModel", "Exception fetching continue watching: ${e.message}")
             emptyList()
         }
     }

@@ -97,7 +97,8 @@ data class Media(
 
 enum class MediaType {
     MOVIE,
-    EPISODE
+    EPISODE,
+    TV_SHOW
 }
 
 @Parcelize

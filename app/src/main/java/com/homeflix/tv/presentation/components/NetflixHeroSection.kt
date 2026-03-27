@@ -20,6 +20,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -63,7 +64,7 @@ fun NetflixHeroSection(
     // Auto-slide functionality - Netflix style (re-enabled)
     LaunchedEffect(currentIndex, isUserInteracting) {
         if (!isUserInteracting && mediaList.size > 1) {
-            delay(5000) // 5 seconds per slide
+            delay(10000) // 10 seconds per slide
             val nextIndex = (currentIndex + 1) % mediaList.size
             onIndexChange(nextIndex)
         }
@@ -79,156 +80,95 @@ fun NetflixHeroSection(
     
     // REMOVED: Auto-focus to prevent scroll issues
     // Focus is managed by parent NetflixHomeScreen
-    
-    // Loading state for smooth transitions
-    var isLoading by remember { mutableStateOf(true) }
-    
-    // Reset loading state when media changes
-    LaunchedEffect(currentMedia.id) {
-        isLoading = true
-        delay(300) // Brief loading state for smooth transition
-        isLoading = false
-    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(480.dp)
     ) {
-        // Animated background banner with enhanced fade transitions
-        AnimatedContent(
-            targetState = currentMedia.id,
-            transitionSpec = {
-                fadeIn(
-                    animationSpec = tween(
-                        durationMillis = 1000,
-                        delayMillis = 200
-                    )
-                ) togetherWith fadeOut(
-                    animationSpec = tween(
-                        durationMillis = 600
-                    )
-                )
-            },
-            label = "hero_background"
-        ) { targetMediaId ->
-            // Derive the correct media for this animation state
-            // CRITICAL: Must use targetMediaId (not currentMedia) to avoid showing wrong backdrop
-            val targetMedia = mediaList.find { it.id == targetMediaId } ?: currentMedia
+        // Netflix-style unified slide transition
+        // Single Crossfade wraps backdrop + gradients + content for smooth transition
+        androidx.compose.animation.Crossfade(
+            targetState = currentIndex,
+            animationSpec = tween(durationMillis = 1500),
+            label = "hero_crossfade"
+        ) { targetIndex ->
+            val targetMedia = mediaList.getOrElse(targetIndex) { currentMedia }
             
-            AsyncImage(
-                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-                    .data(ApiUtils.getBannerUrl(targetMedia))
-                    .memoryCacheKey("banner_${targetMediaId}")
-                    .diskCacheKey("banner_${targetMediaId}")
-                    .crossfade(true)
-                    .build(),
-                contentDescription = targetMedia.title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        }
-        
-        // Netflix-style gradient overlays
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.8f),
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.4f)
-                        ),
-                        startX = 0f,
-                        endX = 1200f
-                    )
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Background banner
+                AsyncImage(
+                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(ApiUtils.getBannerUrl(targetMedia))
+                        .memoryCacheKey("banner_${targetMedia.id}")
+                        .diskCacheKey("banner_${targetMedia.id}")
+                        .crossfade(false) // Crossfade handled by parent
+                        .build(),
+                    contentDescription = targetMedia.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
-        )
-        
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.6f)
-                        ),
-                        startY = 400f
-                    )
-                )
-        )
-        
-        // Loading overlay with fade animation
-        androidx.compose.animation.AnimatedVisibility(
-            visible = isLoading,
-            enter = fadeIn(animationSpec = tween(300)),
-            exit = fadeOut(animationSpec = tween(500))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = NetflixRed,
-                    modifier = Modifier.size(48.dp),
-                    strokeWidth = 4.dp
-                )
-            }
-        }
-
-        // Enhanced content animation with staggered timing
-        AnimatedContent(
-            targetState = currentMedia,
-            transitionSpec = {
-                fadeIn(
-                    animationSpec = tween(
-                        durationMillis = 1200,
-                        delayMillis = 400
-                    )
-                ) togetherWith fadeOut(
-                    animationSpec = tween(
-                        durationMillis = 600
-                    )
-                )
-            },
-            label = "hero_content"
-        ) { media ->
-            Column(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 48.dp, top = 80.dp, end = 300.dp, bottom = 60.dp)
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Animated title with staggered entrance
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = !isLoading,
-                    enter = fadeIn(
-                        animationSpec = tween(
-                            durationMillis = 800,
-                            delayMillis = 600
+                
+                // Netflix-style gradient overlays
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.8f),
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.4f)
+                                ),
+                                startX = 0f,
+                                endX = 1200f
+                            )
                         )
-                    ) + androidx.compose.animation.slideInVertically(
-                        animationSpec = tween(
-                            durationMillis = 800,
-                            delayMillis = 600
-                        ),
-                        initialOffsetY = { it / 4 }
-                    )
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.6f)
+                                ),
+                                startY = 400f
+                            )
+                        )
+                )
+                
+                // Staggered content reveal with alpha animations per slide
+                val contentVisible = remember { mutableStateOf(false) }
+                LaunchedEffect(targetMedia.id) {
+                    contentVisible.value = false
+                    delay(300) // Brief delay after crossfade starts
+                    contentVisible.value = true
+                }
+                
+                val contentAlpha by androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = if (contentVisible.value) 1f else 0f,
+                    animationSpec = tween(durationMillis = 800),
+                    label = "content_alpha"
+                )
+                
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 48.dp, top = 80.dp, end = 300.dp, bottom = 60.dp)
+                        .fillMaxWidth()
+                        .graphicsLayer { alpha = contentAlpha },
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Movie logo (loaded from API logo_path, matching web app)
-                    // Falls back to title text if no logo available
+                    // Movie logo or title
                     var logoLoaded by remember { mutableStateOf(false) }
-                    val logoUrl = ApiUtils.getLogoUrl(media)
+                    val logoUrl = ApiUtils.getLogoUrl(targetMedia)
                     
                     if (!logoLoaded) {
-                        // Fallback: Text title
                         Text(
-                            text = media.title,
+                            text = targetMedia.title,
                             style = MaterialTheme.typography.headlineLarge.copy(
                                 fontWeight = FontWeight.Black,
                                 color = TextPrimary
@@ -239,16 +179,15 @@ fun NetflixHeroSection(
                         )
                     }
                     
-                    // Only try to load logo if URL exists
                     if (logoUrl != null) {
                         AsyncImage(
                             model = coil.request.ImageRequest.Builder(LocalContext.current)
                                 .data(logoUrl)
-                                .memoryCacheKey("logo_${media.id}")
-                                .diskCacheKey("logo_${media.id}")
+                                .memoryCacheKey("logo_${targetMedia.id}")
+                                .diskCacheKey("logo_${targetMedia.id}")
                                 .crossfade(true)
                                 .build(),
-                            contentDescription = "${media.title} logo",
+                            contentDescription = "${targetMedia.title} logo",
                             modifier = Modifier
                                 .heightIn(max = 100.dp)
                                 .fillMaxWidth(0.5f),
@@ -257,140 +196,100 @@ fun NetflixHeroSection(
                             onError = { logoLoaded = false }
                         )
                     }
-                }
-                
-                // Animated metadata row
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = !isLoading,
-                    enter = fadeIn(
-                        animationSpec = tween(
-                            durationMillis = 800,
-                            delayMillis = 800
-                        )
-                    ) + androidx.compose.animation.slideInVertically(
-                        animationSpec = tween(
-                            durationMillis = 800,
-                            delayMillis = 800
-                        ),
-                        initialOffsetY = { it / 4 }
-                    )
-                ) {
+                    
+                    // Metadata row
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                    // Netflix match percentage (simulated)
-                    Text(
-                        text = "${(85..99).random()}% Match",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF46d369) // Netflix green
-                        )
-                    )
-                    
-                    // Year
-                    media.year?.let { year ->
                         Text(
-                            text = year.toString(),
+                            text = "${(85..99).random()}% Match",
                             style = MaterialTheme.typography.titleMedium.copy(
-                                color = TextSecondary
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF46d369)
                             )
                         )
-                    }
-                    
-                    // Rating with yellow star
-                    if (media.rating > 0) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
+                        
+                        targetMedia.year?.let { year ->
                             Text(
-                                text = "★",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    color = Color(0xFFFFD700) // Gold/Yellow
-                                )
-                            )
-                            Text(
-                                text = String.format("%.1f", media.rating),
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    color = TextSecondary,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            )
-                        }
-                    }
-                    
-                    // Age rating
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = Color.Gray.copy(alpha = 0.8f)
-                    ) {
-                        Text(
-                            text = media.certification ?: "TV-MA",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = TextPrimary,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                    
-                    // Quality badge
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = NetflixRed.copy(alpha = 0.8f)
-                    ) {
-                        Text(
-                            text = if (media.quality?.contains("4K", ignoreCase = true) == true) "4K" else "HD",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                    
-                    // Duration
-                    media.runtime?.let { runtime ->
-                        Text(
-                            text = "${runtime}m",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                color = TextSecondary
-                            )
-                        )
-                    }
-                    }
-                }
-                
-                // Animated genres and description
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = !isLoading,
-                    enter = fadeIn(
-                        animationSpec = tween(
-                            durationMillis = 800,
-                            delayMillis = 1000
-                        )
-                    ) + androidx.compose.animation.slideInVertically(
-                        animationSpec = tween(
-                            durationMillis = 800,
-                            delayMillis = 1000
-                        ),
-                        initialOffsetY = { it / 4 }
-                    )
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        // Genres
-                        if (media.genreNames.isNotEmpty()) {
-                            Text(
-                                text = media.genreNames.take(3).joinToString(" • "),
+                                text = year.toString(),
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     color = TextSecondary
                                 )
                             )
                         }
                         
-                        // Description
-                        media.description?.let { description ->
+                        if (targetMedia.rating > 0) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "★",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        color = Color(0xFFFFD700)
+                                    )
+                                )
+                                Text(
+                                    text = String.format("%.1f", targetMedia.rating),
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        color = TextSecondary,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            }
+                        }
+                        
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = Color.Gray.copy(alpha = 0.8f)
+                        ) {
+                            Text(
+                                text = targetMedia.certification ?: "TV-MA",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = NetflixRed.copy(alpha = 0.8f)
+                        ) {
+                            Text(
+                                text = if (targetMedia.quality?.contains("4K", ignoreCase = true) == true) "4K" else "HD",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        
+                        targetMedia.runtime?.let { runtime ->
+                            Text(
+                                text = "${runtime}m",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    color = TextSecondary
+                                )
+                            )
+                        }
+                    }
+                    
+                    // Genres and description
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        if (targetMedia.genreNames.isNotEmpty()) {
+                            Text(
+                                text = targetMedia.genreNames.take(3).joinToString(" • "),
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    color = TextSecondary
+                                )
+                            )
+                        }
+                        
+                        targetMedia.description?.let { description ->
                             Text(
                                 text = description,
                                 style = MaterialTheme.typography.bodyMedium.copy(
@@ -403,107 +302,86 @@ fun NetflixHeroSection(
                             )
                         }
                     }
-                }
-                
-                // Animated action buttons with final staggered entrance
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = !isLoading,
-                    enter = fadeIn(
-                        animationSpec = tween(
-                            durationMillis = 800,
-                            delayMillis = 1200
-                        )
-                    ) + androidx.compose.animation.slideInVertically(
-                        animationSpec = tween(
-                            durationMillis = 800,
-                            delayMillis = 1200
-                        ),
-                        initialOffsetY = { it / 4 }
-                    )
-                ) {
+                    
+                    // Action buttons
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
-                    // Play Button - PROPER TV NAVIGATION
-                    Button(
-                        onClick = { onPlayClick(media) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
-                        ),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier
-                            .height(44.dp)
-                            .then(
-                                if (playButtonFocusRequester != null) {
-                                    Modifier.focusRequester(playButtonFocusRequester)
-                                } else {
-                                    Modifier
-                                }
-                            )
-                            .onFocusChanged { 
-                                playButtonFocused = it.isFocused
-                                if (it.isFocused) {
-                                    isUserInteracting = true
-                                }
-                            }
-                            .onKeyEvent { keyEvent ->
-                                if (keyEvent.type == KeyEventType.KeyDown) {
-                                    when (keyEvent.key) {
-                                        Key.DirectionDown -> {
-                                            onNavigateDown?.invoke()
-                                            true
-                                        }
-                                        Key.DirectionLeft -> {
-                                            // Navigate to previous slide
-                                            if (mediaList.size > 1) {
-                                                val prevIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
-                                                onIndexChange(prevIndex)
-                                                isUserInteracting = true
-                                            }
-                                            true
-                                        }
-                                        Key.DirectionRight -> {
-                                            // Navigate to next slide
-                                            if (mediaList.size > 1) {
-                                                val nextIndex = (currentIndex + 1) % mediaList.size
-                                                onIndexChange(nextIndex)
-                                                isUserInteracting = true
-                                            }
-                                            true
-                                        }
-                                        Key.DirectionUp -> {
-                                            // No navigation up from hero play button
-                                            true
-                                        }
-                                        else -> false
+                        Button(
+                            onClick = { onPlayClick(targetMedia) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (playButtonFocused) Color(0xFFE50914) else Color.White,
+                                contentColor = if (playButtonFocused) Color.White else Color.Black
+                            ),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier
+                                .height(44.dp)
+                                .then(
+                                    if (playButtonFocusRequester != null) {
+                                        Modifier.focusRequester(playButtonFocusRequester)
+                                    } else {
+                                        Modifier
                                     }
-                                } else false
-                            },
-                        elevation = ButtonDefaults.buttonElevation(
-                            defaultElevation = if (playButtonFocused) 6.dp else 2.dp
-                        )
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "▶",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                text = "Play Now",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold
                                 )
+                                .onFocusChanged { 
+                                    playButtonFocused = it.isFocused
+                                    if (it.isFocused) {
+                                        isUserInteracting = true
+                                    }
+                                }
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.key) {
+                                            Key.DirectionDown -> {
+                                                onNavigateDown?.invoke()
+                                                true
+                                            }
+                                            Key.DirectionLeft -> {
+                                                if (mediaList.size > 1) {
+                                                    val prevIndex = if (currentIndex > 0) currentIndex - 1 else mediaList.size - 1
+                                                    onIndexChange(prevIndex)
+                                                    isUserInteracting = true
+                                                }
+                                                true
+                                            }
+                                            Key.DirectionRight -> {
+                                                if (mediaList.size > 1) {
+                                                    val nextIndex = (currentIndex + 1) % mediaList.size
+                                                    onIndexChange(nextIndex)
+                                                    isUserInteracting = true
+                                                }
+                                                true
+                                            }
+                                            Key.DirectionUp -> {
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else false
+                                },
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = if (playButtonFocused) 6.dp else 2.dp
                             )
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "▶",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = "Play Now",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
                         }
                     }
-                    }
                 }
-
             }
         }
         

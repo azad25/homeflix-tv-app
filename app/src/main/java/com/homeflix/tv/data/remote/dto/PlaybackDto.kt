@@ -27,7 +27,11 @@ data class WatchlistItemDto(
     @SerializedName("media_id")
     val mediaId: Int,
     @SerializedName("user_id")
-    val userId: String,
+    val userId: Int,
+    @SerializedName("media_type")
+    val mediaType: String? = null,
+    val notes: String? = null,
+    val priority: Int = 0,
     val media: MediaDto,
     @SerializedName("added_at")
     val addedAt: String
@@ -135,7 +139,29 @@ data class AudioTrackDto(
 
 // Extension functions to convert DTOs to domain models
 fun PlaybackProgressDto.toDomain(): PlaybackProgress {
-    val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+    // Try multiple date formats — API may return different formats
+    fun parseDate(dateStr: String): Date {
+        val formats = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd HH:mm:ss"
+        )
+        for (fmt in formats) {
+            try {
+                return SimpleDateFormat(fmt, Locale.getDefault()).parse(dateStr) ?: continue
+            } catch (_: Exception) { }
+        }
+        // Fallback: strip timezone and try basic format
+        try {
+            val cleaned = dateStr.replace(Regex("[+-]\\d{2}:\\d{2}$"), "Z")
+                .replace(Regex("\\.\\d+"), "")
+            return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).parse(cleaned) ?: Date()
+        } catch (_: Exception) {
+            return Date()
+        }
+    }
     
     return PlaybackProgress(
         id = id,
@@ -144,21 +170,31 @@ fun PlaybackProgressDto.toDomain(): PlaybackProgress {
         progress = progress,
         duration = duration,
         completed = completed,
-        lastWatched = dateFormat.parse(lastWatched) ?: Date(),
-        createdAt = dateFormat.parse(createdAt) ?: Date(),
-        updatedAt = dateFormat.parse(updatedAt) ?: Date()
+        lastWatched = parseDate(lastWatched),
+        createdAt = parseDate(createdAt),
+        updatedAt = parseDate(updatedAt)
     )
 }
 
 fun WatchlistItemDto.toDomain(): WatchlistItem {
-    val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+    val parsedDate = try {
+        val dateStr = addedAt.replace(Regex("[+-]\\d{2}:\\d{2}$"), "Z")
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).parse(dateStr)
+    } catch (e: Exception) {
+        try {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+                .parse(addedAt.substringBefore("+").substringBefore("Z"))
+        } catch (e2: Exception) {
+            Date()
+        }
+    }
     
     return WatchlistItem(
         id = id,
         mediaId = mediaId,
         userId = userId,
         media = media.toDomain(),
-        addedAt = dateFormat.parse(addedAt) ?: Date()
+        addedAt = parsedDate ?: Date()
     )
 }
 

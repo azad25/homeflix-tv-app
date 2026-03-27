@@ -41,6 +41,7 @@ import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.domain.model.MediaType
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
@@ -110,6 +111,7 @@ fun VideoPlayer(
     var duration by remember { mutableStateOf(0L) }
     var showControls by remember { mutableStateOf(true) }
     var isBuffering by remember { mutableStateOf(false) }
+    var isMediaLoading by remember { mutableStateOf(true) } // Loading until media with subtitles is ready
     var bufferPercentage by remember { mutableStateOf(0) }
     var volume by remember { mutableStateOf(1f) }
     var isMuted by remember { mutableStateOf(false) }
@@ -281,14 +283,13 @@ fun VideoPlayer(
             // Fetch external subtitle tracks from API
             var fetchedSubtitles = emptyList<com.homeflix.tv.domain.model.SubtitleTrack>()
             try {
-                streamingRepository.getSubtitleTracks(media.id.toString()).collect { result ->
-                    if (result.isSuccess) {
-                        fetchedSubtitles = result.getOrNull() ?: emptyList()
-                        externalSubtitleTracks = fetchedSubtitles
-                        android.util.Log.d("VideoPlayer", "Found ${fetchedSubtitles.size} external subtitle tracks")
-                    } else {
-                        android.util.Log.w("VideoPlayer", "Failed to fetch subtitles: ${result.exceptionOrNull()?.message}")
-                    }
+                val result = streamingRepository.getSubtitleTracks(media.id.toString()).first()
+                if (result.isSuccess) {
+                    fetchedSubtitles = result.getOrNull() ?: emptyList()
+                    externalSubtitleTracks = fetchedSubtitles
+                    android.util.Log.d("VideoPlayer", "Found ${fetchedSubtitles.size} external subtitle tracks")
+                } else {
+                    android.util.Log.w("VideoPlayer", "Failed to fetch subtitles: ${result.exceptionOrNull()?.message}")
                 }
             } catch (e: Exception) {
                 android.util.Log.w("VideoPlayer", "Error fetching external subtitles", e)
@@ -355,12 +356,9 @@ fun VideoPlayer(
                                 .setSubtitleConfigurations(subtitleConfigs)
                                 .build()
                             
-                            if (shouldResumePlayback && startTime > 0) {
-                                // Use setMediaItems with start position for reliable resume
-                                setMediaItems(listOf(mediaItem), 0, startTime)
-                            } else {
-                                setMediaItem(mediaItem)
-                            }
+                            // ALWAYS use setMediaItem to preserve SubtitleConfigurations
+                            // setMediaItems() can drop subtitle configs in some ExoPlayer versions
+                            setMediaItem(mediaItem)
                             prepare()
                             
                             // Don't seek here - wait for STATE_READY for reliable seeking
@@ -391,11 +389,8 @@ fun VideoPlayer(
                                 .setSubtitleConfigurations(subtitleConfigs)
                                 .build()
                             
-                            if (shouldResumePlayback && startTime > 0) {
-                                setMediaItems(listOf(mediaItem), 0, startTime)
-                            } else {
-                                setMediaItem(mediaItem)
-                            }
+                            // ALWAYS use setMediaItem to preserve SubtitleConfigurations  
+                            setMediaItem(mediaItem)
                             prepare()
                             playWhenReady = true
                         } catch (e: Exception) {
@@ -418,6 +413,40 @@ fun VideoPlayer(
                                     }
                                     
                                     isBuffering = false
+                                    isMediaLoading = false // Media with subtitles is now ready
+                                    
+                                    // Resume seek: since we use setMediaItem() (not setMediaItems with position)
+                                    // to preserve subtitle configs, we seek here on STATE_READY
+                                    if (shouldResumePlayback && startTime > 0 && !resumeSeekAttempted) {
+                                        resumeSeekAttempted = true
+                                        this@apply.seekTo(startTime)
+                                        android.util.Log.d("VideoPlayer", "Resume seek to $startTime ms on STATE_READY")
+                                    }
+                                    
+                                    // Delayed subtitle re-check: ExoPlayer may detect external subtitle
+                                    // tracks after the initial STATE_READY, since they download separately
+                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                        kotlinx.coroutines.delay(2000)
+                                        val currentTracks = this@apply.currentTracks
+                                        val subtitleGroups = currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+                                        android.util.Log.d("VideoPlayer", "Delayed subtitle re-check: ${subtitleGroups.size} groups found")
+                                        if (subtitleGroups.isNotEmpty() && !subtitlesEnabled) {
+                                            availableSubtitleTracks = subtitleGroups
+                                            val firstGroup = subtitleGroups.first()
+                                            if (firstGroup.length > 0) {
+                                                val trackGroup = firstGroup.mediaTrackGroup
+                                                newTrackSelector.parameters = newTrackSelector.parameters.buildUpon()
+                                                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                                                    .setOverrideForType(
+                                                        androidx.media3.common.TrackSelectionOverride(trackGroup, listOf(0))
+                                                    )
+                                                    .build()
+                                                subtitlesEnabled = true
+                                                currentSubtitleTrack = 0
+                                                android.util.Log.d("VideoPlayer", "Subtitles enabled via delayed re-check")
+                                            }
+                                        }
+                                    }
                                 }
                                 Player.STATE_ENDED -> {
                                     // Save progress before handling episode end
@@ -643,13 +672,13 @@ fun VideoPlayer(
                         
                         // Configure subtitle styling
                         subtitleView?.apply {
-                            // Reduce subtitle text size
-                            setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f) // Smaller text
+                            // Slightly larger bold subtitle text
+                            setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 18f)
                             
                             // Remove black background and set transparent
                             setBackgroundColor(android.graphics.Color.TRANSPARENT)
                             
-                            // Set white text with subtle shadow for better readability
+                            // White bold text with drop shadow for readability
                             setStyle(
                                 androidx.media3.ui.CaptionStyleCompat(
                                     android.graphics.Color.WHITE, // Foreground color (text)
@@ -657,7 +686,7 @@ fun VideoPlayer(
                                     android.graphics.Color.TRANSPARENT, // Window color (transparent)
                                     androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW, // Edge type
                                     android.graphics.Color.BLACK, // Edge color (shadow)
-                                    android.graphics.Typeface.DEFAULT // Typeface
+                                    android.graphics.Typeface.DEFAULT_BOLD // Bold typeface
                                 )
                             )
                         }
@@ -1007,10 +1036,12 @@ fun VideoPlayer(
                 }
             }
             
-            // Netflix-style red buffering indicator - Clean loader on top of everything
-            if (isBuffering) {
+            // Netflix-style loading indicator - shows during initial load AND buffering
+            if (isMediaLoading || isBuffering) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(if (isMediaLoading) Color.Black else Color.Transparent),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(

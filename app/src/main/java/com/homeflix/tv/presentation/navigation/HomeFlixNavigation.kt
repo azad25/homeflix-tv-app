@@ -9,6 +9,7 @@ import androidx.media3.common.util.UnstableApi
 import com.homeflix.tv.presentation.screens.browse.BrowseScreen
 import com.homeflix.tv.presentation.screens.details.DetailsScreen
 import com.homeflix.tv.presentation.screens.home.NetflixHomeScreen
+import com.homeflix.tv.presentation.screens.mylist.MyListScreen
 import com.homeflix.tv.presentation.screens.player.VideoPlayerScreen
 import com.homeflix.tv.presentation.screens.search.SearchScreen
 import com.homeflix.tv.presentation.screens.tvshows.TvShowsScreen
@@ -38,6 +39,10 @@ fun HomeFlixNavigation(
         
         composable(Screen.TvShows.route) {
             TvShowsScreen(navController = navController)
+        }
+        
+        composable(Screen.MyList.route) {
+            MyListScreen(navController = navController)
         }
         
         composable(
@@ -108,6 +113,7 @@ sealed class Screen(val route: String) {
     }
     object Search : Screen("search")
     object TvShows : Screen("tv-shows")
+    object MyList : Screen("my-list")
     object TvSeriesDetails : Screen("tv-series/{seriesId}") {
         fun createRoute(seriesId: String) = "tv-series/$seriesId"
         val arguments = listOf(

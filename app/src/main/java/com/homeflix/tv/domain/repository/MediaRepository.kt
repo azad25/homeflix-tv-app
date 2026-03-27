@@ -63,6 +63,13 @@ interface MediaRepository {
     suspend fun getGenreRecommendations(limit: Int = 25): retrofit2.Response<List<com.homeflix.tv.data.remote.dto.MediaDto>>
     
     // Playback methods
+    suspend fun getPlaybackProgress(mediaId: String): Result<PlaybackProgress?>
     suspend fun getContinueWatching(): retrofit2.Response<List<com.homeflix.tv.data.remote.dto.MediaDto>>
     suspend fun getRecentlyWatched(): retrofit2.Response<List<com.homeflix.tv.data.remote.dto.MediaDto>>
+    
+    // My List methods
+    suspend fun getMyList(): Result<List<WatchlistItem>>
+    suspend fun checkMyList(mediaId: String): Result<Boolean>
+    suspend fun addToMyList(mediaId: String): Result<Unit>
+    suspend fun removeFromMyList(mediaId: String): Result<Unit>
 }

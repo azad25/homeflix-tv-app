@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
@@ -23,7 +24,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 
 data class NavItem(
     val icon: ImageVector,
@@ -46,6 +46,7 @@ fun NetflixSideNavigation(
         NavItem(Icons.Default.Search, "search", "Search"),
         NavItem(Icons.Default.Home, "home", "Home"),
         NavItem(Icons.Default.List, "browse", "Browse Movies"),
+        NavItem(Icons.Default.BookmarkBorder, "my-list", "My List"),
         NavItem(Icons.Default.Tv, "tv-shows", "TV Shows")
     )
     
@@ -64,9 +65,7 @@ fun NetflixSideNavigation(
                 item = item,
                 isSelected = selectedRoute == item.route,
                 onClick = { onNavigate(item.route) },
-                onNavigateRight = onNavigateToContent,
-                // Focus the home icon (middle one) when sidebar is focused
-                autoFocus = item.route == selectedRoute
+                onNavigateRight = onNavigateToContent
             )
             if (index < navItems.size - 1) {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -83,8 +82,7 @@ private fun NetflixNavIcon(
     item: NavItem,
     isSelected: Boolean,
     onClick: () -> Unit,
-    onNavigateRight: (() -> Unit)? = null,
-    autoFocus: Boolean = false
+    onNavigateRight: (() -> Unit)? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
@@ -95,18 +93,6 @@ private fun NetflixNavIcon(
         animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
         label = "nav_icon_scale"
     )
-    
-    // Auto-focus this icon when requested
-    LaunchedEffect(autoFocus) {
-        if (autoFocus) {
-            delay(100) // Small delay to ensure UI is ready
-            try {
-                focusRequester.requestFocus()
-            } catch (e: Exception) {
-                // Ignore focus errors
-            }
-        }
-    }
     
     Box(
         modifier = Modifier

@@ -153,6 +153,27 @@ class MediaRepository @Inject constructor(
     override suspend fun getGenreRecommendations(limit: Int) = apiService.getGenreRecommendations(limit)
     
     // Playback methods matching web frontend
+    override suspend fun getPlaybackProgress(mediaId: String): Result<com.homeflix.tv.domain.model.PlaybackProgress?> {
+        return try {
+            val response = apiService.getPlaybackProgress(mediaId)
+            if (response.isSuccessful) {
+                val dto = response.body()
+                if (dto != null) {
+                    Result.success(dto.toDomain())
+                } else {
+                    Result.success(null)
+                }
+            } else if (response.code() == 404) {
+                // No progress found — not an error
+                Result.success(null)
+            } else {
+                Result.failure(Exception("Failed to get playback progress: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.w("MediaRepository", "Error fetching playback progress for $mediaId", e)
+            Result.success(null) // Fallback to no progress
+        }
+    }
     override suspend fun getContinueWatching() = apiService.getContinueWatching()
     override suspend fun getRecentlyWatched() = apiService.getRecentlyWatched()
     
@@ -473,6 +494,72 @@ class MediaRepository @Inject constructor(
         } catch (e: Exception) {
             Log.e("MediaRepository", "getTvSeriesEpisodes error", e)
             emptyList()
+        }
+    }
+    
+    // My List methods
+    override suspend fun getMyList(): Result<List<com.homeflix.tv.domain.model.WatchlistItem>> {
+        return try {
+            val response = apiService.getMyList()
+            if (response.isSuccessful) {
+                val items = response.body()?.map { it.toDomain() } ?: emptyList()
+                Log.d("MediaRepository", "getMyList success: ${items.size} items")
+                Result.success(items)
+            } else {
+                Log.e("MediaRepository", "getMyList failed: ${response.code()} - ${response.message()}")
+                Result.failure(Exception("Failed to fetch my list: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "getMyList error", e)
+            Result.failure(e)
+        }
+    }
+    
+    override suspend fun checkMyList(mediaId: String): Result<Boolean> {
+        return try {
+            val response = apiService.checkMyList(mediaId)
+            if (response.isSuccessful) {
+                Result.success(response.body() ?: false)
+            } else if (response.code() == 404) {
+                Result.success(false)
+            } else {
+                Result.failure(Exception("Failed to check my list: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "checkMyList error", e)
+            Result.failure(e)
+        }
+    }
+    
+    override suspend fun addToMyList(mediaId: String): Result<Unit> {
+        return try {
+            val response = apiService.addToMyList(mediaId)
+            if (response.isSuccessful) {
+                Log.d("MediaRepository", "addToMyList success: $mediaId")
+                Result.success(Unit)
+            } else {
+                Log.e("MediaRepository", "addToMyList failed: ${response.code()}")
+                Result.failure(Exception("Failed to add to my list: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "addToMyList error", e)
+            Result.failure(e)
+        }
+    }
+    
+    override suspend fun removeFromMyList(mediaId: String): Result<Unit> {
+        return try {
+            val response = apiService.removeFromMyList(mediaId)
+            if (response.isSuccessful) {
+                Log.d("MediaRepository", "removeFromMyList success: $mediaId")
+                Result.success(Unit)
+            } else {
+                Log.e("MediaRepository", "removeFromMyList failed: ${response.code()}")
+                Result.failure(Exception("Failed to remove from my list: ${response.code()}"))
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "removeFromMyList error", e)
+            Result.failure(e)
         }
     }
 }

@@ -17,7 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.focusRequester
@@ -52,7 +52,8 @@ fun ContinueWatchingRow(
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
     onNavigateUp: (() -> Unit)? = null,
-    onNavigateDown: (() -> Unit)? = null
+    onNavigateDown: (() -> Unit)? = null,
+    mediaTypeFilter: Set<com.homeflix.tv.domain.model.MediaType>? = setOf(com.homeflix.tv.domain.model.MediaType.MOVIE)
 ) {
     if (continueWatchingItems.isNullOrEmpty()) {
         return
@@ -67,8 +68,8 @@ fun ContinueWatchingRow(
                 !item.media.title.isNullOrBlank() &&
                 item.progress >= 0f &&
                 item.progress <= 1f &&
-                // STRICT FILTER: Only show movies, exclude all TV episodes
-                item.media.type == com.homeflix.tv.domain.model.MediaType.MOVIE
+                // Filter by media type if specified, otherwise show all
+                (mediaTypeFilter == null || item.media.type in mediaTypeFilter)
             } catch (e: Exception) {
                 false
             }
@@ -143,7 +144,7 @@ private fun ContinueWatchingCard(
         modifier = modifier
             .width(300.dp)
             .height(170.dp)
-            .scale(scale)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }

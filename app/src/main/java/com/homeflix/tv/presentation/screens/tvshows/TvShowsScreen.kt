@@ -1,6 +1,7 @@
 package com.homeflix.tv.presentation.screens.tvshows
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,7 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -68,9 +69,10 @@ fun TvShowsScreen(
         if (uiState is TvShowsUiState.Success) {
             delay(100)
             try {
-                // Scroll to top first, then request focus
-                scrollState.scrollToItem(0)
-                // Don't auto-request focus on hero button to avoid unwanted scrolling
+                contentFocusRequester.requestFocus()
+                // Scroll back to top AFTER focus to keep hero slider visible
+                delay(150)
+                scrollState.scrollToItem(0, 0)
             } catch (_: Exception) {}
         }
     }
@@ -112,7 +114,7 @@ fun TvShowsScreen(
                     )
                 )
                 Text(
-                    text = "Latest series first • Sorted by recently added",
+                    text = "Latest TV Shows",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = TextSecondary
                     ),
@@ -170,7 +172,8 @@ fun TvShowsScreen(
                 is TvShowsUiState.Success -> {
                     LazyColumn(
                         state = scrollState,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        userScrollEnabled = true
                     ) {
                         // Hero slider section for featured series
                         if (currentState.featuredSeries.isNotEmpty()) {
@@ -214,7 +217,11 @@ fun TvShowsScreen(
                                     },
                                     onInfo = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                    }
+                                    },
+                                    mediaTypeFilter = setOf(
+                                        com.homeflix.tv.domain.model.MediaType.EPISODE,
+                                        com.homeflix.tv.domain.model.MediaType.TV_SHOW
+                                    )
                                 )
                             }
                         }
@@ -249,11 +256,10 @@ private fun TvShowsHeroSlider(
     if (featuredSeries.isEmpty()) return
     
     var currentIndex by remember { mutableStateOf(0) }
-    val currentSeries = featuredSeries[currentIndex]
     
-    // Auto-slide every 6 seconds
+    // Auto-slide every 10 seconds
     LaunchedEffect(currentIndex) {
-        delay(6000)
+        delay(10000)
         currentIndex = (currentIndex + 1) % featuredSeries.size
     }
     
@@ -262,132 +268,150 @@ private fun TvShowsHeroSlider(
             .fillMaxWidth()
             .height(400.dp)
     ) {
-        // Backdrop image
-        AsyncImage(
-            model = ApiUtils.getSeriesBackdropUrl(currentSeries),
-            contentDescription = currentSeries.title,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-        
-        // Gradient overlays
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.9f),
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.4f)
+        // Netflix-style unified slide transition
+        Crossfade(
+            targetState = currentIndex,
+            animationSpec = tween(durationMillis = 1500),
+            label = "tvshows_hero_crossfade"
+        ) { targetIndex ->
+            val targetSeries = featuredSeries.getOrElse(targetIndex) { featuredSeries[0] }
+            
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Backdrop image
+                AsyncImage(
+                    model = ApiUtils.getSeriesBackdropUrl(targetSeries),
+                    contentDescription = targetSeries.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                
+                // Gradient overlays
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.9f),
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.4f)
+                                )
+                            )
                         )
-                    )
                 )
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.8f)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.8f)
+                                ),
+                                startY = 300f
+                            )
+                        )
+                )
+                
+                // Staggered content reveal
+                val contentVisible = remember { mutableStateOf(false) }
+                LaunchedEffect(targetSeries.id) {
+                    contentVisible.value = false
+                    delay(300)
+                    contentVisible.value = true
+                }
+                
+                val contentAlpha by animateFloatAsState(
+                    targetValue = if (contentVisible.value) 1f else 0f,
+                    animationSpec = tween(durationMillis = 800),
+                    label = "tvshows_content_alpha"
+                )
+                
+                // Content
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 48.dp, end = 200.dp, bottom = 32.dp, top = 32.dp)
+                        .graphicsLayer { alpha = contentAlpha },
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Series Logo with text fallback
+                    var logoLoaded by remember(targetSeries.id) { mutableStateOf(false) }
+                    
+                    if (!logoLoaded) {
+                        Text(
+                            text = targetSeries.title,
+                            style = MaterialTheme.typography.displaySmall.copy(
+                                fontWeight = FontWeight.Black,
+                                color = TextPrimary
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    
+                    AsyncImage(
+                        model = ApiUtils.getSeriesLogoUrl(targetSeries.id),
+                        contentDescription = "${targetSeries.title} logo",
+                        modifier = Modifier
+                            .heightIn(max = 80.dp)
+                            .fillMaxWidth(0.4f),
+                        contentScale = ContentScale.Fit,
+                        onSuccess = { logoLoaded = true },
+                        onError = { logoLoaded = false }
+                    )
+                    
+                    // Metadata row
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        targetSeries.year?.takeIf { it > 0 }?.let { year ->
+                            Text(
+                                text = year.toString(),
+                                style = MaterialTheme.typography.titleMedium.copy(color = TextSecondary)
+                            )
+                        }
+                    }
+                    
+                    // Description
+                    targetSeries.description?.let { desc ->
+                        Text(
+                            text = desc,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = TextPrimary.copy(alpha = 0.9f)
+                            ),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(0.7f)
+                        )
+                    }
+                    
+                    // View Details button
+                    var viewDetailsFocused by remember { mutableStateOf(false) }
+                    Button(
+                        onClick = { onSeriesClick(targetSeries) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (viewDetailsFocused) Color(0xFFE50914) else Color.White,
+                            contentColor = if (viewDetailsFocused) Color.White else Color.Black
                         ),
-                        startY = 300f
-                    )
-                )
-        )
-        
-        // Content
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 48.dp, end = 200.dp, bottom = 32.dp, top = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Series Logo with text fallback
-            var logoLoaded by remember(currentSeries.id) { mutableStateOf(false) }
-            
-            if (!logoLoaded) {
-                Text(
-                    text = currentSeries.title,
-                    style = MaterialTheme.typography.displaySmall.copy(
-                        fontWeight = FontWeight.Black,
-                        color = TextPrimary
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            
-            AsyncImage(
-                model = ApiUtils.getSeriesLogoUrl(currentSeries.id),
-                contentDescription = "${currentSeries.title} logo",
-                modifier = Modifier
-                    .heightIn(max = 80.dp)
-                    .fillMaxWidth(0.4f),
-                contentScale = ContentScale.Fit,
-                onSuccess = { logoLoaded = true },
-                onError = { logoLoaded = false }
-            )
-            
-            // Metadata row
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                currentSeries.year?.let { year ->
-                    Text(
-                        text = year.toString(),
-                        style = MaterialTheme.typography.titleMedium.copy(color = TextSecondary)
-                    )
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.height(44.dp)
+                            .then(
+                                if (contentFocusRequester != null) {
+                                    Modifier.focusRequester(contentFocusRequester)
+                                } else Modifier
+                            )
+                            .onFocusChanged { viewDetailsFocused = it.isFocused }
+                    ) {
+                        Text(
+                            text = "View Details",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    }
                 }
-                if (currentSeries.rating > 0) {
-                    Text(
-                        text = "★ ${String.format("%.1f", currentSeries.rating)}",
-                        style = MaterialTheme.typography.titleMedium.copy(color = Color(0xFFFFD700))
-                    )
-                }
-                Text(
-                    text = "${currentSeries.totalSeasons} Season${if (currentSeries.totalSeasons != 1) "s" else ""}",
-                    style = MaterialTheme.typography.titleMedium.copy(color = TextSecondary)
-                )
-            }
-            
-            // Description
-            currentSeries.description?.let { desc ->
-                Text(
-                    text = desc,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = TextPrimary.copy(alpha = 0.9f)
-                    ),
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(0.7f)
-                )
-            }
-            
-            // View Details button
-            Button(
-                onClick = { onSeriesClick(currentSeries) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = Color.Black
-                ),
-                shape = RoundedCornerShape(4.dp),
-                modifier = Modifier.height(44.dp)
-                    .then(
-                        if (contentFocusRequester != null) {
-                            Modifier.focusRequester(contentFocusRequester)
-                        } else Modifier
-                    )
-            ) {
-                Text(
-                    text = "View Details",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
             }
         }
         
@@ -528,7 +552,7 @@ private fun TvSeriesCard(
                 isFocused = focusState.isFocused
             }
             .focusable()
-            .scale(scale)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown &&
                     (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
@@ -634,96 +658,7 @@ private fun TvSeriesCard(
                     )
                 }
                 
-                // Netflix-style overlay on focus
-                if (isFocused) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Color.Black.copy(alpha = 0.7f),
-                                RoundedCornerShape(6.dp)
-                            )
-                    ) {
-                        // Play button
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .size(48.dp)
-                                .background(
-                                    NetflixRed,
-                                    RoundedCornerShape(24.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "▶",
-                                color = Color.White,
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-                        }
-                        
-                        // Series info at bottom
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(8.dp)
-                        ) {
-                            Text(
-                                text = series.title,
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                ),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(top = 4.dp)
-                            ) {
-                                series.year?.let { year ->
-                                    Text(
-                                        text = year.toString(),
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = TextSecondary
-                                        )
-                                    )
-                                }
-                                
-                                if (series.rating > 0) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Star,
-                                            contentDescription = null,
-                                            tint = Color(0xFFFFD700),
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Text(
-                                            text = String.format("%.1f", series.rating),
-                                            style = MaterialTheme.typography.bodySmall.copy(
-                                                color = TextSecondary
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                            
-                            // Seasons info
-                            Text(
-                                text = "${series.totalSeasons} Season${if (series.totalSeasons != 1) "s" else ""}",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = TextSecondary
-                                ),
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-                    }
-                }
+
             }
         }
     }

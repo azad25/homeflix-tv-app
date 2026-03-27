@@ -21,7 +21,7 @@ data class PlaybackProgress(
 data class WatchlistItem(
     val id: Int,
     val mediaId: Int,
-    val userId: String,
+    val userId: Int,
     val media: Media,
     val addedAt: Date
 ) : Parcelable

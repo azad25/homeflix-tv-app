@@ -314,30 +314,31 @@ fun SearchScreen(
                             }
                         }
                         
-                        is SearchUiState.Error -> {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Error: ${currentState.message}",
-                                    color = Color.White,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                        
                         is SearchUiState.Success -> {
                             if (currentState.results.isEmpty()) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
+                                // No results - show Top Searches instead of error message
+                                Text(
+                                    text = "Top Searches",
+                                    color = Color.White,
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 24.dp)
+                                )
+                                
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(4),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier.fillMaxSize()
                                 ) {
-                                    Text(
-                                        text = "No results found for \"$searchQuery\"",
-                                        color = Color.White,
-                                        textAlign = TextAlign.Center
-                                    )
+                                    items(topSearches.take(8)) { media ->
+                                        TopSearchCard(
+                                            media = media,
+                                            onClick = {
+                                                navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                            }
+                                        )
+                                    }
                                 }
                             } else {
                                 LazyVerticalGrid(
@@ -361,7 +362,30 @@ fun SearchScreen(
                         }
                         
                         else -> {
-                            // Initial state - show top searches
+                            // Initial state or Error - show Top Searches (default content)
+                            Text(
+                                text = "Top Searches",
+                                color = Color.White,
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 24.dp)
+                            )
+                            
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(4),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(topSearches.take(8)) { media ->
+                                    TopSearchCard(
+                                        media = media,
+                                        onClick = {
+                                            navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }

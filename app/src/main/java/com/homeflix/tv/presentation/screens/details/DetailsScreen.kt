@@ -35,6 +35,9 @@ import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.focus.onFocusChanged
 
 @Composable
 fun DetailsScreen(
@@ -43,21 +46,37 @@ fun DetailsScreen(
     viewModel: DetailsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isInMyList by viewModel.isInMyList.collectAsState()
+    val myListLoading by viewModel.myListLoading.collectAsState()
     val contentFocusRequester = remember { FocusRequester() }
     val scrollState = rememberLazyListState()
+    
+    // Focus counter — increments when returning from player to re-trigger focus
+    var focusCounter by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
+    
+    LaunchedEffect(lifecycleState) {
+        if (lifecycleState == Lifecycle.State.RESUMED) {
+            focusCounter++
+            // Re-fetch details to get updated watch progress after closing player
+            if (focusCounter > 1) {
+                viewModel.loadMediaDetails(mediaId)
+            }
+        }
+    }
     
     LaunchedEffect(mediaId) {
         viewModel.loadMediaDetails(mediaId)
     }
     
-    // Auto-focus content when loaded, but keep scroll at top
-    LaunchedEffect(uiState) {
+    // Auto-focus content when loaded or when returning from player
+    LaunchedEffect(uiState, focusCounter) {
         if (uiState is DetailsUiState.Success) {
             delay(400)
             try {
                 contentFocusRequester.requestFocus()
-                // Scroll back to top after focus — focusing the play button
-                // causes LazyColumn to auto-scroll down to make it visible
+                // Scroll back to top after focus
                 delay(100)
                 scrollState.scrollToItem(0)
             } catch (_: Exception) {}
@@ -320,40 +339,56 @@ fun DetailsScreen(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     // Continue Watching or Play Button based on progress
-                                    if (currentState.watchProgress != null && currentState.watchProgress > 0.05f) {
-                                        // Continue Watching Button (primary)
-                                        Button(
-                                            onClick = { 
-                                                val startTimeMs = (currentState.progressSeconds ?: 0L) * 1000
-                                                navController.navigate(Screen.VideoPlayer.createRoute(media.id, startTime = startTimeMs))
-                                            },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = Color.White,
-                                                contentColor = Color.Black
-                                            ),
-                                            shape = RoundedCornerShape(4.dp),
-                                            modifier = Modifier.height(44.dp)
-                                                .focusRequester(contentFocusRequester)
-                                        ) {
-                                            Text(
-                                                text = "▶ Continue Watching",
-                                                style = MaterialTheme.typography.titleMedium.copy(
-                                                    fontWeight = FontWeight.Bold
+                                    if (currentState.watchProgress != null && currentState.watchProgress > 0.001f) {
+                                        // Continue Watching Button with progress bar (primary)
+                                        var continueWatchingFocused by remember { mutableStateOf(false) }
+                                        Column {
+                                            Button(
+                                                onClick = { 
+                                                    val startTimeMs = (currentState.progressSeconds ?: 0L) * 1000
+                                                    navController.navigate(Screen.VideoPlayer.createRoute(media.id, startTime = startTimeMs))
+                                                },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (continueWatchingFocused) NetflixRed else Color.White,
+                                                    contentColor = if (continueWatchingFocused) Color.White else Color.Black
+                                                ),
+                                                shape = RoundedCornerShape(4.dp),
+                                                modifier = Modifier.height(44.dp)
+                                                    .focusRequester(contentFocusRequester)
+                                                    .onFocusChanged { continueWatchingFocused = it.isFocused }
+                                            ) {
+                                                Text(
+                                                    text = "▶ Continue Watching",
+                                                    style = MaterialTheme.typography.titleMedium.copy(
+                                                        fontWeight = FontWeight.Bold
+                                                    )
                                                 )
+                                            }
+                                            // Progress bar showing watch completion
+                                            LinearProgressIndicator(
+                                                progress = { currentState.watchProgress ?: 0f },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(3.dp)
+                                                    .clip(RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp)),
+                                                color = NetflixRed,
+                                                trackColor = Color.Gray.copy(alpha = 0.3f)
                                             )
                                         }
                                         
                                         // Play from Beginning Button (secondary)
+                                        var playFromStartFocused by remember { mutableStateOf(false) }
                                         OutlinedButton(
                                             onClick = { 
                                                 navController.navigate(Screen.VideoPlayer.createRoute(media.id, forceStartFromBeginning = true))
                                             },
                                             colors = ButtonDefaults.outlinedButtonColors(
-                                                contentColor = TextPrimary,
-                                                containerColor = Color.Black.copy(alpha = 0.5f)
+                                                contentColor = if (playFromStartFocused) Color.White else TextPrimary,
+                                                containerColor = if (playFromStartFocused) NetflixRed else Color.Black.copy(alpha = 0.5f)
                                             ),
                                             shape = RoundedCornerShape(4.dp),
                                             modifier = Modifier.height(44.dp)
+                                                .onFocusChanged { playFromStartFocused = it.isFocused }
                                         ) {
                                             Text(
                                                 text = "↻ Play from Beginning",
@@ -362,17 +397,19 @@ fun DetailsScreen(
                                         }
                                     } else {
                                         // Regular Play Button (no progress)
+                                        var playFocused by remember { mutableStateOf(false) }
                                         Button(
                                             onClick = { 
                                                 navController.navigate(Screen.VideoPlayer.createRoute(media.id))
                                             },
                                             colors = ButtonDefaults.buttonColors(
-                                                containerColor = Color.White,
-                                                contentColor = Color.Black
+                                                containerColor = if (playFocused) NetflixRed else Color.White,
+                                                contentColor = if (playFocused) Color.White else Color.Black
                                             ),
                                             shape = RoundedCornerShape(4.dp),
                                             modifier = Modifier.height(44.dp)
                                                 .focusRequester(contentFocusRequester)
+                                                .onFocusChanged { playFocused = it.isFocused }
                                         ) {
                                             Text(
                                                 text = "▶ Play",
@@ -382,22 +419,27 @@ fun DetailsScreen(
                                             )
                                         }
                                         
-                                        // Add to List Button
-                                        OutlinedButton(
-                                            onClick = { 
-                                                // TODO: Add to watchlist
-                                            },
-                                            colors = ButtonDefaults.outlinedButtonColors(
-                                                contentColor = TextPrimary,
-                                                containerColor = Color.Black.copy(alpha = 0.5f)
-                                            ),
-                                            shape = RoundedCornerShape(4.dp),
-                                            modifier = Modifier.height(44.dp)
-                                        ) {
-                                            Text(
-                                                text = "+ My List",
-                                                style = MaterialTheme.typography.titleMedium
-                                            )
+                                        // Add to List Button — only show if NOT in My List
+                                        if (!isInMyList) {
+                                            var myListFocused by remember { mutableStateOf(false) }
+                                            OutlinedButton(
+                                                onClick = { 
+                                                    viewModel.addToMyList(media.id.toString())
+                                                },
+                                                colors = ButtonDefaults.outlinedButtonColors(
+                                                    contentColor = if (myListFocused) Color.White else TextPrimary,
+                                                    containerColor = if (myListFocused) NetflixRed else Color.Black.copy(alpha = 0.5f)
+                                                ),
+                                                shape = RoundedCornerShape(4.dp),
+                                                modifier = Modifier.height(44.dp)
+                                                    .onFocusChanged { myListFocused = it.isFocused },
+                                                enabled = !myListLoading
+                                            ) {
+                                                Text(
+                                                    text = if (myListLoading) "Adding..." else "+ My List",
+                                                    style = MaterialTheme.typography.titleMedium
+                                                )
+                                            }
                                         }
                                     }
                                 }

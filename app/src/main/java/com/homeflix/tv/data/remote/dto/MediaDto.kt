@@ -159,6 +159,7 @@ fun MediaDto.toDomain(): Media {
         type = when (type.lowercase()) {
             "movie" -> MediaType.MOVIE
             "episode" -> MediaType.EPISODE
+            "tv", "series", "tv_show" -> MediaType.TV_SHOW
             else -> MediaType.MOVIE
         },
         filePath = filePath,
