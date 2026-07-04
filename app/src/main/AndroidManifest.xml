@@ -31,11 +31,15 @@
         tools:targetApi="31">
 
         <!-- Main TV Activity -->
+        <!-- clearTaskOnLaunch: relaunching from the TV launcher always starts
+             fresh at the home screen (never resumes a stale player screen) -->
         <activity
             android:name=".presentation.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.HomeFlixTV.NoActionBar"
-            android:screenOrientation="landscape">
+            android:screenOrientation="landscape"
+            android:launchMode="singleTask"
+            android:clearTaskOnLaunch="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />

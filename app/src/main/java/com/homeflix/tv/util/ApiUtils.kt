@@ -6,7 +6,9 @@ import com.homeflix.tv.domain.model.Media
 object ApiUtils {
     
     fun getBaseUrl(): String {
-        return BuildConfig.BASE_URL.removeSuffix("/")
+        // Runtime server selection: LAN IP when reachable, domain otherwise.
+        // Keeps image/stream URLs on the same server as API calls.
+        return ServerConfig.activeApiBase
     }
     
     /**

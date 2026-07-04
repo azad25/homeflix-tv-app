@@ -116,7 +116,11 @@ fun VideoPlayer(
     var bufferPercentage by remember { mutableStateOf(0) }
     var volume by remember { mutableStateOf(1f) }
     var isMuted by remember { mutableStateOf(false) }
-    
+
+    // Settings drawer (speed / audio / subtitles) - D-pad navigable
+    var showSettings by remember { mutableStateOf(false) }
+    var playbackSpeed by remember { mutableStateOf(1.0f) }
+
     // Resume seeking state - persists across recompositions, resets for new media
     var resumeSeekAttempted by remember(media.id) { mutableStateOf(false) }
     val shouldResumePlayback = remember(media.id) { !forceStartFromBeginning && startTime > 0 }
@@ -676,6 +680,28 @@ fun VideoPlayer(
         }
     }
 
+    // LIFECYCLE GUARD: the app must never keep playing in the background.
+    // HOME button / screen off -> pause immediately and persist progress.
+    val playerLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(playerLifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE,
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    exoPlayer?.let { player ->
+                        if (player.isPlaying) {
+                            savePlaybackProgress()
+                            player.pause()
+                        }
+                    }
+                }
+                else -> {}
+            }
+        }
+        playerLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { playerLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     if (isVisible) {
         Box(
             modifier = modifier
@@ -730,14 +756,23 @@ fun VideoPlayer(
                                 true
                             }
                             Key.DirectionDown -> {
-                                // Toggle subtitles on DOWN key
-                                toggleSubtitles()
+                                // Reveal controls; focus traversal handles the rest
                                 showControls = true
+                                false
+                            }
+                            Key.Menu -> {
+                                // Remote MENU key opens the settings drawer
+                                showControls = true
+                                showSettings = true
                                 true
                             }
                             Key.Back, Key.Escape -> {
-                                // Close player with progress saving
-                                closePlayerWithProgressSave()
+                                if (showSettings) {
+                                    showSettings = false
+                                } else {
+                                    // Close player with progress saving
+                                    closePlayerWithProgressSave()
+                                }
                                 true
                             }
                             Key.M -> {
@@ -802,344 +837,183 @@ fun VideoPlayer(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Custom TV Controls (Netflix-style)
+            // ── NETFLIX-STYLE CONTROLS ─────────────────────────────────
+            // Top-left title, bottom red scrubber with thumb + remaining
+            // time, and a centered option row (Speed / Audio & Subtitles
+            // open the D-pad settings drawer).
             if (showControls) {
+                // Netflix gradient: subtle top, strong bottom
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.3f))
-                ) {
-                    // Top bar with title and close button
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = media.title,
-                            color = Color.White,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
+                        .background(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.55f),
+                                    Color.Transparent,
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.92f)
+                                )
+                            )
                         )
+                )
 
-                        // Close button removed - use Back/Escape key to close
+                // Title - small, top-left like Netflix
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(horizontal = 48.dp, vertical = 30.dp)
+                ) {
+                    Text(
+                        text = media.title,
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (media.type == MediaType.EPISODE && media.seasonNumber != null && media.episodeNumber != null) {
+                        Text(
+                            text = "S${media.seasonNumber}:E${media.episodeNumber}",
+                            color = Color.White.copy(alpha = 0.75f),
+                            fontSize = 15.sp
+                        )
+                    }
+                }
+
+                // Bottom control stack
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 48.dp)
+                        .padding(bottom = 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    // ── Scrubber: LEFT/RIGHT seeks, CENTER play/pause ──
+                    var scrubberFocused by remember { mutableStateOf(false) }
+                    val progress = if (duration > 0) (currentPosition.toFloat() / duration).coerceIn(0f, 1f) else 0f
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(24.dp)
+                                .focusRequester(playPauseFocusRequester)
+                                .onFocusChanged { scrubberFocused = it.isFocused }
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.key) {
+                                            Key.DirectionLeft -> {
+                                                exoPlayer?.let { p -> p.seekTo((p.currentPosition - 10_000).coerceAtLeast(0)) }
+                                                showControls = true
+                                                true
+                                            }
+                                            Key.DirectionRight -> {
+                                                exoPlayer?.let { p -> p.seekTo((p.currentPosition + 10_000).coerceAtMost(p.duration)) }
+                                                showControls = true
+                                                true
+                                            }
+                                            Key.DirectionCenter, Key.Enter -> {
+                                                exoPlayer?.let { p -> if (p.isPlaying) p.pause() else p.play() }
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else false
+                                }
+                                .focusable(),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            // Track
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(if (scrubberFocused) 6.dp else 4.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(Color.White.copy(alpha = 0.3f))
+                            )
+                            // Red fill
+                            Box(
+                                Modifier
+                                    .fillMaxWidth(progress)
+                                    .height(if (scrubberFocused) 6.dp else 4.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(Color(0xFFE50914))
+                            )
+                            // Thumb (visible when scrubber focused, Netflix style)
+                            if (scrubberFocused) {
+                                Box(
+                                    Modifier
+                                        .align(
+                                            androidx.compose.ui.BiasAlignment(
+                                                horizontalBias = progress * 2f - 1f,
+                                                verticalBias = 0f
+                                            )
+                                        )
+                                        .size(18.dp)
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .background(Color(0xFFE50914))
+                                        .border(2.dp, Color.White, RoundedCornerShape(9.dp))
+                                )
+                            }
+                        }
+                        // Remaining time, right of the bar (Netflix shows -mm:ss)
+                        Text(
+                            text = formatTime((duration - currentPosition).coerceAtLeast(0)),
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
 
-                    // Center controls
+                    // ── Option row: centered like the Netflix TV player ──
                     Row(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(horizontal = 48.dp),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        horizontalArrangement = Arrangement.spacedBy(18.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Seek backward - Netflix style with "10" text
-                        var seekBackFocused by remember { mutableStateOf(false) }
-                        Box(
-                            modifier = Modifier
-                                .focusRequester(seekBackwardFocusRequester)
-                                .focusable()
-                                .onFocusChanged { seekBackFocused = it.isFocused }
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(
-                                    if (seekBackFocused) Color.White.copy(alpha = 0.9f) 
-                                    else Color.Black.copy(alpha = 0.6f)
-                                )
-                                .border(
-                                    width = if (seekBackFocused) 2.dp else 0.dp,
-                                    color = if (seekBackFocused) Color(0xFFE50914) else Color.Transparent,
-                                    shape = RoundedCornerShape(24.dp)
-                                )
-                                .onKeyEvent { keyEvent ->
-                                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                                        exoPlayer?.let { player ->
-                                            val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
-                                            player.seekTo(newPosition)
-                                        }
-                                        true
-                                    } else false
-                                }
-                                .clickable {
-                                    exoPlayer?.let { player ->
-                                        val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
-                                        player.seekTo(newPosition)
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Netflix-style rewind icon with "10"
-                            Box(contentAlignment = Alignment.Center) {
+                        NetflixCircleButton(
+                            icon = {
                                 Icon(
-                                    imageVector = Icons.Rounded.FastRewind,
-                                    contentDescription = "Rewind 10 seconds",
-                                    tint = if (seekBackFocused) Color.Black else Color.White,
-                                    modifier = Modifier.size(24.dp)
+                                    imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (isPlaying) "Pause" else "Play",
+                                    tint = it,
+                                    modifier = Modifier.size(30.dp)
                                 )
-                                Text(
-                                    text = "10",
-                                    color = if (seekBackFocused) Color.Black else Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.offset(y = 1.dp)
-                                )
+                            },
+                            focusRequester = seekBackwardFocusRequester,
+                            onClick = { exoPlayer?.let { p -> if (p.isPlaying) p.pause() else p.play() } }
+                        )
+                        NetflixCircleButton(
+                            icon = {
+                                Icon(Icons.Rounded.FastRewind, "Rewind 10 seconds", tint = it, modifier = Modifier.size(26.dp))
+                            },
+                            onClick = {
+                                exoPlayer?.let { p -> p.seekTo((p.currentPosition - 10_000).coerceAtLeast(0)) }
                             }
-                        }
-
-                        // Play/Pause - Netflix RED circle with white icon
-                        var playPauseFocused by remember { mutableStateOf(false) }
-                        Box(
-                            modifier = Modifier
-                                .focusRequester(playPauseFocusRequester)
-                                .focusable()
-                                .onFocusChanged { playPauseFocused = it.isFocused }
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(Color(0xFFE50914)) // Netflix red
-                                .border(
-                                    width = if (playPauseFocused) 3.dp else 0.dp,
-                                    color = if (playPauseFocused) Color.White else Color.Transparent,
-                                    shape = RoundedCornerShape(28.dp)
-                                )
-                                .onKeyEvent { keyEvent ->
-                                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                                        exoPlayer?.let { player ->
-                                            if (player.isPlaying) {
-                                                player.pause()
-                                            } else {
-                                                player.play()
-                                            }
-                                        }
-                                        true
-                                    } else false
-                                }
-                                .clickable {
-                                    exoPlayer?.let { player ->
-                                        if (player.isPlaying) {
-                                            player.pause()
-                                        } else {
-                                            player.play()
-                                        }
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (isPlaying) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Pause,
-                                    contentDescription = "Pause",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Play",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(28.dp)
-                                )
+                        )
+                        NetflixCircleButton(
+                            icon = {
+                                Icon(Icons.Rounded.FastForward, "Forward 10 seconds", tint = it, modifier = Modifier.size(26.dp))
+                            },
+                            onClick = {
+                                exoPlayer?.let { p -> p.seekTo((p.currentPosition + 10_000).coerceAtMost(p.duration)) }
                             }
-                        }
-
-                        // Seek forward - Netflix style with "10" text
-                        var seekForwardFocused by remember { mutableStateOf(false) }
-                        Box(
-                            modifier = Modifier
-                                .focusRequester(seekForwardFocusRequester)
-                                .focusable()
-                                .onFocusChanged { seekForwardFocused = it.isFocused }
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(
-                                    if (seekForwardFocused) Color.White.copy(alpha = 0.9f) 
-                                    else Color.Black.copy(alpha = 0.6f)
-                                )
-                                .border(
-                                    width = if (seekForwardFocused) 2.dp else 0.dp,
-                                    color = if (seekForwardFocused) Color(0xFFE50914) else Color.Transparent,
-                                    shape = RoundedCornerShape(24.dp)
-                                )
-                                .onKeyEvent { keyEvent ->
-                                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                                        exoPlayer?.let { player ->
-                                            val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
-                                            player.seekTo(newPosition)
-                                        }
-                                        true
-                                    } else false
-                                }
-                                .clickable {
-                                    exoPlayer?.let { player ->
-                                        val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
-                                        player.seekTo(newPosition)
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // Netflix-style forward icon with "10"
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Rounded.FastForward,
-                                    contentDescription = "Forward 10 seconds",
-                                    tint = if (seekForwardFocused) Color.Black else Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Text(
-                                    text = "10",
-                                    color = if (seekForwardFocused) Color.Black else Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.offset(y = 1.dp)
-                                )
-                            }
-                        }
-
-                        // Subtitle toggle - Netflix style with reduced size
-                        if (availableSubtitleTracks.isNotEmpty()) {
-                            var subtitleButtonFocused by remember { mutableStateOf(false) }
-                            
-                            Box(
-                                modifier = Modifier
-                                    .focusRequester(subtitlesFocusRequester)
-                                    .focusable()
-                                    .onFocusChanged { subtitleButtonFocused = it.isFocused }
-                                    .size(48.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(
-                                        when {
-                                            subtitleButtonFocused -> Color.White.copy(alpha = 0.9f)
-                                            subtitlesEnabled -> Color(0xFFE50914).copy(alpha = 0.8f)
-                                            else -> Color.Black.copy(alpha = 0.6f)
-                                        }
-                                    )
-                                    .border(
-                                        width = if (subtitleButtonFocused) 2.dp else 0.dp,
-                                        color = if (subtitleButtonFocused) Color(0xFFE50914) else Color.Transparent,
-                                        shape = RoundedCornerShape(24.dp)
-                                    )
-                                    .onKeyEvent { keyEvent ->
-                                        if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionCenter) {
-                                            toggleSubtitles()
-                                            true
-                                        } else false
-                                    }
-                                    .clickable { toggleSubtitles() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Subtitles,
-                                    contentDescription = if (subtitlesEnabled) "Disable subtitles" else "Enable subtitles",
-                                    tint = when {
-                                        subtitleButtonFocused -> Color.Black
-                                        subtitlesEnabled -> Color.White
-                                        else -> Color.White
-                                    },
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Bottom progress bar and info
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(24.dp)
-                    ) {
-                        // Netflix-style progress bar - thin with small thumb
-                        if (duration > 0) {
-                            val progress = (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
-
-                            // Custom Netflix-style progress bar
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(4.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(Color.White.copy(alpha = 0.3f))
-                            ) {
-                                // Progress fill (Netflix red)
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxHeight()
-                                        .fillMaxWidth(progress)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(Color(0xFFE50914))
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Time info - Netflix style (smaller, subtle)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = formatTime(currentPosition),
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Normal
-                                )
-
-                                Text(
-                                    text = formatTime(duration),
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Normal
-                                )
-                            }
-                        }
-
-                        // Status indicators row
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Empty space where volume indicator was
-                            Spacer(modifier = Modifier.width(1.dp))
-
-                            // Subtitle status indicator
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (availableSubtitleTracks.isNotEmpty()) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Subtitles,
-                                        contentDescription = null,
-                                        tint = if (subtitlesEnabled) Color(0xFFE50914) else Color.White.copy(alpha = 0.5f),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    
-                                    Text(
-                                        text = if (subtitlesEnabled) "ON" else "OFF",
-                                        color = if (subtitlesEnabled) Color(0xFFE50914) else Color.White.copy(alpha = 0.5f),
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                                
-                                // Control hints
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Text(
-                                    text = "HOMEFLIX",
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
+                        )
+                        NetflixPillButton(
+                            label = "Speed (${if (playbackSpeed == playbackSpeed.toInt().toFloat()) "${playbackSpeed.toInt()}" else playbackSpeed.toString()}x)",
+                            onClick = { showSettings = true }
+                        )
+                        NetflixPillButton(
+                            label = "Audio & Subtitles",
+                            focusRequester = subtitlesFocusRequester,
+                            onClick = { showSettings = true }
+                        )
                     }
                 }
             }
-            
+
             // Netflix-style loading indicator - shows during initial load AND buffering
             if (isMediaLoading || isBuffering) {
                 Box(
@@ -1192,7 +1066,164 @@ fun VideoPlayer(
                     }
                 }
             }
+
+            // ── SETTINGS DRAWER: speed / audio / subtitles, D-pad navigable ──
+            if (showSettings) {
+                val speedOptions = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+                val audioGroups = exoPlayer?.currentTracks?.groups
+                    ?.filter { it.type == C.TRACK_TYPE_AUDIO } ?: emptyList()
+
+                val sections = buildList {
+                    add(SettingsSection(
+                        title = "Playback Speed",
+                        options = speedOptions.map { speed ->
+                            SettingsOption(
+                                label = if (speed == 1.0f) "Normal" else "${speed}x",
+                                selected = playbackSpeed == speed,
+                                onSelect = {
+                                    playbackSpeed = speed
+                                    exoPlayer?.setPlaybackSpeed(speed)
+                                }
+                            )
+                        }
+                    ))
+                    if (availableSubtitleTracks.isNotEmpty()) {
+                        add(SettingsSection(
+                            title = "Subtitles",
+                            options = buildList {
+                                add(SettingsOption(
+                                    label = "Off",
+                                    selected = !subtitlesEnabled,
+                                    onSelect = { if (subtitlesEnabled) toggleSubtitles() }
+                                ))
+                                availableSubtitleTracks.forEachIndexed { index, group ->
+                                    val format = group.getTrackFormat(0)
+                                    val label = format.label ?: format.language ?: "Track ${index + 1}"
+                                    add(SettingsOption(
+                                        label = label,
+                                        selected = subtitlesEnabled && currentSubtitleTrack == index,
+                                        onSelect = {
+                                            trackSelector?.let { selector ->
+                                                selector.parameters = selector.parameters.buildUpon()
+                                                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                                                    .setOverrideForType(
+                                                        androidx.media3.common.TrackSelectionOverride(
+                                                            group.mediaTrackGroup, listOf(0)
+                                                        )
+                                                    )
+                                                    .build()
+                                                subtitlesEnabled = true
+                                                userDisabledSubtitles = false
+                                                currentSubtitleTrack = index
+                                            }
+                                        }
+                                    ))
+                                }
+                            }
+                        ))
+                    }
+                    if (audioGroups.size > 1) {
+                        add(SettingsSection(
+                            title = "Audio",
+                            options = audioGroups.mapIndexed { index, group ->
+                                val format = group.getTrackFormat(0)
+                                val label = format.label ?: format.language ?: "Audio ${index + 1}"
+                                SettingsOption(
+                                    label = label,
+                                    selected = group.isSelected,
+                                    onSelect = {
+                                        trackSelector?.let { selector ->
+                                            selector.parameters = selector.parameters.buildUpon()
+                                                .setOverrideForType(
+                                                    androidx.media3.common.TrackSelectionOverride(
+                                                        group.mediaTrackGroup, listOf(0)
+                                                    )
+                                                )
+                                                .build()
+                                        }
+                                    }
+                                )
+                            }
+                        ))
+                    }
+                }
+
+                PlayerSettingsPanel(
+                    sections = sections,
+                    onClose = { showSettings = false }
+                )
+            }
         }
+    }
+}
+
+/**
+ * Netflix-style circular control button: translucent at rest, white on focus.
+ * The icon lambda receives the tint to use.
+ */
+@Composable
+private fun NetflixCircleButton(
+    icon: @Composable (tint: Color) -> Unit,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null
+) {
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .size(52.dp)
+            .clip(RoundedCornerShape(26.dp))
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.14f))
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .onFocusChanged { focused = it.isFocused }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter)
+                ) {
+                    onClick(); true
+                } else false
+            }
+            .focusable()
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        icon(if (focused) Color.Black else Color.White)
+    }
+}
+
+/**
+ * Netflix-style text pill button (e.g. "Speed (1x)", "Audio & Subtitles").
+ */
+@Composable
+private fun NetflixPillButton(
+    label: String,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null
+) {
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.14f))
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .onFocusChanged { focused = it.isFocused }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.DirectionCenter || keyEvent.key == Key.Enter)
+                ) {
+                    onClick(); true
+                } else false
+            }
+            .focusable()
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = if (focused) Color.Black else Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 13.dp)
+        )
     }
 }
 

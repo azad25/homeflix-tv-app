@@ -43,6 +43,7 @@ import com.homeflix.tv.domain.model.MediaType
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.components.ContinueWatchingRow
 import com.homeflix.tv.presentation.navigation.Screen
+import com.homeflix.tv.presentation.theme.PrimeBg
 import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
@@ -102,7 +103,7 @@ fun TvShowsScreen(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(PrimeBg)
     ) {
         // SIDE NAVIGATION
         NetflixSideNavigation(

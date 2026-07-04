@@ -23,6 +23,9 @@ class DetailsViewModel @Inject constructor(
     
     private val _myListLoading = MutableStateFlow(false)
     val myListLoading: StateFlow<Boolean> = _myListLoading.asStateFlow()
+
+    private val _similar = MutableStateFlow<List<Media>>(emptyList())
+    val similar: StateFlow<List<Media>> = _similar.asStateFlow()
     
     fun loadMediaDetails(mediaId: String) {
         viewModelScope.launch {
@@ -38,6 +41,8 @@ class DetailsViewModel @Inject constructor(
                                 loadWatchProgress(media)
                                 // Check if media is in My List
                                 checkMyList(mediaId)
+                                // Fetch "More like this" by first genre
+                                loadSimilar(media)
                             },
                             onFailure = { error ->
                                 _uiState.value = DetailsUiState.Error(
@@ -96,6 +101,24 @@ class DetailsViewModel @Inject constructor(
         }
     }
     
+    private fun loadSimilar(media: Media) {
+        val genre = media.genreNames.firstOrNull() ?: media.genres.firstOrNull()?.name ?: return
+        viewModelScope.launch {
+            try {
+                mediaRepository.getMediaByGenre(genre.lowercase(), 15, 0).collect { result ->
+                    result.fold(
+                        onSuccess = { list ->
+                            _similar.value = list.filter { it.id != media.id }.take(12)
+                        },
+                        onFailure = { _similar.value = emptyList() }
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w("DetailsViewModel", "Failed to load similar media", e)
+            }
+        }
+    }
+
     private suspend fun loadWatchProgress(media: Media) {
         try {
             // Use direct playback progress API (matches web frontend: GET /api/playback/progress/{id})

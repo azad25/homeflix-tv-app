@@ -47,13 +47,14 @@ class HomeViewModel @Inject constructor(
     
     fun loadHomeContent() {
         viewModelScope.launch {
-            _uiState.value = HomeUiState.Loading
-            
             try {
-                // Try to load from cache first for instant display
+                // CACHE-FIRST: paint instantly from cache, refresh silently in
+                // the background. Only show the spinner on a true cold start.
                 val cachedMovies = com.homeflix.tv.data.persistence.ContentCache.getMediaList(context, "movies")
                 if (cachedMovies != null && cachedMovies.isNotEmpty()) {
                     displayCachedContent(cachedMovies)
+                } else {
+                    _uiState.value = HomeUiState.Loading
                 }
                 
                 // Load movies content first
@@ -163,6 +164,11 @@ class HomeViewModel @Inject constructor(
                         },
                         onFailure = { error ->
                             Log.e("HomeViewModel", "Error loading movies", error)
+                            // Cached content already on screen? Keep it - a failed
+                            // background refresh must never blank a working UI.
+                            if (_uiState.value is HomeUiState.Success) {
+                                return@fold
+                            }
                             val errorMessage = when {
                                 error.message?.contains("ConnectException") == true -> "Cannot connect to server at ${BuildConfig.BASE_URL}. Check if server is running and TV is on same network."
                                 error.message?.contains("UnknownHostException") == true -> "Server not found at ${BuildConfig.BASE_URL}. Check network connection and server IP."
@@ -177,6 +183,9 @@ class HomeViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error loading home content", e)
+                if (_uiState.value is HomeUiState.Success) {
+                    return@launch // keep cached UI on background-refresh failure
+                }
                 val errorMessage = when {
                     e.message?.contains("ConnectException") == true -> "Cannot connect to server at ${BuildConfig.BASE_URL}. Check if server is running and TV is on same network."
                     e.message?.contains("UnknownHostException") == true -> "Server not found at ${BuildConfig.BASE_URL}. Check network connection and server IP."

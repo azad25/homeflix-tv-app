@@ -24,3 +24,17 @@ val SuccessGreen = Color(0xFF46D369)
 val WarningYellow = Color(0xFFFFC107)
 val ErrorRed = Color(0xFFDC3545)
 val InfoBlue = Color(0xFF17A2B8)
+
+// ── Prime/Netflix hybrid design system ──────────────────────────────
+// Deep blue-black canvas like Prime Video, with Prime blue as the
+// interactive accent and Netflix red kept as the brand color.
+val PrimeBg = Color(0xFF0F171E)          // page background
+val PrimeBgDeep = Color(0xFF00050D)      // hero gradient target
+val PrimeSurface = Color(0xFF1A242F)     // cards, chips
+val PrimeSurfaceHigh = Color(0xFF252E39) // focused surface
+val PrimeBlue = Color(0xFF1399FF)        // CTA / focus accent
+val PrimeBlueDark = Color(0xFF0F6FBD)
+val PrimeTextDim = Color(0xFF8197A4)     // secondary text (blue-grey)
+val RatingGold = Color(0xFFFFB43A)       // star ratings
+val BadgeOutline = Color(0xFF3A4750)     // certification chip border
+val Top10Stroke = Color(0xFF425364)      // outlined big numbers

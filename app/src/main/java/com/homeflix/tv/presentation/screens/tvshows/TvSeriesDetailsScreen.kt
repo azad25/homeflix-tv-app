@@ -7,41 +7,50 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.homeflix.tv.presentation.components.NetflixSideNavigation
+import com.homeflix.tv.presentation.components.CertBadge
+import com.homeflix.tv.presentation.components.HeroActionButton
 import com.homeflix.tv.presentation.navigation.Screen
-import com.homeflix.tv.presentation.theme.NetflixRed
-import com.homeflix.tv.presentation.theme.TextPrimary
-import com.homeflix.tv.presentation.theme.TextSecondary
+import com.homeflix.tv.presentation.theme.*
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 
-
-
+/**
+ * TV SERIES DETAILS - Prime Video style.
+ *
+ * Full-bleed backdrop hero with series info, then an inline season selector
+ * and Prime-style episode tiles (16:9 still, number, title, duration,
+ * synopsis) - no extra navigation hop to see episodes.
+ */
+@UnstableApi
 @Composable
 fun TvSeriesDetailsScreen(
     seriesId: String,
@@ -49,316 +58,266 @@ fun TvSeriesDetailsScreen(
     viewModel: TvSeriesDetailsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val contentFocusRequester = remember { FocusRequester() }
-    
+    val episodes by viewModel.episodes.collectAsState()
+    val selectedSeason by viewModel.selectedSeason.collectAsState()
+    val episodesLoading by viewModel.episodesLoading.collectAsState()
+
+    val playFocusRequester = remember { FocusRequester() }
+
     LaunchedEffect(seriesId) {
         viewModel.loadSeriesDetails(seriesId)
     }
-    
-    // Auto-focus content when loaded, then scroll to top
-    val scrollState = rememberLazyListState()
-    
-    LaunchedEffect(uiState) {
-        if (uiState is TvSeriesDetailsUiState.Success) {
-            delay(400)
-            try {
-                contentFocusRequester.requestFocus()
-                // Scroll back to top after focus to prevent auto-scroll past hero
-                scrollState.scrollToItem(0)
-            } catch (_: Exception) {}
-        }
-    }
-    
-    Row(
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(PrimeBg)
     ) {
-        // Side Navigation
-        NetflixSideNavigation(
-            selectedRoute = "tv-series",
-            onNavigate = { route ->
-                navController.navigate(route) {
-                    popUpTo(Screen.Home.route) { inclusive = false }
-                    launchSingleTop = true
-                }
-            }
-        )
-        
-        // Main Content
-        val currentState = uiState
-        when (currentState) {
-            is TvSeriesDetailsUiState.Loading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = NetflixRed)
-                }
-            }
-            
-            is TvSeriesDetailsUiState.Error -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Error loading series",
-                            style = MaterialTheme.typography.headlineMedium,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = currentState.message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = { navController.popBackStack() }
-                        ) {
-                            Text("Go Back")
-                        }
+        when (val state = uiState) {
+            is TvSeriesDetailsUiState.Success -> {
+                val series = state.series
+
+                LaunchedEffect(series.id) {
+                    delay(400)
+                    try {
+                        playFocusRequester.requestFocus()
+                    } catch (_: Exception) {
                     }
                 }
-            }
-            
-            is TvSeriesDetailsUiState.Success -> {
-                val series = currentState.series
-                
-                LazyColumn(
-                    state = scrollState,
-                    userScrollEnabled = true,
-                    modifier = Modifier.fillMaxSize()
-                ) {
+
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    // ── HERO ─────────────────────────────────────────────
                     item {
-                        // Hero Section with Backdrop
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(400.dp)
+                                .height(480.dp)
                         ) {
-                            // Background Banner Image
                             AsyncImage(
-                                model = ApiUtils.getSeriesBannerUrl(series),
+                                model = coil.request.ImageRequest.Builder(LocalContext.current)
+                                    .data(ApiUtils.getSeriesBackdropUrl(series))
+                                    .memoryCacheKey("series_backdrop_${series.id}")
+                                    .diskCacheKey("series_backdrop_${series.id}")
+                                    .crossfade(true)
+                                    .build(),
                                 contentDescription = series.title,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
                             )
-                            
-                            // Gradient Overlay
                             Box(
-                                modifier = Modifier
+                                Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(
+                                                PrimeBgDeep.copy(alpha = 0.96f),
+                                                PrimeBgDeep.copy(alpha = 0.6f),
+                                                Color.Transparent
+                                            ),
+                                            endX = 1500f
+                                        )
+                                    )
+                            )
+                            Box(
+                                Modifier
                                     .fillMaxSize()
                                     .background(
                                         Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.Transparent,
-                                                Color.Black.copy(alpha = 0.8f)
-                                            )
+                                            colors = listOf(Color.Transparent, PrimeBg),
+                                            startY = 700f
                                         )
                                     )
                             )
-                            
-                            // Content
-                            Row(
+
+                            Column(
                                 modifier = Modifier
                                     .align(Alignment.BottomStart)
-                                    .padding(32.dp)
-                                    .fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(24.dp)
+                                    .padding(start = 56.dp, bottom = 36.dp, end = 480.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                // Poster
-                                AsyncImage(
-                                    model = ApiUtils.getSeriesPosterUrl(series),
-                                    contentDescription = series.title,
-                                    modifier = Modifier
-                                        .width(160.dp)
-                                        .aspectRatio(2f / 3f)
-                                        .clip(RoundedCornerShape(6.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                                
-                                // Details
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    // Series Logo + text fallback
-                                    var logoLoaded by remember { mutableStateOf(false) }
-                                    
-                                    if (!logoLoaded) {
-                                        Text(
-                                            text = series.title,
-                                            style = MaterialTheme.typography.displayMedium.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                color = TextPrimary
-                                            )
-                                        )
-                                    }
-                                    
-                                    // Try series logo from API
-                                    val seriesLogoUrl = ApiUtils.getSeriesLogoUrl(series.id)
-                                    
-                                    coil.compose.AsyncImage(
-                                        model = coil.request.ImageRequest.Builder(LocalContext.current)
-                                            .data(seriesLogoUrl)
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = "${series.title} logo",
-                                        modifier = Modifier
-                                            .heightIn(max = 80.dp)
-                                            .fillMaxWidth(0.5f),
-                                        contentScale = ContentScale.Fit,
-                                        onSuccess = { logoLoaded = true },
-                                        onError = { logoLoaded = false }
+                                Text(
+                                    text = "HOMEFLIX ORIGINAL SERIES",
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        color = NetflixRed,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 3.sp
                                     )
-                                    
-                                    // Metadata Row
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        series.year?.let { year ->
+                                )
+
+                                // Series logo or title
+                                var logoOk by remember(series.id) { mutableStateOf(true) }
+                                if (logoOk) {
+                                    AsyncImage(
+                                        model = ApiUtils.getSeriesLogoUrl(series.id),
+                                        contentDescription = series.title,
+                                        modifier = Modifier
+                                            .heightIn(max = 110.dp)
+                                            .widthIn(max = 420.dp),
+                                        contentScale = ContentScale.Fit,
+                                        onError = { logoOk = false }
+                                    )
+                                } else {
+                                    Text(
+                                        text = series.title,
+                                        style = MaterialTheme.typography.displaySmall.copy(
+                                            fontWeight = FontWeight.Black,
+                                            color = TextPrimary
+                                        ),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                // Metadata
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (series.rating > 0) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text("★", color = RatingGold, style = MaterialTheme.typography.titleSmall)
                                             Text(
-                                                text = year.toString(),
-                                                style = MaterialTheme.typography.titleMedium.copy(
-                                                    color = TextSecondary
-                                                )
+                                                String.format("%.1f", series.rating),
+                                                color = TextPrimary,
+                                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
                                             )
                                         }
-                                        
-                                        if (series.rating > 0) {
-                                            Text(
-                                                text = "★ ${String.format("%.1f", series.rating)}",
-                                                style = MaterialTheme.typography.titleMedium.copy(
-                                                    color = TextSecondary
-                                                )
-                                            )
-                                        }
-                                        
-                                        Text(
-                                            text = "${series.totalSeasons} Season${if (series.totalSeasons != 1) "s" else ""}",
-                                            style = MaterialTheme.typography.titleMedium.copy(
-                                                color = TextSecondary
-                                            )
-                                        )
-                                        
-                                        Text(
-                                            text = "${series.totalEpisodes} Episodes",
-                                            style = MaterialTheme.typography.titleMedium.copy(
-                                                color = TextSecondary
-                                            )
-                                        )
                                     }
-                                    
-                                    // Genres
+                                    series.year?.let {
+                                        Text(it.toString(), color = PrimeTextDim, style = MaterialTheme.typography.titleSmall)
+                                    }
+                                    Text(
+                                        "${series.totalSeasons} Season${if (series.totalSeasons != 1) "s" else ""}",
+                                        color = PrimeTextDim,
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
+                                    Text(
+                                        "${series.totalEpisodes} Episodes",
+                                        color = PrimeTextDim,
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
                                     if (series.genres.isNotEmpty()) {
                                         Text(
-                                            text = series.genres.joinToString(" • "),
-                                            style = MaterialTheme.typography.titleMedium.copy(
-                                                color = TextSecondary
-                                            )
+                                            series.genres.take(2).joinToString(" • "),
+                                            color = PrimeTextDim,
+                                            style = MaterialTheme.typography.titleSmall
                                         )
                                     }
-                                    
-                                    // Description
-                                    series.description?.let { description ->
-                                        Text(
-                                            text = description,
-                                            style = MaterialTheme.typography.bodyLarge.copy(
-                                                color = TextPrimary.copy(alpha = 0.9f)
-                                            ),
-                                            maxLines = 4,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    
-                                    // Action Buttons
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        // Play First Episode Button
-                                        Button(
-                                            onClick = { 
-                                                // Navigate to first season to play first episode
-                                                navController.navigate(Screen.TvSeriesSeason.createRoute(seriesId, 1))
-                                            },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = Color.White,
-                                                contentColor = Color.Black
-                                            ),
-                                            shape = RoundedCornerShape(4.dp),
-                                            modifier = Modifier.height(44.dp)
-                                                .focusRequester(contentFocusRequester)
-                                        ) {
-                                            Text(
-                                                text = "▶ Play",
-                                                style = MaterialTheme.typography.titleMedium.copy(
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            )
+                                    CertBadge("TV-MA")
+                                }
+
+                                series.description?.let { desc ->
+                                    Text(
+                                        text = desc,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            color = TextPrimary.copy(alpha = 0.92f),
+                                            lineHeight = 24.sp
+                                        ),
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                // Play first episode of the selected season
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    HeroActionButton(
+                                        label = "Play S${selectedSeason} E1",
+                                        icon = { Icon(Icons.Default.PlayArrow, null, Modifier.size(26.dp)) },
+                                        primary = true,
+                                        focusRequester = playFocusRequester,
+                                        onClick = {
+                                            episodes.firstOrNull()?.let { ep ->
+                                                navController.navigate(Screen.VideoPlayer.createRoute(ep.id))
+                                            }
                                         }
-                                        
-                                        // Add to List Button
-                                        OutlinedButton(
-                                            onClick = { 
-                                                // TODO: Add to watchlist
-                                            },
-                                            colors = ButtonDefaults.outlinedButtonColors(
-                                                contentColor = TextPrimary,
-                                                containerColor = Color.Black.copy(alpha = 0.5f)
-                                            ),
-                                            shape = RoundedCornerShape(4.dp),
-                                            modifier = Modifier.height(44.dp)
-                                        ) {
-                                            Text(
-                                                text = "+ My List",
-                                                style = MaterialTheme.typography.titleMedium
-                                            )
-                                        }
-                                    }
+                                    )
                                 }
                             }
                         }
                     }
-                    
-                    // Seasons Section
+
+                    // ── SEASON SELECTOR ──────────────────────────────────
                     item {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(48.dp)
-                        ) {
+                        Column(modifier = Modifier.padding(top = 8.dp)) {
                             Text(
-                                text = "Seasons",
-                                style = MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.SemiBold,
+                                text = "Episodes",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
                                     color = TextPrimary
                                 ),
-                                modifier = Modifier.padding(bottom = 24.dp)
+                                modifier = Modifier.padding(start = 56.dp, bottom = 12.dp)
                             )
-                            
-                            // Seasons Grid
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 56.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                currentState.seasons.forEach { season ->
-                                    SeasonCard(
-                                        season = season,
-                                        series = series,
-                                        onClick = {
-                                            navController.navigate(
-                                                Screen.TvSeriesSeason.createRoute(seriesId, season.seasonNumber)
-                                            )
-                                        }
+                                items(state.seasons) { season ->
+                                    SeasonChip(
+                                        label = "Season ${season.seasonNumber}",
+                                        selected = season.seasonNumber == selectedSeason,
+                                        onClick = { viewModel.selectSeason(seriesId, season.seasonNumber) }
                                     )
                                 }
                             }
                         }
+                    }
+
+                    // ── EPISODE TILES (Prime style) ─────────────────────
+                    if (episodesLoading) {
+                        item {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(color = PrimeBlue)
+                            }
+                        }
+                    } else {
+                        itemsIndexed(episodes) { index, episode ->
+                            EpisodeTile(
+                                episode = episode,
+                                episodeNumber = index + 1,
+                                onClick = {
+                                    navController.navigate(Screen.VideoPlayer.createRoute(episode.id))
+                                },
+                                modifier = Modifier.padding(
+                                    start = 56.dp, end = 56.dp,
+                                    top = if (index == 0) 18.dp else 10.dp
+                                )
+                            )
+                        }
+                        item { Spacer(Modifier.height(56.dp)) }
+                    }
+                }
+            }
+
+            is TvSeriesDetailsUiState.Loading -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = PrimeBlue, strokeWidth = 4.dp)
+                }
+            }
+
+            is TvSeriesDetailsUiState.Error -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "Couldn't load this series",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = TextPrimary
+                        )
+                        Text(state.message, color = PrimeTextDim)
+                        Button(
+                            onClick = { viewModel.loadSeriesDetails(seriesId) },
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimeBlue)
+                        ) { Text("Try Again") }
                     }
                 }
             }
@@ -367,135 +326,159 @@ fun TvSeriesDetailsScreen(
 }
 
 @Composable
-private fun SeasonCard(
-    season: Season,
-    series: com.homeflix.tv.presentation.screens.tvshows.TvSeries,
+private fun SeasonChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    var focused by remember { mutableStateOf(false) }
+    val bg = when {
+        focused -> PrimeBlue
+        selected -> PrimeSurfaceHigh
+        else -> PrimeSurface
+    }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = bg,
+        border = if (selected && !focused) androidx.compose.foundation.BorderStroke(1.dp, PrimeBlue) else null,
+        modifier = Modifier
+            .onFocusChanged { focused = it.isFocused }
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                ) {
+                    onClick(); true
+                } else false
+            }
+            .focusable()
+            .clickable { onClick() }
+    ) {
+        Text(
+            text = label,
+            color = if (focused || selected) TextPrimary else PrimeTextDim,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+        )
+    }
+}
+
+/**
+ * Prime-style episode tile: 16:9 still on the left, episode number + title,
+ * duration and synopsis on the right. Whole tile is one focus target.
+ */
+@Composable
+private fun EpisodeTile(
+    episode: Episode,
+    episodeNumber: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isFocused by remember { mutableStateOf(false) }
-    
-    // Scale animation on focus
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.02f else 1.0f,
-        animationSpec = tween(durationMillis = 200),
-        label = "season_card_scale"
-    )
-    
-    Card(
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.015f else 1f, tween(150), label = "ep_scale")
+
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = if (focused) PrimeSurfaceHigh else Color.Transparent,
         modifier = modifier
             .fillMaxWidth()
-            .scale(scale)
-            .onFocusChanged { focusState ->
-                isFocused = focusState.isFocused
-            }
-            .focusable()
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .onFocusChanged { focused = it.isFocused }
             .onKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown &&
-                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
-                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
-                    onClick()
-                    true
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                ) {
+                    onClick(); true
                 } else false
             }
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(
-            containerColor = if (isFocused) Color.White.copy(alpha = 0.1f) else Color.Transparent
-        ),
-        border = if (isFocused) {
-            androidx.compose.foundation.BorderStroke(2.dp, Color.White)
-        } else null,
-        shape = RoundedCornerShape(8.dp)
+            .focusable()
+            .clickable { onClick() }
+            .then(
+                if (focused) Modifier.border(2.dp, Color.White, RoundedCornerShape(10.dp))
+                else Modifier
+            )
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            // Season Backdrop Thumbnail (like web app)
+            // Episode still with play glyph on focus
             Box(
                 modifier = Modifier
-                    .width(160.dp)
+                    .width(232.dp)
                     .aspectRatio(16f / 9f)
-                    .background(
-                        Color.Gray.copy(alpha = 0.3f),
-                        RoundedCornerShape(8.dp)
-                    )
+                    .clip(RoundedCornerShape(6.dp))
             ) {
-                // Use series backdrop (seasons don't have their own)
                 AsyncImage(
-                    model = ApiUtils.getSeriesBackdropUrl(series),
-                    contentDescription = season.name,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-                
-                // Season number overlay
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .background(
-                            Color.Black.copy(alpha = 0.7f),
-                            RoundedCornerShape(4.dp)
+                    model = coil.request.ImageRequest.Builder(LocalContext.current)
+                        .data(
+                            episode.episodeStillPath?.takeIf { it.isNotBlank() }
+                                ?: ApiUtils.getEpisodeThumbnailUrl(episode)
                         )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .memoryCacheKey("episode_${episode.id}")
+                        .diskCacheKey("episode_${episode.id}")
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = episode.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                if (focused) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.35f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(44.dp)
+                        )
+                    }
+                }
+            }
+
+            // Episode info
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "S${season.seasonNumber}",
+                        text = "$episodeNumber. ${episode.episodeTitle ?: episode.title}",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    )
-                }
-            }
-            
-            // Season Info
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = season.name,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                )
-                
-                Text(
-                    text = "${season.episodeCount} Episodes",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = TextSecondary
-                    )
-                )
-                
-                season.description?.let { description ->
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = TextSecondary
+                            color = TextPrimary
                         ),
-                        maxLines = 2,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    episode.duration?.takeIf { it > 0 }?.let { mins ->
+                        Text(
+                            "${mins}min",
+                            color = PrimeTextDim,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+                episode.airDate?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, color = PrimeTextDim, style = MaterialTheme.typography.labelMedium)
+                }
+                episode.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                    Text(
+                        text = desc,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = TextPrimary.copy(alpha = 0.8f)
+                        ),
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
-                }
-            }
-            
-            // Play Button
-            if (isFocused) {
-                Button(
-                    onClick = onClick,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = NetflixRed
-                    ),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text("▶ Play")
                 }
             }
         }

@@ -24,6 +24,7 @@ android {
     buildTypes {
         debug {
             buildConfigField("String", "BASE_URL", "\"http://192.168.0.109:8252/api/\"")
+            buildConfigField("String", "FALLBACK_BASE_URL", "\"https://homeflix.ferdousazad.com/api/\"")
         }
         release {
             isMinifyEnabled = false
@@ -32,6 +33,7 @@ android {
                 "proguard-rules.pro"
             )
             buildConfigField("String", "BASE_URL", "\"http://192.168.0.109:8252/api/\"")
+            buildConfigField("String", "FALLBACK_BASE_URL", "\"https://homeflix.ferdousazad.com/api/\"")
         }
     }
     compileOptions {

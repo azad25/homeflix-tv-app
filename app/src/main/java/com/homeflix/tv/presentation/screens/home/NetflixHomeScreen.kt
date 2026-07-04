@@ -21,12 +21,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import com.homeflix.tv.domain.model.MediaType
-import com.homeflix.tv.presentation.components.NetflixHeroSection
+import com.homeflix.tv.presentation.components.CinematicHero
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.components.MediaRow
 import com.homeflix.tv.presentation.components.ContinueWatchingRow
+import com.homeflix.tv.presentation.components.FeaturedRow
+import com.homeflix.tv.presentation.components.Top10Row
 import com.homeflix.tv.presentation.navigation.Screen
 import com.homeflix.tv.presentation.theme.NetflixRed
+import com.homeflix.tv.presentation.theme.PrimeBg
 import com.homeflix.tv.presentation.theme.TextPrimary
 import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
@@ -109,7 +112,7 @@ fun NetflixHomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(PrimeBg)
     ) {
         // Main content layout
         Row(
@@ -150,7 +153,7 @@ fun NetflixHomeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
-                    .background(Color.Black)
+                    .background(PrimeBg)
                     .onKeyEvent { keyEvent ->
                         if (keyEvent.type == KeyEventType.KeyDown) {
                             when (keyEvent.key) {
@@ -179,7 +182,7 @@ fun NetflixHomeScreen(
                             state = listState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black),
+                                .background(PrimeBg),
                             userScrollEnabled = true
                         ) {
                         // HERO SECTION as LazyColumn item
@@ -188,7 +191,7 @@ fun NetflixHomeScreen(
                             if (moviesOnly.isNotEmpty()) {
                                 item {
                                     val safeIndex = currentHeroIndex % moviesOnly.size
-                                    NetflixHeroSection(
+                                    CinematicHero(
                                         mediaList = moviesOnly,
                                         currentIndex = safeIndex,
                                         onPlayClick = { media ->
@@ -237,41 +240,42 @@ fun NetflixHomeScreen(
                             }
                         }
                         
-                        // Latest Movies as LazyColumn item (replaces duplicate Trending/Popular/Recently Added rows)
+                        // TOP 10 - Prime-style big rank numbers (most-watched)
+                        if (currentState.popularMovies.isNotEmpty()) {
+                            item {
+                                Top10Row(
+                                    title = "Top 10 on HomeFlix",
+                                    mediaList = currentState.popularMovies,
+                                    onMediaClick = { media ->
+                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                    },
+                                    focusRequester = if (currentState.continueWatching.isEmpty()) firstRowFocusRequester else null,
+                                    modifier = Modifier.padding(bottom = 28.dp)
+                                )
+                            }
+                        }
+
+                        // LATEST - Prime-style 16:9 landscape showcase cards
                         if (currentState.latestMovies.isNotEmpty()) {
                             item {
-                                MediaRow(
+                                FeaturedRow(
                                     title = "Latest Movies",
                                     mediaList = currentState.latestMovies,
                                     onMediaClick = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
-                                    focusRequester = if (currentState.continueWatching.isEmpty()) firstRowFocusRequester else latestMoviesFocusRequester,
-                                    modifier = Modifier.padding(bottom = 24.dp)
+                                    focusRequester = latestMoviesFocusRequester,
+                                    modifier = Modifier.padding(bottom = 28.dp)
                                 )
                             }
                         }
-                        
-                        // Trending Movies
+
+                        // Trending poster row
                         if (currentState.trendingMovies.isNotEmpty()) {
                             item {
                                 MediaRow(
-                                    title = "🔥 Trending Now",
+                                    title = "Trending Now",
                                     mediaList = currentState.trendingMovies,
-                                    onMediaClick = { media ->
-                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                    },
-                                    modifier = Modifier.padding(bottom = 24.dp)
-                                )
-                            }
-                        }
-                        
-                        // Popular Movies
-                        if (currentState.popularMovies.isNotEmpty()) {
-                            item {
-                                MediaRow(
-                                    title = "⭐ Popular on HomeFlix",
-                                    mediaList = currentState.popularMovies,
                                     onMediaClick = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
@@ -347,7 +351,7 @@ fun NetflixHomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black)
+                        .background(PrimeBg)
                         .focusable(false), // Prevent any focus during loading
                     contentAlignment = Alignment.Center
                 ) {
@@ -373,7 +377,7 @@ fun NetflixHomeScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black)
+                        .background(PrimeBg)
                         .focusable(false),
                     contentAlignment = Alignment.Center
                 ) {

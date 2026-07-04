@@ -37,6 +37,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.navigation.Screen
+import com.homeflix.tv.presentation.theme.PrimeBg
 import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
@@ -94,7 +95,7 @@ fun TvSeriesSeasonScreen(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(PrimeBg)
     ) {
         // Side Navigation
         NetflixSideNavigation(

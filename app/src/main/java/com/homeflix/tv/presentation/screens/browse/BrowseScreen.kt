@@ -39,6 +39,7 @@ import coil.compose.AsyncImage
 import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.navigation.Screen
+import com.homeflix.tv.presentation.theme.PrimeBg
 import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
@@ -74,7 +75,7 @@ fun BrowseScreen(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(PrimeBg)
     ) {
         // SIDE NAVIGATION
         NetflixSideNavigation(
@@ -214,7 +215,7 @@ fun BrowseScreen(
                     }
                     
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 120.dp),
+                        columns = GridCells.Adaptive(minSize = 132.dp),
                         state = gridState,
                         contentPadding = PaddingValues(24.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),

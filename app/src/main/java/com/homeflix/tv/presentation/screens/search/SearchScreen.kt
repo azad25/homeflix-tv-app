@@ -43,6 +43,7 @@ import coil.compose.AsyncImage
 import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.navigation.Screen
+import com.homeflix.tv.presentation.theme.PrimeBg
 import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
@@ -98,7 +99,7 @@ fun SearchScreen(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(PrimeBg)
     ) {
         // SIDE NAVIGATION (48dp width)
         NetflixSideNavigation(
@@ -279,7 +280,7 @@ fun SearchScreen(
                     
                     // Top searches grid (2x4 layout like screenshot)
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
+                        columns = GridCells.Fixed(6),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize()
@@ -326,7 +327,7 @@ fun SearchScreen(
                                 )
                                 
                                 LazyVerticalGrid(
-                                    columns = GridCells.Fixed(4),
+                                    columns = GridCells.Fixed(6),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
                                     modifier = Modifier.fillMaxSize()
@@ -342,7 +343,7 @@ fun SearchScreen(
                                 }
                             } else {
                                 LazyVerticalGrid(
-                                    columns = GridCells.Adaptive(minSize = 160.dp),
+                                    columns = GridCells.Adaptive(minSize = 136.dp),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalArrangement = Arrangement.spacedBy(16.dp),
                                     modifier = Modifier
@@ -372,7 +373,7 @@ fun SearchScreen(
                             )
                             
                             LazyVerticalGrid(
-                                columns = GridCells.Fixed(4),
+                                columns = GridCells.Fixed(6),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier.fillMaxSize()
