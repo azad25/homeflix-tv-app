@@ -124,7 +124,7 @@ Navigation uses global **fade in/out** transitions; the player fades on open/clo
 `util/ServerConfig` + a `ServerFailoverInterceptor` pick the server at runtime:
 
 1. **LAN IP first** (`BuildConfig.BASE_URL`, e.g. `http://192.168.x.x:8252/api/`).
-2. **Public domain fallback** (`FALLBACK_BASE_URL`, `https://homeflix.ferdousazad.com/api/`).
+2. **Public domain fallback** (`FALLBACK_BASE_URL`, `https://example.com/api/`).
 
 A 2.5 s reachability probe runs at boot; every request transparently fails over to the other server and sticks with whichever works. All image/stream URLs are built from the active base, so they always match the API host.
 
