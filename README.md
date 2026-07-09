@@ -163,27 +163,5 @@ The app icon (adaptive red "H▶" on black) lives in `res/drawable/ic_launcher_f
 
 ---
 
-## Is it properly optimized / efficient for resources?
-
-**Short answer: yes for its target (a 2 GB LAN TV) at the config level, but this is engineering‑level tuning, not device‑measured, and a few things are worth cleaning up.**
-
-**What's genuinely efficient**
-- Memory is bounded on every axis that matters: image memory/disk caches scale down on low‑RAM, bitmaps are RGB_565 (½ the RAM), and the playback read‑ahead is **byte‑capped** so 4K can't OOM. These are the three biggest RAM consumers, all capped.
-- The player now **buffers ahead** for smoothness instead of the previous 2‑second cap, without sacrificing RAM safety.
-- CPU/GPU during browsing is modest: `graphicsLayer` focus scaling avoids relayout, lists reuse items via stable keys, and only **one** video decoder runs at a time (preview or playback).
-- Direct play means the TV's **hardware decoder** does the heavy lifting; the CPU stays cool unless the server transcodes.
-- Startup and navigation are cache‑first and lifecycle‑correct (no background decoding, no stale player on relaunch).
-
-**Honest caveats / where it's not perfect**
-- **Not profiled on the actual TV.** All of the above is measured from configuration, not from `dumpsys meminfo`/`gfxinfo` on your Sony. Real smoothness depends on the specific SoC.
-- **The background preview video is the heaviest ongoing cost.** It's a deliberate signature feature, but on a 2 GB TV a second decoder running while you navigate is the most likely remaining source of any jank. It can be gated off on low‑RAM devices in one line (`DeviceCapabilities.allowBackgroundVideo`) if you ever want to trade the flourish for maximum smoothness.
-- **One ExoPlayer instance per player screen** (created/released per navigation) rather than a shared pooled instance — fine, but re‑creation has a small cost.
-- **Legacy dead code still ships** (`HeroSection`, `NetflixHeroSection`, `RecommendationSection`, older card composables, unused `TopSearchCard`, `HomeScreen`). Harmless at runtime but adds a little APK size and confusion; removing it is a good cleanup.
-- **4K over the public domain** is the one weak spot: the byte‑capped buffer buys only ~15–20 s at 4K bitrate, so a slow internet uplink can still stall 4K remotely (LAN is fine). Server‑side adaptive/HLS for the TV client would fix that.
-
-**Bottom line:** for the intended use — a 2 GB Android TV streaming from a fast LAN server — the app is well within budget and should feel smooth. It is *config‑optimized and honest about it*, not lab‑verified; the one lever left for maximum smoothness on weak hardware is disabling the ambient background video.
-
----
-
 ## © Copyright
 © 2025 Homeflix Studios. All Rights Reserved.
