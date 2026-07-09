@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -85,10 +86,12 @@ fun VideoPlayer(
     media: Media,
     isVisible: Boolean,
     onClose: () -> Unit,
+    seriesTitle: String? = null,
+    nextEpisodeId: Int? = null,
     startTime: Long = 0L,
     forceStartFromBeginning: Boolean = false,
     onProgress: (currentTime: Long, duration: Long) -> Unit = { _, _ -> },
-    onPlayNext: ((Media) -> Unit)? = null,
+    onPlayNext: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
     mediaRepository: com.homeflix.tv.domain.repository.MediaRepository? = null
 ) {
@@ -139,11 +142,11 @@ fun VideoPlayer(
     // External subtitle tracks fetched from API
     var externalSubtitleTracks by remember { mutableStateOf<List<com.homeflix.tv.domain.model.SubtitleTrack>>(emptyList()) }
 
-    // Next episode state for autoplay
-    var nextEpisode by remember(media.id) { mutableStateOf<Media?>(null) }
-    var showNextEpisodePreview by remember { mutableStateOf(false) }
-    
+    // Next episode is provided by the ViewModel (nextEpisodeId param) — no
+    // client-side scan needed.
+
     // TV remote control focus
+    val rootFocusRequester = remember { FocusRequester() }
     val playPauseFocusRequester = remember { FocusRequester() }
     val seekBackwardFocusRequester = remember { FocusRequester() }
     val seekForwardFocusRequester = remember { FocusRequester() }
@@ -184,39 +187,6 @@ fun VideoPlayer(
         onClose()
     }
     
-    // Fetch next episode for TV series autoplay
-    LaunchedEffect(media.id) {
-        if (media.type == MediaType.EPISODE && media.seriesId != null && onPlayNext != null) {
-            try {
-                // Get all episodes for this series
-                val allMediaResult = repository.getAllMedia(limit = 1000, offset = 0)
-                allMediaResult.collect { result ->
-                    if (result.isSuccess) {
-                        val allMedia = result.getOrNull() ?: emptyList()
-                        
-                        // Filter episodes for this series
-                        val seriesEpisodes = allMedia.filter { 
-                            it.type == MediaType.EPISODE && it.seriesId == media.seriesId 
-                        }.sortedWith(compareBy({ it.seasonNumber }, { it.episodeNumber }))
-                        
-                        // Find current episode index
-                        val currentIndex = seriesEpisodes.indexOfFirst { it.id == media.id }
-                        
-                        if (currentIndex != -1 && currentIndex < seriesEpisodes.size - 1) {
-                            // Get next episode
-                            nextEpisode = seriesEpisodes[currentIndex + 1]
-                            android.util.Log.d("VideoPlayer", "Next episode found: ${nextEpisode?.title}")
-                        } else {
-                            android.util.Log.d("VideoPlayer", "No next episode found (last episode or not found)")
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("VideoPlayer", "Failed to fetch next episode", e)
-            }
-        }
-    }
-
     // Subtitle toggle function
     // IMPORTANT: Only use setTrackTypeDisabled() — NOT setRendererDisabled()
     // setRendererDisabled takes a RENDERER INDEX (0,1,2), not a track type constant
@@ -350,16 +320,23 @@ fun VideoPlayer(
             val renderersFactory = DefaultRenderersFactory(context)
                 .setEnableDecoderFallback(true)
 
-            // CRITICAL: Configure LoadControl to start playback immediately
-            // Don't wait for subtitle buffer - prioritize video playback
+            // Buffer AHEAD like Netflix/YouTube for smooth playback: start fast
+            // (~2s) but then keep reading ahead up to ~2 minutes so disk seeks,
+            // WiFi dips or server hiccups never stall playback. A byte cap keeps
+            // it safe on low-RAM TVs — at high bitrate (4K) the cap is hit first
+            // (~15-20s), at HD bitrate it reaches the full ~2 minutes.
+            val lowRam = com.homeflix.tv.util.DeviceCapabilities.isLowRam(context)
+            val targetBufferBytes = if (lowRam) 80 * 1024 * 1024 else 256 * 1024 * 1024
             val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
                 .setBufferDurationsMs(
-                    500,    // Min buffer to start (500ms - very low)
-                    2000,   // Max buffer (2s)
-                    250,    // Buffer for playback (250ms - very low)
-                    500     // Buffer for playback after rebuffer (500ms)
+                    30_000,   // Min buffer to keep (30s)
+                    120_000,  // Max read-ahead (2 minutes)
+                    2_000,    // Buffer before playback starts (2s — still fast)
+                    5_000     // Buffer before resuming after a rebuffer (5s)
                 )
-                .setPrioritizeTimeOverSizeThresholds(true) // Prioritize time over size
+                .setTargetBufferBytes(targetBufferBytes)
+                // Respect the byte cap so 4K on a 2GB TV can't OOM
+                .setPrioritizeTimeOverSizeThresholds(false)
                 .build()
 
             val player = ExoPlayer.Builder(context)
@@ -541,13 +518,11 @@ fun VideoPlayer(
                                 Player.STATE_ENDED -> {
                                     // Save progress before handling episode end
                                     savePlaybackProgress()
-                                    
-                                    // Check if there's a next episode for autoplay
-                                    if (nextEpisode != null && onPlayNext != null) {
-                                        android.util.Log.d("VideoPlayer", "Episode ended, playing next: ${nextEpisode?.title}")
-                                        onPlayNext(nextEpisode!!)
+
+                                    // Autoplay the next episode when one exists
+                                    if (nextEpisodeId != null && onPlayNext != null) {
+                                        onPlayNext(nextEpisodeId)
                                     } else {
-                                        android.util.Log.d("VideoPlayer", "Episode ended, no next episode available")
                                         onClose()
                                     }
                                 }
@@ -657,17 +632,35 @@ fun VideoPlayer(
         }
     }
 
-    // Update progress for UI only (no periodic saving for better performance)
-    LaunchedEffect(exoPlayer, isPlaying) {
-        while (isPlaying && exoPlayer != null) {
-            currentPosition = exoPlayer?.currentPosition ?: 0L
-            duration = exoPlayer?.duration ?: 0L
-
-            if (duration > 0) {
-                onProgress(currentPosition, duration)
+    // Poll position/duration continuously (not gated on isPlaying) so the
+    // scrubber and timer are correct from the very start and while paused.
+    LaunchedEffect(exoPlayer) {
+        while (exoPlayer != null) {
+            val p = exoPlayer
+            if (p != null) {
+                currentPosition = p.currentPosition.coerceAtLeast(0L)
+                val d = p.duration
+                if (d > 0) {
+                    duration = d
+                    onProgress(currentPosition, d)
+                }
             }
+            delay(500)
+        }
+    }
 
-            delay(1000) // Update every second
+    // Focus ownership: when controls appear, move focus onto the Play button
+    // so D-pad drives the buttons; when they hide, return focus to the root so
+    // the next key press re-reveals them. This is what makes the buttons
+    // selectable instead of the root swallowing all D-pad input.
+    LaunchedEffect(showControls) {
+        if (showSettings) return@LaunchedEffect
+        if (showControls) {
+            repeat(10) {
+                try { playPauseFocusRequester.requestFocus(); return@LaunchedEffect } catch (_: Exception) { delay(40) }
+            }
+        } else {
+            try { rootFocusRequester.requestFocus() } catch (_: Exception) {}
         }
     }
 
@@ -707,95 +700,33 @@ fun VideoPlayer(
             modifier = modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .focusable() // CRITICAL: Make video player focusable for D-pad
+                .focusRequester(rootFocusRequester)
+                .focusable() // receives keys only while controls are hidden
                 .onKeyEvent { keyEvent ->
-                    if (keyEvent.type == KeyEventType.KeyDown) {
-                        when (keyEvent.key) {
-                            Key.DirectionCenter, Key.Enter, Key.Spacebar -> {
-                                // Always show controls and toggle play/pause
-                                exoPlayer?.let { player ->
-                                    if (player.isPlaying) {
-                                        player.pause()
-                                    } else {
-                                        player.play()
-                                    }
-                                }
-                                showControls = true
-                                true
-                            }
-                            Key.DirectionLeft -> {
-                                // Always seek backward and show controls
-                                exoPlayer?.let { player ->
-                                    if (player.duration > 0) {
-                                        val newPosition = (player.currentPosition - 10000).coerceAtLeast(0)
-                                        player.seekTo(newPosition)
-                                        // Don't manually set isBuffering - let the player handle it
-                                    }
-                                }
-                                showControls = true
-                                true
-                            }
-                            Key.DirectionRight -> {
-                                // Always seek forward and show controls
-                                exoPlayer?.let { player ->
-                                    if (player.duration > 0) {
-                                        val newPosition = (player.currentPosition + 10000).coerceAtMost(player.duration)
-                                        player.seekTo(newPosition)
-                                        // Don't manually set isBuffering - let the player handle it
-                                    }
-                                }
-                                showControls = true
-                                true
-                            }
-                            Key.DirectionUp -> {
-                                // Volume up
-                                volume = (volume + 0.1f).coerceAtMost(1f)
-                                exoPlayer?.volume = volume
-                                isMuted = false
-                                showControls = true
-                                true
-                            }
-                            Key.DirectionDown -> {
-                                // Reveal controls; focus traversal handles the rest
-                                showControls = true
-                                false
-                            }
-                            Key.Menu -> {
-                                // Remote MENU key opens the settings drawer
-                                showControls = true
-                                showSettings = true
-                                true
-                            }
-                            Key.Back, Key.Escape -> {
-                                if (showSettings) {
-                                    showSettings = false
-                                } else {
-                                    // Close player with progress saving
-                                    closePlayerWithProgressSave()
-                                }
-                                true
-                            }
-                            Key.M -> {
-                                // Toggle mute
-                                isMuted = !isMuted
-                                exoPlayer?.volume = if (isMuted) 0f else volume
-                                showControls = true
-                                true
-                            }
-                            Key.S -> {
-                                // Toggle subtitles
-                                toggleSubtitles()
-                                showControls = true
-                                true
-                            }
-                            else -> {
-                                // Show controls on any other key
-                                showControls = true
-                                false
-                            }
+                    if (showSettings) return@onKeyEvent false
+                    if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    when (keyEvent.key) {
+                        Key.Back, Key.Escape -> {
+                            // First Back hides controls; second closes the player
+                            if (showControls) { showControls = false; true }
+                            else { closePlayerWithProgressSave(); true }
                         }
-                    } else {
-                        false
+                        Key.Menu -> {
+                            showControls = true; showSettings = true; true
+                        }
+                        Key.M -> {
+                            isMuted = !isMuted
+                            exoPlayer?.volume = if (isMuted) 0f else volume
+                            showControls = true; true
+                        }
+                        Key.S -> { toggleSubtitles(); showControls = true; true }
+                        else -> {
+                            // Any other key: if controls are hidden, reveal them
+                            // (focus moves to Play via LaunchedEffect) and consume
+                            // this press. If already shown, let the focused
+                            // control handle it.
+                            if (!showControls) { showControls = true; true } else false
+                        }
                     }
                 }
         ) {
@@ -864,18 +795,27 @@ fun VideoPlayer(
                         .align(Alignment.TopStart)
                         .padding(horizontal = 48.dp, vertical = 30.dp)
                 ) {
+                    val isEpisode = media.type == MediaType.EPISODE
+                    // Primary line = series name for episodes (falls back to
+                    // media.title if enrichment failed); movies show their title.
                     Text(
-                        text = media.title,
+                        text = if (isEpisode) (seriesTitle ?: media.title) else media.title,
                         color = Color.White,
-                        fontSize = 22.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    if (media.type == MediaType.EPISODE && media.seasonNumber != null && media.episodeNumber != null) {
-                        Text(
-                            text = "S${media.seasonNumber}:E${media.episodeNumber}",
-                            color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 15.sp
-                        )
+                    if (isEpisode) {
+                        val se = if (media.seasonNumber != null && media.episodeNumber != null)
+                            "S${media.seasonNumber}:E${media.episodeNumber} · " else ""
+                        // When seriesTitle is present, media.title is the episode title.
+                        val epLine = (se + media.title).trim()
+                        if (epLine.isNotBlank()) {
+                            Text(
+                                text = epLine,
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = 15.sp
+                            )
+                        }
                     }
                 }
 
@@ -1001,6 +941,18 @@ fun VideoPlayer(
                                 exoPlayer?.let { p -> p.seekTo((p.currentPosition + 10_000).coerceAtMost(p.duration)) }
                             }
                         )
+                        // Next Episode (TV series only)
+                        if (nextEpisodeId != null && onPlayNext != null) {
+                            NetflixCircleButton(
+                                icon = {
+                                    Icon(Icons.Rounded.SkipNext, "Next episode", tint = it, modifier = Modifier.size(28.dp))
+                                },
+                                onClick = {
+                                    savePlaybackProgress()
+                                    onPlayNext(nextEpisodeId)
+                                }
+                            )
+                        }
                         NetflixPillButton(
                             label = "Speed (${if (playbackSpeed == playbackSpeed.toInt().toFloat()) "${playbackSpeed.toInt()}" else playbackSpeed.toString()}x)",
                             onClick = { showSettings = true }

@@ -9,30 +9,32 @@ import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
 /**
- * NETFLIX-STYLE IMAGE CACHING
- * - Aggressive memory cache (256MB)
- * - Large disk cache (512MB)
- * - Instant image loading
+ * IMAGE CACHING — tuned to be light on low-RAM TVs (2 GB / 8 GB boxes).
+ * Memory cache scales down and disk cache is capped small on low-RAM devices
+ * so posters/backdrops don't pressure the heap or fill limited storage.
  */
 object ImageCache {
-    
+
     private var imageLoader: ImageLoader? = null
-    
+
     fun getImageLoader(context: Context): ImageLoader {
         return imageLoader ?: createImageLoader(context).also { imageLoader = it }
     }
-    
+
     private fun createImageLoader(context: Context): ImageLoader {
+        val lowRam = DeviceCapabilities.isLowRam(context)
+        val memPercent = if (lowRam) 0.12 else 0.20
+        val diskBytes = if (lowRam) 96L * 1024 * 1024 else 256L * 1024 * 1024
         return ImageLoader.Builder(context)
             .memoryCache {
                 MemoryCache.Builder(context)
-                    .maxSizePercent(0.25) // Use 25% of app memory
+                    .maxSizePercent(memPercent)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(context.cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(512 * 1024 * 1024) // 512MB disk cache
+                    .maxSizeBytes(diskBytes)
                     .build()
             }
             .okHttpClient {
@@ -45,8 +47,10 @@ object ImageCache {
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
-            .crossfade(true)
-            .crossfade(300)
+            // Perf on low-RAM TVs: RGB_565 halves bitmap memory (less GC → less
+            // D-pad jank) and no global crossfade avoids an extra draw pass.
+            .allowRgb565(true)
+            .crossfade(false)
             .build()
     }
     

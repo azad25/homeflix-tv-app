@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,10 +42,12 @@ import coil.compose.AsyncImage
 import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.domain.model.MediaType
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
-import com.homeflix.tv.presentation.components.ContinueWatchingRow
+import com.homeflix.tv.presentation.components.ContinueWatchingSeriesRow
+import com.homeflix.tv.presentation.components.HeroActionButton
 import com.homeflix.tv.presentation.navigation.Screen
 import com.homeflix.tv.presentation.theme.PrimeBg
-import com.homeflix.tv.presentation.theme.NetflixRed
+import com.homeflix.tv.presentation.theme.RatingGold
+import com.homeflix.tv.presentation.theme.PrimeBlue
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
@@ -86,14 +89,9 @@ fun TvShowsScreen(
         if (uiState is TvShowsUiState.Success) {
             delay(100)
             try {
-                val successState = uiState as TvShowsUiState.Success
-                // Focus continue watching if available, otherwise focus hero slider
-                if (successState.continueWatchingEpisodes.isNotEmpty()) {
-                    continueWatchingFocusRequester.requestFocus()
-                } else {
-                    contentFocusRequester.requestFocus()
-                }
-                // Scroll back to top AFTER focus to keep hero slider visible
+                // Always focus the hero first, then pin to top (never land
+                // scrolled into Continue Watching / rows).
+                contentFocusRequester.requestFocus()
                 delay(150)
                 scrollState.scrollToItem(0, 0)
             } catch (_: Exception) {}
@@ -121,30 +119,10 @@ fun TvShowsScreen(
             }
         )
         
-        // Main Content
+        // Main Content — hero is the immersive top element (no separate header)
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header
-            Column(
-                modifier = Modifier.padding(32.dp)
-            ) {
-                Text(
-                    text = "TV Shows",
-                    style = MaterialTheme.typography.displayMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                )
-                Text(
-                    text = "Latest TV Shows",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = TextSecondary
-                    ),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-            
             val currentState = uiState
             when (currentState) {
                 is TvShowsUiState.Loading -> {
@@ -152,7 +130,7 @@ fun TvShowsScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = NetflixRed)
+                        CircularProgressIndicator(color = PrimeBlue)
                     }
                 }
                 
@@ -183,7 +161,7 @@ fun TvShowsScreen(
                             Button(
                                 onClick = { viewModel.loadTvShows() },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = NetflixRed
+                                    containerColor = PrimeBlue
                                 )
                             ) {
                                 Text("Retry")
@@ -211,48 +189,63 @@ fun TvShowsScreen(
                             }
                         }
                         
-                        // Series count indicator
-                        item {
-                            Row(
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 32.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = "Showing ${currentState.series.size} TV series",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = NetflixRed,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                )
-                            }
-                        }
-                        
-                        // Continue Watching Episodes section
-                        if (currentState.continueWatchingEpisodes.isNotEmpty()) {
+                        // Continue Watching — one card per series (series banner),
+                        // resumes the in-progress episode from its saved position.
+                        if (currentState.continueWatchingSeries.isNotEmpty()) {
                             item {
-                                ContinueWatchingRow(
-                                    continueWatchingItems = currentState.continueWatchingEpisodes,
-                                    onPlay = { media, startTimeMs ->
-                                        navController.navigate(Screen.VideoPlayer.createRoute(media.id, startTime = startTimeMs))
-                                    },
-                                    onInfo = { media ->
-                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                ContinueWatchingSeriesRow(
+                                    items = currentState.continueWatchingSeries,
+                                    onResume = { episodeMediaId, startMs ->
+                                        navController.navigate(Screen.VideoPlayer.createRoute(episodeMediaId, startTime = startMs))
                                     },
                                     focusRequester = continueWatchingFocusRequester,
-                                    mediaTypeFilter = setOf(
-                                        com.homeflix.tv.domain.model.MediaType.EPISODE,
-                                        com.homeflix.tv.domain.model.MediaType.TV_SHOW
-                                    ),
-                                    applyHorizontalPadding = false,
-                                    modifier = Modifier.padding(bottom = 24.dp, start = 32.dp)
+                                    modifier = Modifier.padding(bottom = 24.dp)
                                 )
                             }
                         }
                         
-                        // TV Series horizontal slider row
+                        // Popular series row (by rating)
+                        val popularSeries = currentState.series.sortedByDescending { it.rating }.take(15)
+                        if (popularSeries.isNotEmpty()) {
+                            item {
+                                TvSeriesRow(
+                                    title = "Popular Series",
+                                    seriesList = popularSeries,
+                                    onSeriesClick = { series ->
+                                        navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
+                                    }
+                                )
+                            }
+                        }
+
+                        // Genre-grouped rows (home-like density, built client-side
+                        // from series.genres). Each shown only if it has enough.
+                        val genreBuckets = listOf(
+                            "Action" to listOf("action", "adventure"),
+                            "Drama" to listOf("drama"),
+                            "Comedy" to listOf("comedy"),
+                            "Sci-Fi & Fantasy" to listOf("sci-fi", "science fiction", "fantasy"),
+                            "Crime & Mystery" to listOf("crime", "mystery", "thriller"),
+                            "Animation" to listOf("animation", "kids")
+                        )
+                        genreBuckets.forEach { (label, keys) ->
+                            val list = currentState.series.filter { s ->
+                                s.genres.any { g -> keys.any { k -> g.contains(k, ignoreCase = true) } }
+                            }.take(15)
+                            if (list.size >= 3) {
+                                item {
+                                    TvSeriesRow(
+                                        title = label,
+                                        seriesList = list,
+                                        onSeriesClick = { series ->
+                                            navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // All series row
                         item {
                             TvSeriesRow(
                                 title = "All TV Series",
@@ -262,7 +255,7 @@ fun TvShowsScreen(
                                 }
                             )
                         }
-                        
+
                         item {
                             Spacer(modifier = Modifier.height(48.dp))
                         }
@@ -292,7 +285,7 @@ private fun TvShowsHeroSlider(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(400.dp)
+            .height(470.dp)
     ) {
         // Netflix-style unified slide transition
         Crossfade(
@@ -330,11 +323,10 @@ private fun TvShowsHeroSlider(
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.8f)
-                                ),
-                                startY = 300f
+                                // Fade into the page background so the hero
+                                // blends seamlessly into the rows below.
+                                colors = listOf(Color.Transparent, PrimeBg),
+                                startY = 260f
                             )
                         )
                 )
@@ -387,14 +379,29 @@ private fun TvShowsHeroSlider(
                         onError = { logoLoaded = false }
                     )
                     
-                    // Metadata row
+                    // Metadata row: ★ rating · year · seasons · genres
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        targetSeries.year?.takeIf { it > 0 }?.let { year ->
+                        if (targetSeries.rating > 0) {
                             Text(
-                                text = year.toString(),
+                                text = "★ ${String.format("%.1f", targetSeries.rating)}",
+                                style = MaterialTheme.typography.titleMedium.copy(color = RatingGold, fontWeight = FontWeight.SemiBold)
+                            )
+                        }
+                        targetSeries.year?.takeIf { it > 0 }?.let { year ->
+                            Text(year.toString(), style = MaterialTheme.typography.titleMedium.copy(color = TextSecondary))
+                        }
+                        if (targetSeries.totalSeasons > 0) {
+                            Text(
+                                "${targetSeries.totalSeasons} Season${if (targetSeries.totalSeasons != 1) "s" else ""}",
+                                style = MaterialTheme.typography.titleMedium.copy(color = TextSecondary)
+                            )
+                        }
+                        if (targetSeries.genres.isNotEmpty()) {
+                            Text(
+                                targetSeries.genres.take(2).joinToString(" • "),
                                 style = MaterialTheme.typography.titleMedium.copy(color = TextSecondary)
                             )
                         }
@@ -413,28 +420,15 @@ private fun TvShowsHeroSlider(
                         )
                     }
                     
-                    // View Details button
-                    var viewDetailsFocused by remember { mutableStateOf(false) }
-                    Button(
-                        onClick = { onSeriesClick(targetSeries) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (viewDetailsFocused) Color(0xFFE50914) else Color.White,
-                            contentColor = if (viewDetailsFocused) Color.White else Color.Black
-                        ),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.height(44.dp)
-                            .then(
-                                if (contentFocusRequester != null) {
-                                    Modifier.focusRequester(contentFocusRequester)
-                                } else Modifier
-                            )
-                            .onFocusChanged { viewDetailsFocused = it.isFocused }
-                    ) {
-                        Text(
-                            text = "View Details",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            )
+                    // Proper red Play/Episodes action (Prime-style), replaces the
+                    // plain "View Details" button.
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 4.dp)) {
+                        HeroActionButton(
+                            label = "Episodes",
+                            icon = { Icon(Icons.Default.PlayArrow, null, Modifier.size(26.dp)) },
+                            primary = true,
+                            focusRequester = contentFocusRequester,
+                            onClick = { onSeriesClick(targetSeries) }
                         )
                     }
                 }
@@ -621,8 +615,8 @@ private fun TvSeriesCard(
                             .background(
                                 brush = androidx.compose.ui.graphics.Brush.verticalGradient(
                                     colors = listOf(
-                                        NetflixRed.copy(alpha = 0.8f),
-                                        NetflixRed.copy(alpha = 0.6f)
+                                        PrimeBlue.copy(alpha = 0.8f),
+                                        PrimeBlue.copy(alpha = 0.6f)
                                     )
                                 )
                             ),

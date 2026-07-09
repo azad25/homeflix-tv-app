@@ -52,14 +52,14 @@ fun Top10Row(
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = TextPrimary
             ),
-            modifier = Modifier.padding(start = 56.dp, bottom = 12.dp)
+            modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)
         )
 
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 56.dp),
+            contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             itemsIndexed(items) { index, media ->
@@ -83,7 +83,7 @@ private fun Top10Card(
     modifier: Modifier = Modifier
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.07f else 1f, tween(180), label = "top10_scale")
+    val scale by animateFloatAsState(if (focused) 1.06f else 1f, tween(180), label = "top10_scale")
 
     Row(
         verticalAlignment = Alignment.Bottom,
@@ -118,7 +118,7 @@ private fun Top10Card(
                 .data(ApiUtils.getPosterUrl(media))
                 .memoryCacheKey("poster_${media.id}")
                 .diskCacheKey("poster_${media.id}")
-                .crossfade(true)
+                .crossfade(false)
                 .build(),
             contentDescription = media.title,
             contentScale = ContentScale.Crop,

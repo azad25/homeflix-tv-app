@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -37,6 +38,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.homeflix.tv.presentation.components.CertBadge
+import com.homeflix.tv.presentation.components.ContinueWatchingRow
+import com.homeflix.tv.presentation.components.SidebarOverlay
 import com.homeflix.tv.presentation.components.HeroActionButton
 import com.homeflix.tv.presentation.navigation.Screen
 import com.homeflix.tv.presentation.theme.*
@@ -61,8 +64,14 @@ fun TvSeriesDetailsScreen(
     val episodes by viewModel.episodes.collectAsState()
     val selectedSeason by viewModel.selectedSeason.collectAsState()
     val episodesLoading by viewModel.episodesLoading.collectAsState()
+    val continueWatching by viewModel.continueWatching.collectAsState()
 
     val playFocusRequester = remember { FocusRequester() }
+    // Hoisted above the when(state) so episode-list scroll survives returning
+    // from the player (screen stays on the back stack).
+    val listState = rememberLazyListState()
+    // Overlay nav rail (LEFT/Back reveals it over the cinematic hero)
+    var showSidebar by remember { mutableStateOf(false) }
 
     LaunchedEffect(seriesId) {
         viewModel.loadSeriesDetails(seriesId)
@@ -72,26 +81,42 @@ fun TvSeriesDetailsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(PrimeBg)
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.key) {
+                        Key.DirectionLeft -> {
+                            if (!showSidebar) { showSidebar = true; true } else false
+                        }
+                        Key.Back -> {
+                            if (showSidebar) { showSidebar = false; true } else false
+                        }
+                        else -> false
+                    }
+                } else false
+            }
     ) {
         when (val state = uiState) {
             is TvSeriesDetailsUiState.Success -> {
                 val series = state.series
 
                 LaunchedEffect(series.id) {
-                    delay(400)
-                    try {
-                        playFocusRequester.requestFocus()
-                    } catch (_: Exception) {
+                    // Focus Play, then pin to top so the hero + focus don't leave
+                    // the page scrolled into the episode list.
+                    delay(350)
+                    repeat(8) {
+                        try { playFocusRequester.requestFocus(); return@repeat } catch (_: Exception) { delay(40) }
                     }
+                    delay(60)
+                    listState.scrollToItem(0)
                 }
 
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     // ── HERO ─────────────────────────────────────────────
                     item {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(480.dp)
+                                .height(440.dp)
                         ) {
                             AsyncImage(
                                 model = coil.request.ImageRequest.Builder(LocalContext.current)
@@ -239,6 +264,21 @@ fun TvSeriesDetailsScreen(
                         }
                     }
 
+                    // ── CONTINUE WATCHING (this series) ──────────────────
+                    if (continueWatching.isNotEmpty()) {
+                        item {
+                            ContinueWatchingRow(
+                                continueWatchingItems = continueWatching,
+                                onPlay = { media, startMs ->
+                                    navController.navigate(Screen.VideoPlayer.createRoute(media.id, startTime = startMs))
+                                },
+                                onInfo = { /* already on the series page */ },
+                                mediaTypeFilter = null,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                            )
+                        }
+                    }
+
                     // ── SEASON SELECTOR ──────────────────────────────────
                     item {
                         Column(modifier = Modifier.padding(top = 8.dp)) {
@@ -322,6 +362,14 @@ fun TvSeriesDetailsScreen(
                 }
             }
         }
+
+        // Overlay nav rail (LEFT reveals it, RIGHT/Back dismisses)
+        SidebarOverlay(
+            visible = showSidebar,
+            selectedRoute = "tv-shows",
+            onNavigate = { route -> navController.navigate(route) },
+            onDismiss = { showSidebar = false }
+        )
     }
 }
 
@@ -409,16 +457,21 @@ private fun EpisodeTile(
                     .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(6.dp))
             ) {
+                // Always hit the auto-downloading /episode-stills endpoint;
+                // swap to the thumbnail exactly once if it truly 404s.
+                var stillFailed by remember(episode.id) { mutableStateOf(false) }
+                val stillModel = if (stillFailed)
+                    ApiUtils.getEpisodeThumbnailUrl(episode)
+                else
+                    ApiUtils.getEpisodeStillUrl(episode.id)
                 AsyncImage(
                     model = coil.request.ImageRequest.Builder(LocalContext.current)
-                        .data(
-                            episode.episodeStillPath?.takeIf { it.isNotBlank() }
-                                ?: ApiUtils.getEpisodeThumbnailUrl(episode)
-                        )
-                        .memoryCacheKey("episode_${episode.id}")
-                        .diskCacheKey("episode_${episode.id}")
+                        .data(stillModel)
+                        .memoryCacheKey(if (stillFailed) "episode_thumb_${episode.id}" else "episode_still_${episode.id}")
+                        .diskCacheKey(if (stillFailed) "episode_thumb_${episode.id}" else "episode_still_${episode.id}")
                         .crossfade(true)
                         .build(),
+                    onError = { if (!stillFailed) stillFailed = true },
                     contentDescription = episode.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()

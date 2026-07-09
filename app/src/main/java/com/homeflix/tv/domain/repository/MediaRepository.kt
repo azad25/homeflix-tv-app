@@ -51,7 +51,10 @@ interface MediaRepository {
     suspend fun getTvSeriesSeasons(seriesId: Int): List<Season>
     suspend fun getTvSeriesSeason(seriesId: Int, seasonNumber: Int): Season
     suspend fun getTvSeriesEpisodes(seriesId: Int, seasonNumber: Int): List<Episode>
-    
+
+    // Notifications (display-only)
+    suspend fun getNotifications(limit: Int = 50): List<Notification>
+
     // Recommendation methods
     suspend fun getMixedRecommendations(limit: Int = 25): retrofit2.Response<List<com.homeflix.tv.data.remote.dto.MediaDto>>
     suspend fun getTrendingRecommendations(limit: Int = 25): retrofit2.Response<List<com.homeflix.tv.data.remote.dto.MediaDto>>

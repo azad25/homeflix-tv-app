@@ -54,7 +54,9 @@ fun BackgroundVideo(
         label = "bg_video_alpha"
     )
 
-    // (Re)start playback when the target video changes
+    // (Re)start playback when the target video changes. Background preview is
+    // a HomeFlix signature — always kept; we just keep buffers small (below)
+    // so it's light on low-RAM TVs.
     LaunchedEffect(videoUrl, playbackEnabled) {
         firstFrameRendered = false
         player?.release()
@@ -63,7 +65,13 @@ fun BackgroundVideo(
 
         delay(startDelayMs)
 
-        val exo = ExoPlayer.Builder(context).build().apply {
+        // Small buffers keep the ambient preview light on low-RAM TVs
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(2_000, 8_000, 1_000, 1_500)
+            .build()
+        val exo = ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .build().apply {
             setMediaItem(MediaItem.fromUri(videoUrl))
             repeatMode = Player.REPEAT_MODE_ONE
             volume = 0f

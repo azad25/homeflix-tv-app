@@ -1,449 +1,189 @@
-# 🎬 HomeFlix TV - Netflix-Style Android TV App
+# 🎬 HomeFlix TV — Android TV Streaming Client
 
-**Version 2.0** - Professional Android TV streaming application with modern UI/UX, featuring ultra-fast LAN streaming, intelligent caching, smooth D-pad navigation, and professional-grade video playback. Built with Jetpack Compose and optimized for the bigs screen experience.
+**Version 4.0** — A Netflix/Prime‑grade Android TV client for the HomeFlix media server. Full‑bleed cinematic UI with auto‑playing background previews, a red‑and‑black HomeFlix theme, D‑pad‑first navigation, and an ExoPlayer video pipeline that buffers ahead for smooth playback. Built with Jetpack Compose and deliberately tuned to stay light on low‑RAM TVs (e.g. a 2 GB Sony Android TV).
 
-![Android TV](https://img.shields.io/badge/Android-TV-3DDC84?style=flat&logo=android) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=flat&logo=kotlin) ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=jetpack-compose) ![ExoPlayer](https://img.shields.io/badge/ExoPlayer-FF0000?style=flat&logo=youtube) ![Material3](https://img.shields.io/badge/Material%203-1976D2?style=flat&logo=material-design) ![Version](https://img.shields.io/badge/version-2.0-blue)
+![Android TV](https://img.shields.io/badge/Android-TV-3DDC84?style=flat&logo=android) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=flat&logo=kotlin) ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=jetpack-compose) ![Media3 ExoPlayer](https://img.shields.io/badge/Media3-ExoPlayer-FF0000?style=flat) ![Hilt](https://img.shields.io/badge/Hilt-DI-2196F3?style=flat)
 
+---
 ## 📱 App Preview
 
 ![HomeFlix TV Preview](preview-app.gif)
 
-### 🎯 Netflix-Level Features
-- **Auto-sliding hero section** with crossfade animations and staggered content reveal
-- **Smooth D-pad navigation** optimized for TV remotes with professional focus management
-- **Continue Watching** with progress tracking and resume functionality
-- **Professional video player** with enhanced subtitle support and customizable styling
-- **Intelligent caching system** for instant app startup and offline support
-- **TV series support** with season/episode navigation and autoplay
-- **My List** functionality for personalized content management
-- **Smart recommendations** with multiple algorithm endpoints
-- **Clean, modern UI** following Material Design 3 with Netflix-inspired theming
+## 1. Overview
 
-## 🌟 HomeFlix Ecosystem
+HomeFlix TV is the living‑room client of the HomeFlix ecosystem (Go media server + Next.js web app + this TV app). It talks to the same REST API as the web app and focuses on:
 
-HomeFlix TV is part of the comprehensive **HomeFlix streaming platform ecosystem**:
+- **Cinematic browsing** — full‑bleed heroes with muted auto‑playing preview clips, Top‑10 rows, "art + logo" landscape cards, and poster grids.
+- **Continue Watching** across movies and TV series, with real resume.
+- **Smooth playback** — direct play of the server's files, buffer‑ahead ExoPlayer config, subtitle/audio selection.
+- **Low‑RAM friendliness** — the app detects constrained devices and scales caches, image bitmap depth, and playback buffers accordingly.
 
-- **🏠 HomeFlix Web Backend** - Full-featured media server with torrent downloads
-- **📱 HomeFlix TV** - Android TV client (this repository)  
-- **🌐 Web Interface** - Netflix-style web UI for browser access
+## 2. Tech stack
 
-🔗 **Backend Repository**: [HomeFlix Web App](https://github.com/azad25/homeflix-wifi)
+| Concern | Choice |
+|---|---|
+| UI | Jetpack Compose (Material 3) |
+| DI | Hilt |
+| Navigation | Navigation‑Compose (global fade transitions) |
+| Media | AndroidX **Media3 / ExoPlayer** |
+| Images | **Coil** (custom `ImageLoader`) |
+| Networking | Retrofit + OkHttp + Gson |
+| Async | Coroutines + StateFlow |
+| SDK | `compileSdk/targetSdk 36`, `minSdk 23` |
 
-### 🎥 Complete Streaming Solution
-The HomeFlix ecosystem provides a professional streaming experience with:
-- **One-click torrent downloads** directly from TMDB movie pages
-- **Real-time download progress** tracking with speed and ETA
-- **Automatic library integration** for downloaded content
-- **Multi-source torrent search** with quality filtering (4K, 1080p, 720p)
-- **Smart media management** with automatic metadata fetching
-- **Netflix-style interface** across all platforms
-- **Cross-platform compatibility** (Web, Android TV, Mobile)
+## 3. Architecture
 
-## ✨ Features
+Clean‑ish MVVM with a single Hilt‑provided repository.
 
-### 🎥 Advanced Video Streaming
-- **Ultra-fast LAN streaming** with instant playback and zero-copy sendfile optimization
-- **ExoPlayer 3 integration** with professional-grade video rendering and hardware acceleration
-- **Multiple format support** (MP4, MKV, AVI, MOV, WMV) with automatic transcoding
-- **Adaptive streaming** with automatic quality adjustment and buffer management
-- **Resume playback** from last watched position with progress sync
-- **Enhanced subtitle support** with multiple formats (SRT, VTT, ASS/SSA) and customizable styling
-- **Progress tracking** with automatic save on exit and real-time sync
-- **Netflix-red themed player** with smooth controls and auto-hiding UI
-- **Episode autoplay** for TV series with next episode preview
-- **Multiple audio tracks** and subtitle language selection
-
-### 📺 Netflix-Style TV Interface
-- **Auto-sliding hero section** with crossfade animations and 10-second intervals
-- **Staggered content animations** with fade-in effects for professional polish
-- **Smooth D-pad navigation** between all UI elements with proper focus management
-- **48dp side navigation** with Netflix-red selection indicators and scale animations
-- **Continue Watching** row with progress bars and resume functionality
-- **Multiple content rows** (Trending, Popular, Latest, Action, Drama, Sci-Fi, Horror, Romance, Thriller)
-- **Genre-based browsing** with paginated grid layouts and load more functionality
-- **Search functionality** with virtual QWERTY keyboard and genre filtering
-- **My List** screen for personalized content management
-- **TV Series support** with season/episode navigation and detailed metadata
-- **Recommendation system** with multiple algorithm endpoints (mixed, trending, popular, personalized)
-
-### 🎮 TV Remote Optimization
-- **Natural D-pad navigation** following Android TV guidelines
-- **Focus management** with clear visual feedback
-- **LEFT arrow** navigates to sidebar from any screen
-- **BACK button** focuses navigation (Netflix behavior)
-- **UP/DOWN arrows** for smooth content scrolling
-- **No focus traps** - can navigate freely between areas
-- **Auto-focus** on first content row at app launch
-
-### 🏗️ Technical Architecture
-- **Clean Architecture** with MVVM pattern and clear separation of concerns (domain, data, presentation)
-- **Jetpack Compose** for modern declarative UI with Material Design 3 theming
-- **Hilt dependency injection** for maintainable and testable code structure
-- **ExoPlayer 3** integration with custom controls and subtitle rendering
-- **Coroutines and Flow** for reactive programming and async operations
-- **Navigation Component** with type-safe screen routing and deep linking
-- **StateFlow** for reactive UI state management and lifecycle awareness
-- **Coil** for efficient image loading with multi-tier caching (memory + disk)
-- **Retrofit** for REST API communication with GSON serialization
-- **SharedPreferences** for lightweight content caching (24-hour expiration)
-- **Room Database** ready for advanced offline storage (planned)
-- **Retry Policy** with exponential backoff for network resilience
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Android Studio Arctic Fox or later
-- Android TV device or emulator (API 23+)
-- **HomeFlix media server** running on your network
-- HomeFlix backend setup from [HomeFlix Web App](https://github.com/azad25/homeflix-wifi)
-
-### Installation
-
-1. **Set up HomeFlix Backend**
-   - Install and configure [HomeFlix Web App](https://github.com/azad25/homeflix-wifi)
-   - Ensure your media server is running and accessible
-   - Configure torrent download settings if desired
-
-2. **Clone the TV client repository**
-   ```bash
-   git clone https://github.com/your-username/HomeFlixTV.git
-   cd HomeFlixTV
-   ```
-
-3. **Configure backend connection**
-   
-   Update the base URL in `VideoPlayer.kt`:
-   ```kotlin
-   private fun getBaseUrl(): String {
-       return "http://YOUR_SERVER_IP:8252"  // Replace with your server IP
-   }
-   ```
-   
-   Or update the API configuration in your network module for global configuration.
-
-4. **Build and run**
-   ```bash
-   ./gradlew assembleDebug
-   ```
-
-   Or open in Android Studio and click **Run** ▶️
-
-## 🚀 Version 2.0 - What's New
-
-### ✨ Major Features
-- **Intelligent Caching System** - 24-hour content cache for instant app startup with background refresh
-- **TV Series Support** - Full season/episode navigation with autoplay and detailed metadata
-- **My List Functionality** - Personalized watchlist management with add/remove capabilities
-- **Enhanced Continue Watching** - Progress tracking with resume from any device and time-ago display
-- **Smart Recommendations** - Multiple algorithm endpoints (mixed, trending, popular, personalized) with cycling system
-- **Paginated Browse** - Memory-efficient browsing with load more functionality (24 items per page, max 200 in memory)
-
-### 🎨 UI/UX Improvements
-- **Staggered Animations** - Professional content reveal with fade-in effects and delayed entrance
-- **Improved Focus Management** - Netflix-level D-pad navigation with no focus traps and proper sidebar exit
-- **Enhanced Hero Section** - Crossfade transitions with 10-second auto-slide and staggered content animations
-- **Better Loading States** - Smooth transitions with Netflix-red spinners and full-screen overlays
-- **Refined Card Designs** - Border-only focus indicators (2dp white) with subtle scale animations (1.05x)
-- **TV Series UI** - Season/episode cards with backdrop thumbnails and episode metadata
-
-### ⚡ Performance Enhancements
-- **Aggressive Image Caching** - 25% memory cache (256MB) + 512MB disk cache with Coil
-- **Content Caching** - Instant startup with 24-hour cached content using SharedPreferences
-- **Retry Policy** - Exponential backoff (3 attempts, 1s-10s delays) for network resilience
-- **Network Monitoring** - LAN-optimized connectivity checks (WiFi/Ethernet, no internet required)
-- **Reduced Logging** - Production-ready with minimal overhead (removed 50+ debug logs)
-- **Memory Management** - Paginated loading with max 200 items to prevent OOM on budget devices
-
-### 🐛 Bug Fixes
-- Fixed subtitle loading blocking video playback (timeout + optional subtitle config)
-- Resolved focus management issues in hero section (removed auto-focus interference)
-- Fixed progress tracking sync across screens (unified API endpoint)
-- Improved error handling for network failures (detailed error messages with server URL)
-- Fixed memory leaks in image loading (proper lifecycle management)
-- Fixed continue watching showing episodes on movie homepage (type filtering)
-- Fixed hero slider showing old content (always show latest by creation date)
-
-### 📚 Documentation
-- Added comprehensive ENHANCEMENTS.md with caching and retry policy details
-- Added PERFORMANCE_OPTIMIZATION.md with device-specific recommendations
-- Updated LAN_SETUP_GUIDE.md with troubleshooting and network requirements
-- Enhanced README with v2.0 features and accurate technical details
-
-### 🔧 Technical Improvements
-- **API Integration** - Full REST API with 30+ endpoints for media, playback, recommendations
-- **State Management** - Improved StateFlow usage with proper lifecycle handling
-- **Error Handling** - Comprehensive try-catch blocks with fallback mechanisms
-- **Code Organization** - Clean separation of concerns with domain/data/presentation layers
-- **Dependency Injection** - Hilt integration for all ViewModels and repositories
-
-### 📋 Planned Features (v2.1+)
-- Room Database integration for advanced offline storage and complex queries
-- Background sync with WorkManager for periodic content updates
-- Predictive caching for likely-to-watch content based on viewing patterns
-- Advanced error recovery with circuit breaker pattern
-- User profiles and preferences with personalized settings
-- Cast integration for multi-device streaming (Chromecast support)
-- Adaptive image cache based on device RAM (10%-25% scaling)
-- Download support for offline viewing
-
----
-
-## 🏗️ Architecture Overview
-
-### Package Structure
 ```
 com.homeflix.tv/
-├── HomeFlixTVApplication.kt     # Application class with Hilt setup
-├── di/                          # Dependency injection modules
-│   └── NetworkModule.kt        # Retrofit and API configuration
-├── domain/                      # Business logic and models
-│   └── model/
-│       ├── Media.kt            # Core media data model
-│       ├── Genre.kt            # Genre classification
-│       ├── ContinueWatching.kt # Playback progress tracking
-│       └── MediaType.kt        # Movie/TV show enumeration
-├── data/                        # Data access layer
-│   ├── remote/api/             # API service interfaces
-│   ├── remote/dto/             # Data transfer objects
-│   └── repository/              # Repository implementations
-├── presentation/                # UI layer (Jetpack Compose)
-│   ├── MainActivity.kt         # Main TV activity
-│   ├── navigation/             # Navigation graph and routes
-│   ├── screens/                # Screen composables
-│   │   ├── home/               # Home screen with hero section
-│   │   ├── search/             # Search with virtual keyboard
-│   │   ├── browse/             # Browse movies grid
-│   │   ├── details/            # Movie details screen
-│   │   └── player/             # Video player screen
-│   ├── components/             # Reusable UI components
-│   │   ├── NetflixHeroSection.kt    # Auto-sliding hero carousel
-│   │   ├── NetflixSideNavigation.kt # 48dp sidebar navigation
-│   │   ├── NetflixMediaCard.kt      # Focusable movie cards
-│   │   ├── MediaRow.kt              # Horizontal content rows
-│   │   └── VideoPlayer.kt           # ExoPlayer integration
-│   └── theme/                  # Material Design 3 theming
-└── util/                       # Utility classes and helpers
-    └── ApiUtils.kt             # URL construction helpers
+├── HomeFlixTVApplication.kt        # Hilt app; Coil loader; server probe at boot
+├── di/                             # NetworkModule (Retrofit + failover), RepositoryModule
+├── domain/
+│   ├── model/                      # Media, Genre, Notification, Playback, StreamInfo …
+│   └── repository/MediaRepository  # interface
+├── data/
+│   ├── remote/api/HomeFlixApiService   # Retrofit endpoints
+│   ├── remote/dto/                     # DTOs + toDomain() mappers
+│   └── repository/MediaRepository      # implementation
+├── presentation/
+│   ├── MainActivity.kt             # single activity; theme + NavHost
+│   ├── navigation/HomeFlixNavigation   # NavHost + Screen routes (fade transitions)
+│   ├── screens/                    # one folder per screen (Screen + ViewModel)
+│   │   ├── home/ NetflixHomeScreen + HomeViewModel
+│   │   ├── details/ (movie) · tvshows/ (series list, series details, season, player-agnostic)
+│   │   ├── browse/ · search/ · mylist/ · notifications/
+│   │   └── player/ VideoPlayerScreen + VideoPlayerViewModel
+│   ├── components/                 # shared, reusable composables (see §5)
+│   └── theme/                      # Color.kt (red/black), Type, Theme
+└── util/                           # ApiUtils, ImageCache, DeviceCapabilities,
+                                    #   ServerConfig, NetworkMonitor, RetryPolicy
 ```
 
-### Key Components
+**Data flow:** `Screen` → `hiltViewModel()` → `MediaRepository` → `HomeFlixApiService` (Retrofit). ViewModels expose `StateFlow<UiState>`; screens `collectAsState()` and render. DTOs map to domain models via `toDomain()`.
 
-#### Video Player (`VideoPlayer.kt`)
-- **Professional ExoPlayer integration** with custom controls
-- **Netflix-style UI** with red accent colors and smooth animations
-- **TV remote optimization** with D-pad navigation support
-- **Auto-hiding controls** after 3 seconds of inactivity
-- **Progress tracking** with automatic save on player exit
-- **Enhanced subtitle support** with customizable text size and transparent background
-- **Multiple playback speeds** and seeking controls
-- **Volume control** with visual feedback
+## 4. Design system (RED + BLACK)
 
-#### Hero Section (`NetflixHeroSection.kt`)
-- **Auto-sliding carousel** with 5-second intervals
-- **Staggered animations** for title, metadata, description, and buttons
-- **Loading states** with Netflix-red spinner and fade transitions
-- **Background crossfade** between different media items
-- **Netflix-style metadata** with match percentage, year, rating, and genres
-- **Responsive layout** optimized for 480dp height
-- **Focus management** without blocking D-pad navigation
+All colors live in `presentation/theme/Color.kt`. The palette is HomeFlix **black canvas + Netflix‑red accent**. For historical reasons the tokens are named `Prime*`, but their **values** are black/red — change them in one place to re‑skin the whole app:
 
-#### Side Navigation (`NetflixSideNavigation.kt`)
-- **48dp wide icon-only sidebar** for clean TV interface
-- **Individual focusable icons** with proper focus management
-- **Netflix red selection** indicator for current page
-- **White border focus** indicators with smooth transitions
-- **Passive focus behavior** - only gets focus when explicitly requested
-- **RIGHT arrow exit** back to content areas
+| Token | Value | Use |
+|---|---|---|
+| `PrimeBg` | `#0B0B0B` | page background |
+| `PrimeBgDeep` | `#000000` | hero gradient target |
+| `PrimeSurface` / `PrimeSurfaceHigh` | `#1A1A1A` / `#2A2A2A` | cards, focused surface |
+| `PrimeBlue` | `#E50914` | **accent = Netflix red** (focus, CTAs, progress) |
+| `PrimeTextDim` | `#B3B3B3` | secondary text |
+| `RatingGold` | `#FFB43A` | ★ ratings |
+| `NetflixRed` | `#E50914` | brand wordmark |
 
-#### Media Cards (`NetflixMediaCard.kt`)
-- **Netflix-style scaling** animation on focus (1.05x scale)
-- **White border indicators** with 3dp width for clear focus feedback
-- **Smooth transitions** with 200ms animation timing
-- **Aspect ratio optimization** (2:3) for poster display
-- **Elevation changes** on focus for depth perception
-- **Click handling** with proper navigation to details screens
+Focus is shown with a **2 dp white border + `graphicsLayer` scale** (draw‑time, no relayout).
 
-## 🎮 Navigation System
+## 5. Key components (`presentation/components/`)
 
-### Netflix-Level D-Pad Navigation
-The app implements a sophisticated navigation system that matches Netflix's TV app behavior:
+| Component | Role |
+|---|---|
+| `CinematicHero` | Home hero: full‑bleed backdrop → auto preview video, logo/metadata, Play/More Info |
+| `BackgroundVideo` | Lifecycle‑safe muted looping preview player (kept small‑buffer) |
+| `FeaturedBanner` | "half/half" section: one big banner + rotating side picks |
+| `Top10Row` | Prime‑style big outlined rank numbers |
+| `PosterCard` | Shared 2:3 poster card (Search, My List, rows) |
+| `ThumbLogoCard` / `ThumbLogoRow` | 16:9 backdrop **with title logo composited** — the "art + logo" style used on Movies/Browse, More‑like‑this, Trending |
+| `ContinueWatchingRow` | Movie continue‑watching (episode‑aware) |
+| `ContinueWatchingSeriesRow` | **TV** continue‑watching: one card per series (series banner), resumes the in‑progress episode |
+| `MediaRow` / `MediaCard` | Generic poster row/card |
+| `NetflixSideNavigation` | 48 dp left rail (Search, Home, Browse, TV Shows, My List, Notifications) |
+| `SidebarOverlay` | Slides the rail in over full‑bleed detail pages on LEFT press |
+| `VideoPlayer` | The player UI + ExoPlayer wiring (see §7) |
+| `PlayerSettingsPanel` | D‑pad settings drawer (speed / subtitles / audio) |
 
-```
-App Launch Flow:
-├── Focus: First content row (Continue Watching/Trending)
-├── UP arrow: Navigate to hero section
-├── DOWN arrow: Navigate between content rows
-├── LEFT arrow: Navigate to sidebar from any screen
-├── RIGHT arrow: Navigate back to content from sidebar
-└── BACK button: Focus navigation (Netflix behavior)
+## 6. Screens & flow
 
-Content Navigation:
-├── Individual cards: Independently focusable with scaling animation
-├── Smooth scrolling: Auto-scroll to focused items in rows
-├── Visual feedback: White borders and scaling on focus
-├── No focus traps: Can navigate freely between all areas
-└── Natural traversal: System handles focus movement between elements
-```
+- **Home** — Cinematic hero → Continue Watching → Featured banner (big + rotating) → Top 10 → a thumb+logo Trending row → a genre row. UP from the first row returns focus to the hero and scrolls to top.
+- **Movies (Browse)** — genre‑grouped **thumb+logo** rows ("Recently Added" + Action/Drama/Comedy/Sci‑Fi/… + "All Movies"), built client‑side from one capped batch.
+- **Search** — on‑screen QWERTY keyboard + **large poster grids** (results and Top Searches).
+- **My List** — Continue Watching rail + poster grid + empty state.
+- **TV Shows** — series **CinematicHero** (red "Episodes" Play button) → **Continue Watching (series banners)** → Popular + genre‑grouped series rows.
+- **Movie Details** — full‑bleed hero (backdrop → preview video), badges, cast/director, **Resume vs Play** based on saved progress, and a **More like this** thumb+logo row. Starts at the top (hero fits the viewport so focusing Play never scrolls the page down).
+- **TV Series Details** — hero + inline **season selector** + Prime‑style **episode tiles** (still, number, title, duration, synopsis) + per‑series Continue Watching. Selected season is remembered when you return from the player.
+- **Notifications** — local‑only, **selectable** cards (art from the referenced media id, title, message, relative time); opens the movie/series.
+- **Player** — see §7.
 
-### Screen-Specific Features
-- **Home Screen**: Auto-sliding hero, multiple content rows, continue watching
-- **Search Screen**: Virtual keyboard, genre browsing, search results grid
-- **Browse Screen**: Paginated movie grid with load more functionality
-- **Details Screen**: Full movie information with play/info buttons
-- **Video Player**: Custom controls with subtitle support and progress tracking
+Navigation uses global **fade in/out** transitions; the player fades on open/close.
 
-## 🎨 UI/UX Design
+## 7. Streaming & playback
 
-### Netflix-Inspired Interface
-- **Material Design 3** with dark theme optimized for TV viewing
-- **Netflix color scheme** with red accents (#E50914) and white text
-- **Staggered animations** for professional content entrance
-- **Smooth transitions** between all screens and states
-- **Consistent focus indicators** across all interactive elements
+- **Direct play.** The player streams the server's file URL (`/stream/{id}`); TV SoCs decode HEVC/AC3/MKV in hardware, so nothing is transcoded for the TV client on LAN.
+- **Buffer‑ahead (Netflix/YouTube‑style).** ExoPlayer `LoadControl` starts fast (~2 s) then reads **up to ~2 minutes ahead**, with a **byte cap** so 4K can't exhaust RAM on a 2 GB TV (cap ≈ 80 MB low‑RAM / 256 MB otherwise; at 4K bitrate the cap is hit first at ~15–20 s, at HD it reaches the full ~2 min). This replaced an old 2‑second cap that caused frequent stalls.
+- **Two‑line title** for episodes (Series · S#E# · Episode), **Next Episode** button, and **reliable auto‑advance** driven by the season episode list from the ViewModel.
+- **Resume** — `VideoPlayerViewModel` loads saved progress when no explicit start time is passed, so episodes and movies continue where you left off.
+- **D‑pad controls** — bottom red scrubber (←/→ seek), centered option row, and a focus model where the controls own D‑pad input while shown; a **settings drawer** (speed / subtitle track / audio track) is fully navigable.
+- **Lifecycle‑safe** — playback pauses on HOME/stop and saves progress; the player releases on dispose.
 
-### TV-Specific Optimizations
-- **Landscape-only orientation** for TV viewing
-- **48dp sidebar navigation** for easy thumb navigation
-- **Large card layouts** (160dp width) optimized for viewing distance
-- **High contrast colors** for visibility in various lighting conditions
-- **Smooth scaling animations** for focus feedback
+## 8. Networking (dual endpoint)
 
-## 🔧 Configuration
+`util/ServerConfig` + a `ServerFailoverInterceptor` pick the server at runtime:
 
-### Backend Integration
-HomeFlix TV connects to the HomeFlix web backend which provides:
-- **Media library management** with automatic TMDB metadata fetching
-- **Torrent download system** with real-time progress tracking and speed monitoring
-- **Multi-source search** through Jackett integration (600+ torrent sources)
-- **Quality filtering** (4K, 1080p, 720p, 480p) with automatic selection
-- **Automatic transcoding** for unsupported formats with hardware acceleration
-- **Subtitle management** with multiple language support and streaming
-- **Playback progress tracking** with cross-device sync
-- **Recommendation engine** with multiple algorithms (trending, popular, personalized)
-- **My List management** with add/remove functionality
-- **TV series hierarchy** with season/episode organization
+1. **LAN IP first** (`BuildConfig.BASE_URL`, e.g. `http://192.168.x.x:8252/api/`).
+2. **Public domain fallback** (`FALLBACK_BASE_URL`, `https://homeflix.ferdousazad.com/api/`).
 
-### Network Configuration
-```
-Default Port: 8252
-Protocol: HTTP (LAN only - no internet required)
-Streaming: Direct file streaming with sendfile optimization
-Transcoding: On-demand for unsupported formats (MKV → MP4)
-Torrent Integration: Jackett with 600+ sources
-API Endpoints: RESTful API with JSON responses
-Caching: Multi-tier (L1/L2/L3) for sub-millisecond response
-```
+A 2.5 s reachability probe runs at boot; every request transparently fails over to the other server and sticks with whichever works. All image/stream URLs are built from the active base, so they always match the API host.
 
-### Supported Media Formats
-- **Video**: MP4, MKV, AVI, MOV, WMV, WebM
-- **Audio**: AAC, MP3, AC3, DTS, ALAC (lossless), Opus
-- **Subtitles**: SRT, VTT, ASS/SSA with customizable styling
-- **Codecs**: H.264, H.265/HEVC, VP9, AV1
-- **Containers**: Support for all major formats with automatic transcoding
-- **Quality**: Up to 4K UHD with HDR support (hardware dependent)
-- **Audio Tracks**: Multiple audio tracks with language selection
-- **Subtitle Tracks**: Multiple subtitle tracks with language selection
+## 9. Performance & resource optimization
 
-## 📱 Development
+Tuned for constrained TVs via `util/DeviceCapabilities.isLowRam()` (true under ~2.5 GB total RAM or the OS low‑RAM flag):
 
-### Building from Source
+- **Images (Coil):** memory cache **12 %** of heap (20 % otherwise) + disk cache **96 MB** (256 MB otherwise); **RGB_565** bitmaps (half the memory → less GC) and **no global crossfade** (one less draw pass).
+- **Playback buffer:** byte‑capped (§7) so read‑ahead never OOMs.
+- **Background preview video:** kept (a HomeFlix signature) but runs with **small ExoPlayer buffers** (2 s/8 s) and is lifecycle‑guarded; only one plays at a time.
+- **D‑pad smoothness:** focus scaling via `graphicsLayer` (no relayout), stable `key = { it.id }` on all lists, no `onError` image‑URL swap chains during scroll, cached image keys.
+- **Startup:** cache‑first Home (paints from cache, refreshes in the background); a failed refresh never blanks a working screen.
+- **Fresh relaunch:** `clearTaskOnLaunch` returns to Home from the launcher; the player never keeps decoding in the background.
+
+## 10. Build & run
+
 ```bash
-# Debug build
+# JDK 17 required
+export JAVA_HOME=/path/to/jdk-17     # e.g. ~/.local/jdk/jdk-17*
+# Android SDK 36 in local.properties: sdk.dir=/path/to/Android/Sdk
+
 ./gradlew assembleDebug
+# → app/build/outputs/apk/debug/app-debug.apk   (~31 MB)
 
-# Release build
-./gradlew assembleRelease
-
-# Run tests
-./gradlew test
-
-# Generate APK
-./gradlew bundleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### Code Style
-- Follows [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html)
-- Uses [Detekt](https://detekt.github.io/detekt/) for static analysis (planned)
-- Implements [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) principles
-- MVVM pattern with StateFlow for reactive UI
-- Dependency injection with Hilt
-- Coroutines for async operations
+Set the server IP in `app/build.gradle.kts`:
 
-### Testing
-- Unit tests for ViewModels and repositories (planned)
-- UI tests for critical user flows (planned)
-- Integration tests for API communication (planned)
-- Manual testing on Android TV devices
+```kotlin
+buildConfigField("String", "BASE_URL", "\"http://YOUR_SERVER_IP:8252/api/\"")
+buildConfigField("String", "FALLBACK_BASE_URL", "\"https://your-domain/api/\"")
+```
 
-## 🚀 Current Development Status
-
-### ✅ Completed Features
-- **Netflix-style UI/UX** with Material Design 3
-- **Smooth D-pad navigation** optimized for TV remotes
-- **Auto-sliding hero section** with fade animations
-- **Professional video player** with ExoPlayer integration
-- **Enhanced subtitle support** with customizable styling
-- **Focus management system** following Android TV guidelines
-- **Multiple screen navigation** (Home, Search, Browse, Details, Player)
-- **Progress tracking** with resume functionality
-- **Search functionality** with virtual keyboard
-- **Genre-based browsing** with paginated results
-
-### 🔄 In Progress
-- Backend integration improvements
-- Additional streaming format support
-- Performance optimizations
-- Enhanced error handling
-
-### 📋 Planned Features
-- Watchlist functionality
-- User profiles and preferences
-- Advanced search filters
-- Offline download support
-- Cast integration
-
-## 🐛 Troubleshooting
-
-### Navigation Issues
-- **Focus stuck**: Press BACK button to reset focus to navigation
-- **Can't navigate**: Ensure D-pad is working, try LEFT arrow to access sidebar
-- **Scroll issues**: Use UP/DOWN arrows, avoid using trackpad/mouse
-
-### Video Playback Issues
-- **No video**: Check server IP configuration in `getBaseUrl()` function
-- **Buffering**: Verify network connection and server performance
-- **Subtitles**: Press 'S' key or use subtitle button in player controls
-- **Audio issues**: Check volume settings and audio codec compatibility
-
-### Build Issues
-- **Compilation errors**: Update Android Studio and sync Gradle
-- **Dependencies**: Run `./gradlew clean build` to refresh dependencies
-- **Focus issues**: Ensure target SDK is set to Android TV (API 23+)
-
-## ©️ Copyright
-
-**© 2025 Homeflix Studios. All Rights Reserved.**
-
-Homeflix Studios is the creator and maintainer of the HomeFlix streaming platform ecosystem, including the HomeFlix web backend and Android TV applications.
-
-## 🙏 Acknowledgments
-
-- **ExoPlayer** team for professional-grade media playback library
-- **Jetpack Compose** team for modern declarative UI toolkit
-- **Android TV** team for TV platform guidelines and support
-- **Material Design** team for comprehensive design system
-- **Hilt** team for dependency injection framework
-- **Coil** team for efficient image loading library
-- **Netflix** for UI/UX inspiration and TV navigation patterns
-- **HomeFlix** ecosystem for streaming backend integration
-
-## 📞 Support
-
-For issues, questions, or contributions:
-- Open an issue on GitHub
-- Check existing documentation
-- Review troubleshooting section
-
-🔗 **Backend Support**: [HomeFlix Web App Issues](https://github.com/azad25/homeflix-wifi/issues)
+The app icon (adaptive red "H▶" on black) lives in `res/drawable/ic_launcher_foreground.xml` + `ic_launcher_background.xml`; the TV banner is `res/drawable-nodpi/app_banner.png`.
 
 ---
+
+## Is it properly optimized / efficient for resources?
+
+**Short answer: yes for its target (a 2 GB LAN TV) at the config level, but this is engineering‑level tuning, not device‑measured, and a few things are worth cleaning up.**
+
+**What's genuinely efficient**
+- Memory is bounded on every axis that matters: image memory/disk caches scale down on low‑RAM, bitmaps are RGB_565 (½ the RAM), and the playback read‑ahead is **byte‑capped** so 4K can't OOM. These are the three biggest RAM consumers, all capped.
+- The player now **buffers ahead** for smoothness instead of the previous 2‑second cap, without sacrificing RAM safety.
+- CPU/GPU during browsing is modest: `graphicsLayer` focus scaling avoids relayout, lists reuse items via stable keys, and only **one** video decoder runs at a time (preview or playback).
+- Direct play means the TV's **hardware decoder** does the heavy lifting; the CPU stays cool unless the server transcodes.
+- Startup and navigation are cache‑first and lifecycle‑correct (no background decoding, no stale player on relaunch).
+
+**Honest caveats / where it's not perfect**
+- **Not profiled on the actual TV.** All of the above is measured from configuration, not from `dumpsys meminfo`/`gfxinfo` on your Sony. Real smoothness depends on the specific SoC.
+- **The background preview video is the heaviest ongoing cost.** It's a deliberate signature feature, but on a 2 GB TV a second decoder running while you navigate is the most likely remaining source of any jank. It can be gated off on low‑RAM devices in one line (`DeviceCapabilities.allowBackgroundVideo`) if you ever want to trade the flourish for maximum smoothness.
+- **One ExoPlayer instance per player screen** (created/released per navigation) rather than a shared pooled instance — fine, but re‑creation has a small cost.
+- **Legacy dead code still ships** (`HeroSection`, `NetflixHeroSection`, `RecommendationSection`, older card composables, unused `TopSearchCard`, `HomeScreen`). Harmless at runtime but adds a little APK size and confusion; removing it is a good cleanup.
+- **4K over the public domain** is the one weak spot: the byte‑capped buffer buys only ~15–20 s at 4K bitrate, so a slow internet uplink can still stall 4K remotely (LAN is fine). Server‑side adaptive/HLS for the TV client would fix that.
+
+**Bottom line:** for the intended use — a 2 GB Android TV streaming from a fast LAN server — the app is well within budget and should feel smooth. It is *config‑optimized and honest about it*, not lab‑verified; the one lever left for maximum smoothness on weak hardware is disabling the ambient background video.
+
+---
+
+## © Copyright
+© 2025 Homeflix Studios. All Rights Reserved.

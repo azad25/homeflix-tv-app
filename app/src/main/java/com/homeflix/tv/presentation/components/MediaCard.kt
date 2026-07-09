@@ -43,7 +43,7 @@ fun NetflixMediaCard(
     
     // Netflix-style scale animation on focus (reduced scale)
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.1f else 1.0f,
+        targetValue = if (isFocused) 1.06f else 1.0f,
         animationSpec = tween(durationMillis = 200),
         label = "netflix_card_scale"
     )
@@ -93,7 +93,7 @@ fun NetflixMediaCard(
                     .data(ApiUtils.getPosterUrl(media))
                     .memoryCacheKey("poster_${media.id}")
                     .diskCacheKey("poster_${media.id}")
-                    .crossfade(true)
+                    .crossfade(false)
                     .build(),
                 contentDescription = media.title,
                 modifier = Modifier

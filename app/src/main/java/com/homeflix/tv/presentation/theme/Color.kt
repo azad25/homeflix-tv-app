@@ -25,16 +25,17 @@ val WarningYellow = Color(0xFFFFC107)
 val ErrorRed = Color(0xFFDC3545)
 val InfoBlue = Color(0xFF17A2B8)
 
-// ── Prime/Netflix hybrid design system ──────────────────────────────
-// Deep blue-black canvas like Prime Video, with Prime blue as the
-// interactive accent and Netflix red kept as the brand color.
-val PrimeBg = Color(0xFF0F171E)          // page background
-val PrimeBgDeep = Color(0xFF00050D)      // hero gradient target
-val PrimeSurface = Color(0xFF1A242F)     // cards, chips
-val PrimeSurfaceHigh = Color(0xFF252E39) // focused surface
-val PrimeBlue = Color(0xFF1399FF)        // CTA / focus accent
-val PrimeBlueDark = Color(0xFF0F6FBD)
-val PrimeTextDim = Color(0xFF8197A4)     // secondary text (blue-grey)
+// ── HomeFlix design system (RED + BLACK) ────────────────────────────
+// Names kept as "Prime*" only so existing references compile; the VALUES
+// are HomeFlix black canvas + Netflix-red accent. Changing these recolors
+// the whole app.
+val PrimeBg = Color(0xFF0B0B0B)          // page background (near-black)
+val PrimeBgDeep = Color(0xFF000000)      // hero gradient target (black)
+val PrimeSurface = Color(0xFF1A1A1A)     // cards, chips
+val PrimeSurfaceHigh = Color(0xFF2A2A2A) // focused surface
+val PrimeBlue = Color(0xFFE50914)        // CTA / focus accent = Netflix red
+val PrimeBlueDark = Color(0xFFB0060F)
+val PrimeTextDim = Color(0xFFB3B3B3)     // secondary text (neutral grey)
 val RatingGold = Color(0xFFFFB43A)       // star ratings
-val BadgeOutline = Color(0xFF3A4750)     // certification chip border
-val Top10Stroke = Color(0xFF425364)      // outlined big numbers
+val BadgeOutline = Color(0xFF3A3A3A)     // certification chip border
+val Top10Stroke = Color(0xFF444444)      // outlined big numbers

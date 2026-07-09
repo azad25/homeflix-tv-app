@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,24 +49,15 @@ import androidx.compose.ui.focus.focusRequester
 
 
 
-private fun getEpisodeBackdropUrl(episode: Episode, series: com.homeflix.tv.presentation.screens.tvshows.TvSeries): String {
-    val apiUrl = ApiUtils.getBaseUrl()
-    
-    // Use episode_still_path if available (matching web frontend)
-    // Web pattern: episode.media?.episode_still_path ? `${getApiUrl()}/api/episode-stills/${episode.media.id}`
-    if (!episode.episodeStillPath.isNullOrEmpty()) {
-        return "$apiUrl/episode-stills/${episode.id}"
-    }
-    
-    // Fallback to episode thumbnail path
-    episode.thumbnailPath?.let { thumbnailPath ->
-        if (thumbnailPath.startsWith("http")) {
-            return thumbnailPath
-        }
-    }
-    
-    // Fallback to thumbnails endpoint
-    return "$apiUrl/thumbnails/${episode.id}"
+// Primary episode still: ALWAYS the auto-downloading endpoint (do not gate on
+// episodeStillPath — the backend omits it when empty, which would stop the
+// auto-download from ever running). Thumbnail is the Coil error fallback.
+private fun getEpisodeStillUrl(episode: Episode): String =
+    ApiUtils.getEpisodeStillUrl(episode.id)
+
+private fun getEpisodeThumbUrl(episode: Episode): String {
+    episode.thumbnailPath?.let { if (it.startsWith("http")) return it }
+    return "${ApiUtils.getBaseUrl()}/thumbnails/${episode.id}"
 }
 
 @Composable
@@ -78,10 +70,14 @@ fun TvSeriesSeasonScreen(
     val uiState by viewModel.uiState.collectAsState()
     val contentFocusRequester = remember { FocusRequester() }
     
+    // Hoisted above the when(state) so scroll survives state re-emission and
+    // returning from the player while this screen stays on the back stack.
+    val scrollState = rememberLazyListState()
+
     LaunchedEffect(seriesId, seasonNumber) {
         viewModel.loadSeasonDetails(seriesId, seasonNumber)
     }
-    
+
     // Auto-focus content when loaded
     LaunchedEffect(uiState) {
         if (uiState is TvSeriesSeasonUiState.Success) {
@@ -153,8 +149,7 @@ fun TvSeriesSeasonScreen(
                 val series = currentState.series
                 val season = currentState.season
                 val episodes = currentState.episodes
-                val scrollState = rememberLazyListState()
-                
+
                 LazyColumn(
                     state = scrollState,
                     userScrollEnabled = true,
@@ -502,7 +497,7 @@ private fun EpisodeCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .scale(scale)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
@@ -560,30 +555,23 @@ private fun EpisodeCard(
                         RoundedCornerShape(8.dp)
                     )
             ) {
-                var episodeImageUrl by remember { mutableStateOf(getEpisodeBackdropUrl(episode, series)) }
-                var fallbackLevel by remember { mutableStateOf(0) }
-                
+                // Still (auto-download endpoint) → thumbnail on a single failure.
+                var stillFailed by remember(episode.id) { mutableStateOf(false) }
+                val episodeImageUrl = if (stillFailed) getEpisodeThumbUrl(episode) else getEpisodeStillUrl(episode)
+
                 AsyncImage(
-                    model = episodeImageUrl,
+                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(episodeImageUrl)
+                        .memoryCacheKey(if (stillFailed) "ep_thumb_${episode.id}" else "ep_still_${episode.id}")
+                        .diskCacheKey(if (stillFailed) "ep_thumb_${episode.id}" else "ep_still_${episode.id}")
+                        .crossfade(true)
+                        .build(),
                     contentDescription = episode.title,
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop,
-                    onError = {
-                        when (fallbackLevel) {
-                            0 -> {
-                                // Fallback to series backdrop (episodes don't have their own)
-                                episodeImageUrl = ApiUtils.getSeriesBackdropUrl(series)
-                                fallbackLevel = 1
-                            }
-                            1 -> {
-                                // Final fallback to series thumbnail
-                                episodeImageUrl = "${ApiUtils.getBaseUrl()}/thumbnails/${series.id}"
-                                fallbackLevel = 2
-                            }
-                        }
-                    }
+                    onError = { if (!stillFailed) stillFailed = true }
                 )
                 
                 // Play overlay on focus

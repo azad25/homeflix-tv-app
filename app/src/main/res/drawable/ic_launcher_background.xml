@@ -4,14 +4,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    
-    <!-- Background with Netflix-style red -->
+    <!-- HomeFlix black canvas -->
     <path
-        android:fillColor="#FF3333"
+        android:fillColor="#0B0B0B"
         android:pathData="M0,0h108v108h-108z" />
-        
-    <!-- Rounded corners overlay -->
-    <path
-        android:fillColor="#FF3333"
-        android:pathData="M12,0h84c6.627,0 12,5.373 12,12v84c0,6.627 -5.373,12 -12,12h-84c-6.627,0 -12,-5.373 -12,-12v-84c0,-6.627 5.373,-12 12,-12z" />
 </vector>

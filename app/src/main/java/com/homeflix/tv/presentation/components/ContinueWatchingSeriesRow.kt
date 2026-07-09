@@ -34,70 +34,43 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.homeflix.tv.domain.model.Media
-import com.homeflix.tv.domain.model.MediaType
+import com.homeflix.tv.presentation.screens.tvshows.ContinueWatchingSeries
 import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.PrimeTextDim
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.util.ApiUtils
 
-data class ContinueWatchingItem(
-    val media: Media,
-    val progress: Float,           // 0.0 to 1.0
-    val progressSeconds: Long,     // Actual progress in seconds
-    val lastWatched: String? = null
-)
-
 /**
- * CONTINUE WATCHING — Prime-style 16:9 cards with a bottom gradient, a brand
- * progress bar, and episode awareness (shows "S{n}E{n} · title" for episodes).
+ * Continue Watching for TV — one landscape card per series showing the SERIES
+ * banner. Selecting a card resumes the in-progress episode from its saved
+ * position.
  */
 @Composable
-fun ContinueWatchingRow(
-    continueWatchingItems: List<ContinueWatchingItem>,
-    onPlay: (Media, Long) -> Unit, // media + progressMs
-    onInfo: (Media) -> Unit,
+fun ContinueWatchingSeriesRow(
+    items: List<ContinueWatchingSeries>,
+    onResume: (episodeMediaId: Int, startMs: Long) -> Unit,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
-    onNavigateUp: (() -> Unit)? = null,
-    onNavigateDown: (() -> Unit)? = null,
-    mediaTypeFilter: Set<MediaType>? = setOf(MediaType.MOVIE),
-    applyHorizontalPadding: Boolean = true
+    onNavigateUp: (() -> Unit)? = null
 ) {
-    val validItems = remember(continueWatchingItems, mediaTypeFilter) {
-        continueWatchingItems.filter { item ->
-            item.media.id > 0 && item.media.title.isNotBlank() &&
-                item.progress in 0f..1f &&
-                (mediaTypeFilter == null || item.media.type in mediaTypeFilter)
-        }
-    }
-    if (validItems.isEmpty()) return
+    if (items.isEmpty()) return
 
-    Column(
-        modifier = modifier.then(
-            if (applyHorizontalPadding) Modifier.padding(start = 48.dp) else Modifier
-        )
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = "Continue Watching",
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.SemiBold,
-                color = TextPrimary
-            ),
-            modifier = Modifier.padding(bottom = 8.dp)
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold, color = TextPrimary),
+            modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)
         )
-
         LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(end = 48.dp)
+            contentPadding = PaddingValues(horizontal = 48.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(validItems, key = { it.media.id }) { item ->
-                ContinueWatchingCard(
+            items(items, key = { it.seriesId }) { item ->
+                SeriesCwCard(
                     item = item,
-                    onPlay = { onPlay(item.media, item.progressSeconds * 1000) },
-                    onInfo = { onInfo(item.media) },
+                    onResume = { onResume(item.episodeMediaId, item.progressSeconds * 1000) },
                     onNavigateUp = onNavigateUp,
-                    modifier = if (item == validItems.first() && focusRequester != null)
+                    modifier = if (item == items.first() && focusRequester != null)
                         Modifier.focusRequester(focusRequester) else Modifier
                 )
             }
@@ -106,16 +79,15 @@ fun ContinueWatchingRow(
 }
 
 @Composable
-private fun ContinueWatchingCard(
-    item: ContinueWatchingItem,
-    onPlay: () -> Unit,
-    onInfo: () -> Unit,
-    onNavigateUp: (() -> Unit)? = null,
+private fun SeriesCwCard(
+    item: ContinueWatchingSeries,
+    onResume: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.06f else 1f, tween(160), label = "cw_scale")
-    val media = item.media
+    val scale by animateFloatAsState(if (focused) 1.06f else 1f, tween(160), label = "cws_scale")
+    val bannerUrl = "${ApiUtils.getBaseUrl()}/series/${item.seriesId}/backdrop"
 
     Box(
         modifier = modifier
@@ -126,29 +98,28 @@ private fun ContinueWatchingCard(
             .onKeyEvent { k ->
                 if (k.type == KeyEventType.KeyDown) {
                     when (k.key) {
-                        Key.Enter, Key.DirectionCenter -> { onPlay(); true }
+                        Key.Enter, Key.DirectionCenter -> { onResume(); true }
                         Key.DirectionUp -> if (onNavigateUp != null) { onNavigateUp(); true } else false
                         else -> false
                     }
                 } else false
             }
             .focusable()
-            .clickable { onPlay() }
+            .clickable { onResume() }
             .clip(RoundedCornerShape(8.dp))
             .then(if (focused) Modifier.border(2.dp, Color.White, RoundedCornerShape(8.dp)) else Modifier)
     ) {
         AsyncImage(
             model = coil.request.ImageRequest.Builder(LocalContext.current)
-                .data(ApiUtils.getBackdropUrl(media))
-                .memoryCacheKey("backdrop_${media.id}")
-                .diskCacheKey("backdrop_${media.id}")
+                .data(bannerUrl)
+                .memoryCacheKey("series_backdrop_${item.seriesId}")
+                .diskCacheKey("series_backdrop_${item.seriesId}")
                 .crossfade(false)
                 .build(),
-            contentDescription = media.title,
+            contentDescription = item.seriesTitle,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
-
         Box(
             Modifier
                 .fillMaxSize()
@@ -159,7 +130,6 @@ private fun ContinueWatchingCard(
                     )
                 )
         )
-
         if (focused) {
             Box(
                 modifier = Modifier
@@ -169,23 +139,27 @@ private fun ContinueWatchingCard(
                     .background(Color.White.copy(alpha = 0.92f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.Black, modifier = Modifier.size(30.dp))
+                Icon(Icons.Default.PlayArrow, "Resume", tint = Color.Black, modifier = Modifier.size(30.dp))
             }
         }
-
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
-            // Episode-aware title
-            val primary = if (media.type == MediaType.EPISODE && media.seasonNumber != null && media.episodeNumber != null)
-                "S${media.seasonNumber}E${media.episodeNumber} · ${media.title}"
-            else media.title
             Text(
-                text = primary,
+                text = item.seriesTitle,
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = TextPrimary),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            val epLabel = if (item.seasonNumber != null && item.episodeNumber != null)
+                "S${item.seasonNumber} E${item.episodeNumber} · ${item.lastWatched}"
+            else item.lastWatched
+            Text(
+                text = epLabel,
+                style = MaterialTheme.typography.labelMedium.copy(color = PrimeTextDim),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -199,16 +173,6 @@ private fun ContinueWatchingCard(
                     .height(3.dp)
                     .clip(RoundedCornerShape(2.dp))
             )
-            Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "${(item.progress * 100).toInt()}% watched",
-                    style = MaterialTheme.typography.labelSmall.copy(color = Color.White.copy(alpha = 0.85f))
-                )
-                item.lastWatched?.let {
-                    Text("• $it", style = MaterialTheme.typography.labelSmall.copy(color = PrimeTextDim))
-                }
-            }
         }
     }
 }

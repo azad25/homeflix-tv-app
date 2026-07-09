@@ -42,13 +42,14 @@ class TvShowsViewModel @Inject constructor(
                 // Separate featured series for hero slider (first 5)
                 val featuredSeries = sortedSeries.take(5)
                 
-                // Fetch continue watching episodes
-                val continueWatchingEpisodes = fetchContinueWatchingEpisodes()
-                
+                // Continue Watching, deduped to one entry per series (with the
+                // series banner + the in-progress episode to resume).
+                val continueWatchingSeries = fetchContinueWatchingSeries(sortedSeries)
+
                 _uiState.value = TvShowsUiState.Success(
                     featuredSeries = featuredSeries,
                     series = sortedSeries,
-                    continueWatchingEpisodes = continueWatchingEpisodes
+                    continueWatchingSeries = continueWatchingSeries
                 )
             } catch (e: Exception) {
                 _uiState.value = TvShowsUiState.Error(
@@ -103,6 +104,49 @@ class TvShowsViewModel @Inject constructor(
         }
     }
     
+    /**
+     * Recently-watched TV, deduped to one card per series. Each carries the
+     * series banner + the specific episode to resume from its saved progress.
+     */
+    private suspend fun fetchContinueWatchingSeries(allSeries: List<TvSeries>): List<ContinueWatchingSeries> {
+        return try {
+            val result = mediaRepository.getRecentlyWatchedWithProgress().first()
+            result.fold(
+                onSuccess = { items ->
+                    val titleById = allSeries.associate { it.id to it.title }
+                    items
+                        .filterNotNull()
+                        .filter {
+                            it.media.type == MediaType.EPISODE &&
+                                it.media.seriesId != null && it.media.seriesId > 0 &&
+                                it.durationSeconds > 0 && it.progressSeconds > 0 &&
+                                it.lastWatchedAt != null
+                        }
+                        .sortedByDescending { it.lastWatchedAt?.time ?: 0L }
+                        // keep the most-recent episode per series
+                        .distinctBy { it.media.seriesId }
+                        .take(12)
+                        .map { item ->
+                            val sid = item.media.seriesId!!
+                            ContinueWatchingSeries(
+                                seriesId = sid,
+                                seriesTitle = titleById[sid] ?: item.media.title,
+                                episodeMediaId = item.media.id,
+                                seasonNumber = item.media.seasonNumber,
+                                episodeNumber = item.media.episodeNumber,
+                                progressSeconds = item.progressSeconds,
+                                progress = (item.progressSeconds.toFloat() / item.durationSeconds).coerceIn(0f, 1f),
+                                lastWatched = formatLastWatched(item.lastWatchedAt!!)
+                            )
+                        }
+                },
+                onFailure = { emptyList() }
+            )
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     private fun formatLastWatched(date: java.util.Date): String {
         val now = java.util.Date()
         val diffMs = now.time - date.time
@@ -120,10 +164,10 @@ class TvShowsViewModel @Inject constructor(
     fun refreshContinueWatching() {
         viewModelScope.launch {
             try {
-                val continueWatchingEpisodes = fetchContinueWatchingEpisodes()
                 val currentState = _uiState.value
                 if (currentState is TvShowsUiState.Success) {
-                    _uiState.value = currentState.copy(continueWatchingEpisodes = continueWatchingEpisodes)
+                    val cw = fetchContinueWatchingSeries(currentState.series)
+                    _uiState.value = currentState.copy(continueWatchingSeries = cw)
                 }
             } catch (e: Exception) {
                 Log.e("TvShowsViewModel", "Error refreshing continue watching", e)
@@ -137,10 +181,22 @@ sealed class TvShowsUiState {
     data class Success(
         val featuredSeries: List<TvSeries>,
         val series: List<TvSeries>,
-        val continueWatchingEpisodes: List<ContinueWatchingItem> = emptyList()
+        val continueWatchingSeries: List<ContinueWatchingSeries> = emptyList()
     ) : TvShowsUiState()
     data class Error(val message: String) : TvShowsUiState()
 }
+
+/** One Continue-Watching card per series (banner + episode to resume). */
+data class ContinueWatchingSeries(
+    val seriesId: Int,
+    val seriesTitle: String,
+    val episodeMediaId: Int,
+    val seasonNumber: Int?,
+    val episodeNumber: Int?,
+    val progressSeconds: Long,
+    val progress: Float,
+    val lastWatched: String
+)
 
 data class TvSeries(
     val id: Int,

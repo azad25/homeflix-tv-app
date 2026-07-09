@@ -41,17 +41,17 @@ fun MediaRow(
         // Section Title
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineSmall.copy(
+            style = MaterialTheme.typography.titleLarge.copy(
                 fontWeight = FontWeight.SemiBold,
                 color = TextPrimary
             ),
-            modifier = Modifier.padding(start = 24.dp, bottom = 8.dp)
+            modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)
         )
         
         // NETFLIX PRINCIPLE: Let individual cards handle focus, LazyRow handles scrolling
         LazyRow(
             state = listState,
-            contentPadding = PaddingValues(horizontal = 24.dp),
+            contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             userScrollEnabled = true,
             modifier = Modifier.fillMaxWidth()

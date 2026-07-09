@@ -10,13 +10,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -46,8 +47,9 @@ fun NetflixSideNavigation(
         NavItem(Icons.Default.Search, "search", "Search"),
         NavItem(Icons.Default.Home, "home", "Home"),
         NavItem(Icons.Default.List, "browse", "Browse Movies"),
+        NavItem(Icons.Default.Tv, "tv-shows", "TV Shows"),
         NavItem(Icons.Default.BookmarkBorder, "my-list", "My List"),
-        NavItem(Icons.Default.Tv, "tv-shows", "TV Shows")
+        NavItem(Icons.Default.Notifications, "notifications", "Notifications")
     )
     
     // NETFLIX PRINCIPLE: Each icon is independently focusable
@@ -87,20 +89,20 @@ private fun NetflixNavIcon(
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     
-    // Netflix-style scale animation on focus
+    // Focus scale via graphicsLayer (cheaper than .scale() during D-pad moves)
     val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (isFocused) 1.5f else 1.0f,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
+        targetValue = if (isFocused) 1.3f else 1.0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 160),
         label = "nav_icon_scale"
     )
-    
+
     Box(
         modifier = Modifier
             .size(36.dp)
-            .scale(scale)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .background(
                 color = when {
-                    isSelected -> Color(0xFFE50914) // Netflix Red
+                    isSelected -> com.homeflix.tv.presentation.theme.PrimeBlue
                     isFocused -> Color.White.copy(alpha = 0.2f)
                     else -> Color.Transparent
                 },

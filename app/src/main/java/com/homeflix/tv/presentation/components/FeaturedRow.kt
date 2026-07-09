@@ -52,14 +52,14 @@ fun FeaturedRow(
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = TextPrimary
             ),
-            modifier = Modifier.padding(start = 56.dp, bottom = 12.dp)
+            modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)
         )
 
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 56.dp),
+            contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             itemsIndexed(mediaList) { index, media ->
@@ -109,7 +109,7 @@ fun FeaturedCard(
                 .data(ApiUtils.getBackdropUrl(media))
                 .memoryCacheKey("backdrop_${media.id}")
                 .diskCacheKey("backdrop_${media.id}")
-                .crossfade(true)
+                .crossfade(false)
                 .build(),
             contentDescription = media.title,
             contentScale = ContentScale.Crop,

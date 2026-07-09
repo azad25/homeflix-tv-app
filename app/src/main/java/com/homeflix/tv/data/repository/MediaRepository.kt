@@ -496,7 +496,23 @@ class MediaRepository @Inject constructor(
             emptyList()
         }
     }
-    
+
+    // Notifications (display-only)
+    override suspend fun getNotifications(limit: Int): List<com.homeflix.tv.domain.model.Notification> {
+        return try {
+            val response = apiService.getNotifications(limit)
+            if (response.isSuccessful) {
+                response.body()?.notifications?.map { it.toDomain() } ?: emptyList()
+            } else {
+                Log.e("MediaRepository", "getNotifications failed: ${response.code()}")
+                emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e("MediaRepository", "getNotifications error", e)
+            emptyList()
+        }
+    }
+
     // My List methods
     override suspend fun getMyList(): Result<List<com.homeflix.tv.domain.model.WatchlistItem>> {
         return try {

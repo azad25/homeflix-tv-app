@@ -2,6 +2,7 @@ package com.homeflix.tv.presentation.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -56,11 +57,16 @@ fun PlayerSettingsPanel(
 ) {
     val firstFocus = remember { FocusRequester() }
 
+    // Retry until the first row is laid out and actually takes focus, so the
+    // drawer reliably captures D-pad input instead of the player behind it.
     LaunchedEffect(Unit) {
-        delay(150)
-        try {
-            firstFocus.requestFocus()
-        } catch (_: Exception) {
+        repeat(20) {
+            try {
+                firstFocus.requestFocus()
+                return@LaunchedEffect
+            } catch (_: Exception) {
+                delay(50)
+            }
         }
     }
 
@@ -79,6 +85,7 @@ fun PlayerSettingsPanel(
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight()
                 .width(380.dp)
+                .focusGroup()
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(Color(0xF0101820), Color(0xFA0C121A))

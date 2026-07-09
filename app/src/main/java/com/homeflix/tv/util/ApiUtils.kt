@@ -236,6 +236,18 @@ object ApiUtils {
         return getSeriesBackdropUrl(series) // Use same logic as backdrop
     }
     
+    /**
+     * Episode still URL. ALWAYS points at the /episode-stills/{id} endpoint,
+     * which serves the stored still OR auto-downloads it from TMDB on first
+     * request. We must NOT gate this on episodeStillPath being present: the
+     * backend omits that field (omitempty) when the DB value is empty, so
+     * gating would mean the auto-download endpoint never runs (the bug).
+     * Use getEpisodeThumbnailUrl(episode) as the Coil error/fallback.
+     */
+    fun getEpisodeStillUrl(episodeId: Int): String {
+        return "${getBaseUrl()}/episode-stills/$episodeId"
+    }
+
     fun getEpisodeThumbnailUrl(episode: com.homeflix.tv.presentation.screens.tvshows.Episode): String {
         return if (!episode.thumbnailPath.isNullOrEmpty()) {
             if (episode.thumbnailPath.startsWith("http")) {

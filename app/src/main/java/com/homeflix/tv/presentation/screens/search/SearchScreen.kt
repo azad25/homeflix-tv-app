@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import com.homeflix.tv.presentation.components.PosterCard
+import com.homeflix.tv.presentation.components.ThumbLogoCard
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backspace
@@ -18,6 +21,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,7 +48,7 @@ import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.navigation.Screen
 import com.homeflix.tv.presentation.theme.PrimeBg
-import com.homeflix.tv.presentation.theme.NetflixRed
+import com.homeflix.tv.presentation.theme.PrimeBlue
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
@@ -278,19 +282,21 @@ fun SearchScreen(
                         modifier = Modifier.padding(bottom = 24.dp)
                     )
                     
-                    // Top searches grid (2x4 layout like screenshot)
+                    // Top searches — landscape thumb+logo grid
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(6),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        columns = GridCells.Fixed(5),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(topSearches.take(8)) { media ->
-                            TopSearchCard(
-                                media = media,
-                                onClick = {
-                                    navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                }
+                        items(topSearches.take(9), key = { it.id }) { media ->
+                            PosterCard(
+                                posterUrl = ApiUtils.getPosterUrl(media),
+                                fallbackUrl = ApiUtils.getThumbnailUrl(media),
+                                title = media.title,
+                                subtitle = media.year?.toString(),
+                                onClick = { navController.navigate(Screen.Details.createRoute(media.id.toString())) },
+                                cacheKey = "poster_${media.id}"
                             )
                         }
                     }
@@ -311,7 +317,7 @@ fun SearchScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                CircularProgressIndicator(color = NetflixRed)
+                                CircularProgressIndicator(color = PrimeBlue)
                             }
                         }
                         
@@ -327,35 +333,39 @@ fun SearchScreen(
                                 )
                                 
                                 LazyVerticalGrid(
-                                    columns = GridCells.Fixed(6),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                    columns = GridCells.Fixed(5),
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(14.dp),
                                     modifier = Modifier.fillMaxSize()
                                 ) {
-                                    items(topSearches.take(8)) { media ->
-                                        TopSearchCard(
-                                            media = media,
-                                            onClick = {
-                                                navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                            }
-                                        )
+                                    items(topSearches.take(9), key = { it.id }) { media ->
+                                        PosterCard(
+                                posterUrl = ApiUtils.getPosterUrl(media),
+                                fallbackUrl = ApiUtils.getThumbnailUrl(media),
+                                title = media.title,
+                                subtitle = media.year?.toString(),
+                                onClick = { navController.navigate(Screen.Details.createRoute(media.id.toString())) },
+                                cacheKey = "poster_${media.id}"
+                            )
                                     }
                                 }
                             } else {
+                                val movieResults = currentState.results.filter { it.type == MediaType.MOVIE }
                                 LazyVerticalGrid(
-                                    columns = GridCells.Adaptive(minSize = 136.dp),
+                                    columns = GridCells.Fixed(5),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .focusRequester(contentFocusRequester)
+                                    modifier = Modifier.fillMaxSize()
                                 ) {
-                                    items(currentState.results.filter { it.type == MediaType.MOVIE }) { media ->
-                                        NetflixMovieCard(
-                                            media = media,
-                                            onClick = {
-                                                navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                            }
+                                    itemsIndexed(movieResults, key = { _, m -> m.id }) { index, media ->
+                                        PosterCard(
+                                            posterUrl = ApiUtils.getPosterUrl(media),
+                                            fallbackUrl = ApiUtils.getThumbnailUrl(media),
+                                            title = media.title,
+                                            subtitle = media.year?.toString(),
+                                            onClick = { navController.navigate(Screen.Details.createRoute(media.id.toString())) },
+                                            cacheKey = "poster_${media.id}",
+                                            modifier = if (index == 0) Modifier.focusRequester(contentFocusRequester) else Modifier
                                         )
                                     }
                                 }
@@ -373,17 +383,19 @@ fun SearchScreen(
                             )
                             
                             LazyVerticalGrid(
-                                columns = GridCells.Fixed(6),
+                                columns = GridCells.Fixed(5),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                items(topSearches.take(8)) { media ->
-                                    TopSearchCard(
-                                        media = media,
-                                        onClick = {
-                                            navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                        }
+                                items(topSearches.take(15), key = { it.id }) { media ->
+                                    PosterCard(
+                                        posterUrl = ApiUtils.getPosterUrl(media),
+                                        fallbackUrl = ApiUtils.getThumbnailUrl(media),
+                                        title = media.title,
+                                        subtitle = media.year?.toString(),
+                                        onClick = { navController.navigate(Screen.Details.createRoute(media.id.toString())) },
+                                        cacheKey = "poster_${media.id}"
                                     )
                                 }
                             }
@@ -415,7 +427,7 @@ private fun VirtualKey(
     Card(
         modifier = modifier
             .height(32.dp)
-            .scale(scale)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .then(
                 if (focusRequester != null) {
                     Modifier.focusRequester(focusRequester)
@@ -484,7 +496,7 @@ private fun GenreItem(
             .clickable { onClick() }
             .padding(vertical = 8.dp, horizontal = 12.dp)
             .background(
-                color = if (isFocused) NetflixRed.copy(alpha = 0.8f) else Color.Transparent,
+                color = if (isFocused) PrimeBlue.copy(alpha = 0.8f) else Color.Transparent,
                 shape = RoundedCornerShape(6.dp)
             ),
         verticalAlignment = Alignment.CenterVertically
@@ -516,7 +528,7 @@ private fun TopSearchCard(
     Box(
         modifier = Modifier
             .aspectRatio(2f / 3f)
-            .scale(scale)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }
@@ -588,7 +600,7 @@ private fun TopSearchCard(
                     modifier = Modifier
                         .padding(8.dp)
                         .align(Alignment.TopEnd),
-                    color = NetflixRed,
+                    color = PrimeBlue,
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
@@ -653,7 +665,7 @@ private fun NetflixMovieCard(
     Box(
         modifier = modifier
             .aspectRatio(2f / 3f)
-            .scale(scale)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }

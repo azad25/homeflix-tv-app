@@ -25,8 +25,9 @@ import com.homeflix.tv.presentation.components.CinematicHero
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.components.MediaRow
 import com.homeflix.tv.presentation.components.ContinueWatchingRow
-import com.homeflix.tv.presentation.components.FeaturedRow
+import com.homeflix.tv.presentation.components.FeaturedBanner
 import com.homeflix.tv.presentation.components.Top10Row
+import com.homeflix.tv.presentation.components.ThumbLogoRow
 import com.homeflix.tv.presentation.navigation.Screen
 import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.PrimeBg
@@ -98,6 +99,15 @@ fun NetflixHomeScreen(
     
     // Smooth scrolling management
     val coroutineScope = rememberCoroutineScope()
+
+    // UP from the first content row → scroll list to top and focus the hero
+    // (fixes "can't scroll back to top" when the hero item is disposed).
+    val onNavigateUpToHero: () -> Unit = {
+        coroutineScope.launch {
+            listState.animateScrollToItem(0)
+            try { heroPlayButtonFocusRequester.requestFocus() } catch (_: Exception) {}
+        }
+    }
     
     // Ensure LazyColumn starts at top and handles smooth scrolling
     LaunchedEffect(uiState) {
@@ -128,6 +138,7 @@ fun NetflixHomeScreen(
                         "browse" -> navController.navigate(Screen.Browse.route)
                         "my-list" -> navController.navigate(Screen.MyList.route)
                         "tv-shows" -> navController.navigate(Screen.TvShows.route)
+                        "notifications" -> navController.navigate(Screen.Notifications.route)
                     }
                 },
                 onNavigateToContent = {
@@ -235,11 +246,29 @@ fun NetflixHomeScreen(
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
                                     focusRequester = firstRowFocusRequester,
+                                    onNavigateUp = onNavigateUpToHero,
                                     modifier = Modifier.padding(bottom = 24.dp)
                                 )
                             }
                         }
                         
+                        // FEATURED - half/half banner (one big + rotating list)
+                        // built from the latest movies.
+                        if (currentState.latestMovies.isNotEmpty()) {
+                            item {
+                                FeaturedBanner(
+                                    title = "Featured",
+                                    mediaList = currentState.latestMovies,
+                                    onMediaClick = { media ->
+                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
+                                    },
+                                    focusRequester = if (currentState.continueWatching.isEmpty()) firstRowFocusRequester else null,
+                                    onNavigateUp = onNavigateUpToHero,
+                                    modifier = Modifier.padding(bottom = 28.dp)
+                                )
+                            }
+                        }
+
                         // TOP 10 - Prime-style big rank numbers (most-watched)
                         if (currentState.popularMovies.isNotEmpty()) {
                             item {
@@ -249,31 +278,15 @@ fun NetflixHomeScreen(
                                     onMediaClick = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
-                                    focusRequester = if (currentState.continueWatching.isEmpty()) firstRowFocusRequester else null,
                                     modifier = Modifier.padding(bottom = 28.dp)
                                 )
                             }
                         }
 
-                        // LATEST - Prime-style 16:9 landscape showcase cards
-                        if (currentState.latestMovies.isNotEmpty()) {
-                            item {
-                                FeaturedRow(
-                                    title = "Latest Movies",
-                                    mediaList = currentState.latestMovies,
-                                    onMediaClick = { media ->
-                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                    },
-                                    focusRequester = latestMoviesFocusRequester,
-                                    modifier = Modifier.padding(bottom = 28.dp)
-                                )
-                            }
-                        }
-
-                        // Trending poster row
+                        // Trending — landscape thumb+logo row (mixes card styles)
                         if (currentState.trendingMovies.isNotEmpty()) {
                             item {
-                                MediaRow(
+                                ThumbLogoRow(
                                     title = "Trending Now",
                                     mediaList = currentState.trendingMovies,
                                     onMediaClick = { media ->
@@ -283,8 +296,8 @@ fun NetflixHomeScreen(
                                 )
                             }
                         }
-                        
-                        // Action Movies
+
+                        // Action Movies (single genre row keeps the page tight)
                         if (currentState.actionMovies.isNotEmpty()) {
                             item {
                                 MediaRow(
@@ -297,35 +310,7 @@ fun NetflixHomeScreen(
                                 )
                             }
                         }
-                        
-                        // Drama Movies
-                        if (currentState.dramaMovies.isNotEmpty()) {
-                            item {
-                                MediaRow(
-                                    title = "Drama",
-                                    mediaList = currentState.dramaMovies,
-                                    onMediaClick = { media ->
-                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                    },
-                                    modifier = Modifier.padding(bottom = 24.dp)
-                                )
-                            }
-                        }
-                        
-                        // Sci-Fi Movies
-                        if (currentState.sciFiMovies.isNotEmpty()) {
-                            item {
-                                MediaRow(
-                                    title = "Sci-Fi",
-                                    mediaList = currentState.sciFiMovies,
-                                    onMediaClick = { media ->
-                                        navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                    },
-                                    modifier = Modifier.padding(bottom = 24.dp)
-                                )
-                            }
-                        }
-                        
+
                             // Bottom padding item
                             item {
                                 Spacer(modifier = Modifier.height(48.dp))

@@ -1,5 +1,8 @@
 package com.homeflix.tv.presentation.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -10,6 +13,7 @@ import com.homeflix.tv.presentation.screens.browse.BrowseScreen
 import com.homeflix.tv.presentation.screens.details.DetailsScreen
 import com.homeflix.tv.presentation.screens.home.NetflixHomeScreen
 import com.homeflix.tv.presentation.screens.mylist.MyListScreen
+import com.homeflix.tv.presentation.screens.notifications.NotificationsScreen
 import com.homeflix.tv.presentation.screens.player.VideoPlayerScreen
 import com.homeflix.tv.presentation.screens.search.SearchScreen
 import com.homeflix.tv.presentation.screens.tvshows.TvShowsScreen
@@ -23,7 +27,13 @@ fun HomeFlixNavigation(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Home.route
+        startDestination = Screen.Home.route,
+        // Global cross-fade for every route — gives the player (and all media)
+        // a smooth fade in on open and fade out on close.
+        enterTransition = { fadeIn(tween(250)) },
+        exitTransition = { fadeOut(tween(250)) },
+        popEnterTransition = { fadeIn(tween(250)) },
+        popExitTransition = { fadeOut(tween(250)) }
     ) {
         composable(Screen.Home.route) {
             NetflixHomeScreen(navController = navController)
@@ -44,7 +54,11 @@ fun HomeFlixNavigation(
         composable(Screen.MyList.route) {
             MyListScreen(navController = navController)
         }
-        
+
+        composable(Screen.Notifications.route) {
+            NotificationsScreen(navController = navController)
+        }
+
         composable(
             route = Screen.TvSeriesDetails.route,
             arguments = Screen.TvSeriesDetails.arguments
@@ -114,6 +128,7 @@ sealed class Screen(val route: String) {
     object Search : Screen("search")
     object TvShows : Screen("tv-shows")
     object MyList : Screen("my-list")
+    object Notifications : Screen("notifications")
     object TvSeriesDetails : Screen("tv-series/{seriesId}") {
         fun createRoute(seriesId: String) = "tv-series/$seriesId"
         val arguments = listOf(

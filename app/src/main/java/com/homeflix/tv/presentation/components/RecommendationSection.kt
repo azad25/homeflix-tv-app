@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -200,7 +201,7 @@ private fun NetflixRecommendationCard(
     
     // Scale animation on focus (reduced scale)
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.08f else 1.0f,
+        targetValue = if (isFocused) 1.06f else 1.0f,
         animationSpec = tween(durationMillis = 200),
         label = "recommendation_card_scale"
     )
@@ -210,7 +211,7 @@ private fun NetflixRecommendationCard(
         modifier = modifier
             .width(220.dp)
             .aspectRatio(16f / 9f)
-            .scale(scale)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
             }

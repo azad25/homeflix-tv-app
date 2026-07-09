@@ -40,16 +40,22 @@ class BrowseViewModel @Inject constructor(
     fun loadBrowseContent() {
         viewModelScope.launch {
             _uiState.value = BrowseUiState.Loading
-            
             try {
-                // Reset pagination state
-                currentPage = 0
-                allLoadedMovies.clear()
-                hasMoreContent = true
-                
-                // Load first page of movies with pagination
-                loadMoviesPage()
-                
+                // Load one batch (capped for low-RAM) so the screen can group
+                // it into genre rows — no scroll pagination needed.
+                mediaRepository.getMovies(limit = maxLoadedItems, offset = 0).collect { result ->
+                    val movies = result.getOrNull()?.sortedByDescending { it.id } ?: emptyList()
+                    if (movies.isEmpty()) {
+                        _uiState.value = BrowseUiState.Error("No movies available")
+                        return@collect
+                    }
+                    _uiState.value = BrowseUiState.Success(
+                        movies = movies,
+                        hasMore = false,
+                        isLoadingMore = false,
+                        totalCount = movies.size
+                    )
+                }
             } catch (e: Exception) {
                 _uiState.value = BrowseUiState.Error(e.message ?: "Unknown error occurred")
             }

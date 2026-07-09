@@ -10,6 +10,12 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import com.homeflix.tv.presentation.components.SidebarOverlay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -32,11 +38,14 @@ import com.homeflix.tv.presentation.components.BackgroundVideo
 import com.homeflix.tv.presentation.components.CertBadge
 import com.homeflix.tv.presentation.components.HeroActionButton
 import com.homeflix.tv.presentation.components.MediaRow
+import com.homeflix.tv.presentation.components.ThumbLogoRow
 import com.homeflix.tv.presentation.components.QualityBadge
 import com.homeflix.tv.presentation.navigation.Screen
+import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.*
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * MOVIE DETAILS - Prime Video style full-screen info page.
@@ -57,6 +66,10 @@ fun DetailsScreen(
     val similar by viewModel.similar.collectAsState()
 
     val playFocusRequester = remember { FocusRequester() }
+    val detailListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    // Overlay nav rail (LEFT/Back reveals it over the cinematic hero)
+    var showSidebar by remember { mutableStateOf(false) }
 
     // Reload progress when returning from the player
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -77,25 +90,41 @@ fun DetailsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(PrimeBg)
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.key) {
+                        Key.DirectionLeft -> {
+                            if (!showSidebar) { showSidebar = true; true } else false
+                        }
+                        Key.Back -> {
+                            if (showSidebar) { showSidebar = false; true } else false
+                        }
+                        else -> false
+                    }
+                } else false
+            }
     ) {
         when (val state = uiState) {
             is DetailsUiState.Success -> {
                 val media = state.media
 
                 LaunchedEffect(media.id) {
-                    delay(400)
-                    try {
-                        playFocusRequester.requestFocus()
-                    } catch (_: Exception) {
+                    // Focus Play, then pin to top so the tall hero + focus don't
+                    // leave the page scrolled into "More like this".
+                    delay(350)
+                    repeat(8) {
+                        try { playFocusRequester.requestFocus(); return@repeat } catch (_: Exception) { delay(40) }
                     }
+                    delay(60)
+                    detailListState.scrollToItem(0)
                 }
 
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(state = detailListState, modifier = Modifier.fillMaxSize()) {
                     item {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(560.dp)
+                                .height(440.dp)
                         ) {
                             // Backdrop -> auto-playing muted preview
                             BackgroundVideo(
@@ -171,7 +200,7 @@ fun DetailsScreen(
                                     Text(
                                         text = it,
                                         style = MaterialTheme.typography.titleMedium.copy(
-                                            color = Color(0xFF4FD8CE),
+                                            color = NetflixRed,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                     )
@@ -213,7 +242,7 @@ fun DetailsScreen(
                                             style = MaterialTheme.typography.titleSmall
                                         )
                                     }
-                                    CertBadge(media.certification ?: "PG-13")
+                                    media.certification?.takeIf { it.isNotBlank() }?.let { CertBadge(it) }
                                     QualityBadge(media.quality)
                                 }
 
@@ -225,15 +254,16 @@ fun DetailsScreen(
                                     )
                                 }
 
-                                // Description
+                                // Description (smaller + tighter line spacing)
                                 media.description?.let { desc ->
                                     Text(
                                         text = desc,
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            color = TextPrimary.copy(alpha = 0.92f),
-                                            lineHeight = 24.sp
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            color = TextPrimary.copy(alpha = 0.88f),
+                                            fontSize = 14.sp,
+                                            lineHeight = 20.sp
                                         ),
-                                        maxLines = 4,
+                                        maxLines = 3,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
@@ -325,7 +355,7 @@ fun DetailsScreen(
                     // More like this
                     if (similar.isNotEmpty()) {
                         item {
-                            MediaRow(
+                            ThumbLogoRow(
                                 title = "More like this",
                                 mediaList = similar,
                                 onMediaClick = { m ->
@@ -364,6 +394,14 @@ fun DetailsScreen(
                 }
             }
         }
+
+        // Overlay nav rail (LEFT reveals it, RIGHT/Back dismisses)
+        SidebarOverlay(
+            visible = showSidebar,
+            selectedRoute = "",
+            onNavigate = { route -> navController.navigate(route) },
+            onDismiss = { showSidebar = false }
+        )
     }
 }
 

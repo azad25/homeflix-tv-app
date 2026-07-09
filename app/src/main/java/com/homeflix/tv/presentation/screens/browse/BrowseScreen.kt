@@ -7,10 +7,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.homeflix.tv.presentation.components.MediaRow
+import com.homeflix.tv.presentation.components.ThumbLogoRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -40,7 +40,7 @@ import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.presentation.components.NetflixSideNavigation
 import com.homeflix.tv.presentation.navigation.Screen
 import com.homeflix.tv.presentation.theme.PrimeBg
-import com.homeflix.tv.presentation.theme.NetflixRed
+import com.homeflix.tv.presentation.theme.PrimeBlue
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.presentation.theme.TextSecondary
 import com.homeflix.tv.util.ApiUtils
@@ -55,11 +55,14 @@ fun BrowseScreen(
     viewModel: BrowseViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    
+
     // NETFLIX-LEVEL focus management
     val sideNavFocusRequester = remember { FocusRequester() }
     val contentFocusRequester = remember { FocusRequester() }
     var currentFocusArea by remember { mutableStateOf(FocusArea.CONTENT) }
+    // Hoisted above the when(state) so scroll survives state re-emission and
+    // returning from details/player while Browse stays on the back stack.
+    val browseListState = rememberLazyListState()
     
     // Auto-focus content when loaded
     LaunchedEffect(uiState) {
@@ -98,25 +101,15 @@ fun BrowseScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header with latest content indication
-            Column(
-                modifier = Modifier.padding(32.dp)
-            ) {
-                Text(
-                    text = "Browse Movies",
-                    style = MaterialTheme.typography.displayMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                )
-                Text(
-                    text = "Latest content first • Sorted by recently added",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = TextSecondary
-                    ),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
+            // Compact header
+            Text(
+                text = "Movies",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                ),
+                modifier = Modifier.padding(start = 56.dp, top = 24.dp, bottom = 4.dp)
+            )
             val currentState = uiState
             when (currentState) {
                 is BrowseUiState.Loading -> {
@@ -124,7 +117,7 @@ fun BrowseScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = NetflixRed)
+                        CircularProgressIndicator(color = PrimeBlue)
                     }
                 }
                 
@@ -155,7 +148,7 @@ fun BrowseScreen(
                             Button(
                                 onClick = { viewModel.loadBrowseContent() },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = NetflixRed
+                                    containerColor = PrimeBlue
                                 )
                             ) {
                                 Text("Retry")
@@ -165,93 +158,56 @@ fun BrowseScreen(
                 }
                 
                 is BrowseUiState.Success -> {
-                    // Movie count indicator with pagination info
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 32.dp, vertical = 8.dp)
+                    val movies = currentState.movies
+                    LazyColumn(
+                        state = browseListState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(top = 4.dp, bottom = 48.dp),
+                        verticalArrangement = Arrangement.spacedBy(22.dp)
                     ) {
-                        Text(
-                            text = "Showing ${currentState.movies.size} movies" + 
-                                   if (currentState.hasMore) " • Load more available" else " • All movies loaded",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = NetflixRed,
-                                fontWeight = FontWeight.Medium
+                        // Recently Added — landscape thumb+logo showcase row
+                        item {
+                            ThumbLogoRow(
+                                title = "Recently Added",
+                                mediaList = movies.take(20),
+                                onMediaClick = { navController.navigate(Screen.Details.createRoute(it.id.toString())) },
+                                focusRequester = contentFocusRequester
                             )
+                        }
+
+                        // Genre-grouped poster rows (Netflix browse feel)
+                        val genreBuckets = listOf(
+                            "Action & Adventure" to listOf("action", "adventure"),
+                            "Drama" to listOf("drama"),
+                            "Comedy" to listOf("comedy"),
+                            "Sci-Fi & Fantasy" to listOf("sci-fi", "science fiction", "fantasy"),
+                            "Thriller & Crime" to listOf("thriller", "crime", "mystery"),
+                            "Horror" to listOf("horror"),
+                            "Romance" to listOf("romance"),
+                            "Animation & Family" to listOf("animation", "family", "kids")
                         )
-                        
-                        if (currentState.isLoadingMore) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                CircularProgressIndicator(
-                                    color = NetflixRed,
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp
-                                )
-                                Text(
-                                    text = "Loading more...",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        color = TextSecondary
+                        genreBuckets.forEach { (label, keys) ->
+                            val list = movies.filter { m ->
+                                m.genreNames.any { g -> keys.any { k -> g.contains(k, ignoreCase = true) } }
+                            }.take(18)
+                            if (list.size >= 4) {
+                                item {
+                                    ThumbLogoRow(
+                                        title = label,
+                                        mediaList = list,
+                                        onMediaClick = { navController.navigate(Screen.Details.createRoute(it.id.toString())) }
                                     )
-                                )
+                                }
                             }
                         }
-                    }
-                    
-                    // PAGINATED movie grid with scroll-triggered auto-loading
-                    val gridState = rememberLazyGridState()
-                    
-                    // Auto-load more when near the end of the grid
-                    LaunchedEffect(gridState.firstVisibleItemIndex, currentState.movies.size) {
-                        val totalItems = currentState.movies.size
-                        val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                        if (lastVisible >= totalItems - 6 && currentState.hasMore && !currentState.isLoadingMore) {
-                            viewModel.loadMoreMovies()
-                        }
-                    }
-                    
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 132.dp),
-                        state = gridState,
-                        contentPadding = PaddingValues(24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        userScrollEnabled = true,
-                        modifier = Modifier.fillMaxSize()
-                            .focusRequester(contentFocusRequester)
-                    ) {
-                        items(
-                            items = currentState.movies,
-                            key = { media -> media.id }
-                        ) { media ->
-                            NetflixMovieCard(
-                                media = media,
-                                onClick = {
-                                    navController.navigate(Screen.Details.createRoute(media.id.toString()))
-                                }
+
+                        // All movies
+                        item {
+                            ThumbLogoRow(
+                                title = "All Movies",
+                                mediaList = movies,
+                                onMediaClick = { navController.navigate(Screen.Details.createRoute(it.id.toString())) }
                             )
-                        }
-                        
-                        // Loading indicator at bottom
-                        if (currentState.isLoadingMore) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(
-                                        color = NetflixRed,
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                }
-                            }
                         }
                     }
                 }

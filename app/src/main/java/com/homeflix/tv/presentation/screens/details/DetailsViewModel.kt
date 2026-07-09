@@ -7,6 +7,7 @@ import com.homeflix.tv.data.repository.MediaRepository
 import com.homeflix.tv.domain.model.Media
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -102,44 +103,63 @@ class DetailsViewModel @Inject constructor(
     }
     
     private fun loadSimilar(media: Media) {
-        val genre = media.genreNames.firstOrNull() ?: media.genres.firstOrNull()?.name ?: return
+        val genre = media.genreNames.firstOrNull() ?: media.genres.firstOrNull()?.name
         viewModelScope.launch {
             try {
-                mediaRepository.getMediaByGenre(genre.lowercase(), 15, 0).collect { result ->
-                    result.fold(
-                        onSuccess = { list ->
-                            _similar.value = list.filter { it.id != media.id }.take(12)
-                        },
-                        onFailure = { _similar.value = emptyList() }
-                    )
+                // Try the genre as-is (backend genre slugs are capitalized, e.g.
+                // "Action" / "Science Fiction" — lowercasing broke matching).
+                var results = emptyList<Media>()
+                if (!genre.isNullOrBlank()) {
+                    mediaRepository.getMediaByGenre(genre, 20, 0).collect { r ->
+                        if (r.isSuccess) results = r.getOrNull() ?: emptyList()
+                    }
                 }
+                var filtered = results.filter { it.id != media.id }.take(12)
+
+                // Fallback: if the genre lookup came back empty, show latest
+                // movies so the row is never blank.
+                if (filtered.isEmpty()) {
+                    mediaRepository.getMovies(limit = 20, offset = 0).collect { r ->
+                        if (r.isSuccess) {
+                            filtered = (r.getOrNull() ?: emptyList())
+                                .filter { it.id != media.id }
+                                .take(12)
+                        }
+                    }
+                }
+                _similar.value = filtered
             } catch (e: Exception) {
                 Log.w("DetailsViewModel", "Failed to load similar media", e)
+                _similar.value = emptyList()
             }
         }
     }
 
     private suspend fun loadWatchProgress(media: Media) {
         try {
-            // Use direct playback progress API (matches web frontend: GET /api/playback/progress/{id})
+            // 1) Direct progress endpoint
             val result = mediaRepository.getPlaybackProgress(media.id.toString())
-            
-            result.fold(
-                onSuccess = { progress ->
-                    if (progress != null && progress.duration > 0) {
-                        val watchProgress = (progress.progress.toFloat() / progress.duration.toFloat()).coerceIn(0f, 1f)
-                        Log.d("DetailsViewModel", "Watch progress for media ${media.id}: ${(watchProgress * 100).toInt()}% (${progress.progress}s / ${progress.duration}s)")
-                        _uiState.value = DetailsUiState.Success(media, watchProgress, progress.progress)
-                    } else {
-                        Log.d("DetailsViewModel", "No watch progress found for media ${media.id}")
-                        _uiState.value = DetailsUiState.Success(media, null, null)
-                    }
-                },
-                onFailure = { error ->
-                    Log.w("DetailsViewModel", "Failed to load watch progress: ${error.message}")
-                    _uiState.value = DetailsUiState.Success(media, null, null)
+            val progress = result.getOrNull()
+            if (progress != null && progress.duration > 0 && progress.progress > 0) {
+                val watchProgress = (progress.progress.toFloat() / progress.duration.toFloat()).coerceIn(0f, 1f)
+                _uiState.value = DetailsUiState.Success(media, watchProgress, progress.progress)
+                return
+            }
+
+            // 2) Fallback to the SAME source as the Continue Watching row, so the
+            //    detail page and the row always agree (shows Resume when playable).
+            var applied = false
+            mediaRepository.getRecentlyWatchedWithProgress().take(1).collect { r ->
+                val item = r.getOrNull()?.firstOrNull { it.media.id == media.id || it.mediaId == media.id }
+                if (item != null && item.durationSeconds > 0 && item.progressSeconds > 0) {
+                    val wp = (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
+                    _uiState.value = DetailsUiState.Success(media, wp, item.progressSeconds)
+                    applied = true
                 }
-            )
+            }
+            if (!applied) {
+                _uiState.value = DetailsUiState.Success(media, null, null)
+            }
         } catch (e: Exception) {
             Log.w("DetailsViewModel", "Error loading watch progress", e)
             _uiState.value = DetailsUiState.Success(media, null, null)

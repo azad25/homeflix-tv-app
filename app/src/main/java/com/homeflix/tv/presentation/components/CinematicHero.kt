@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import coil.compose.AsyncImage
 import com.homeflix.tv.domain.model.Media
+import com.homeflix.tv.presentation.theme.NetflixRed
 import com.homeflix.tv.presentation.theme.*
 import com.homeflix.tv.util.ApiUtils
 import kotlinx.coroutines.delay
@@ -73,7 +74,7 @@ fun CinematicHero(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(500.dp)
+            .height(440.dp) // fit within TV viewport so focusing Play doesn't scroll
     ) {
         // Backdrop + delayed muted preview clip
         androidx.compose.animation.Crossfade(
@@ -134,9 +135,9 @@ fun CinematicHero(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 56.dp, bottom = 88.dp, end = 500.dp)
+                .padding(start = 56.dp, bottom = 40.dp, end = 500.dp)
                 .graphicsLayer { this.alpha = alpha },
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Brand strip (Prime shows "prime" above the logo)
             Text(
@@ -181,7 +182,7 @@ fun CinematicHero(
             Text(
                 text = "Newly Added",
                 style = MaterialTheme.typography.titleSmall.copy(
-                    color = Color(0xFF4FD8CE),
+                    color = NetflixRed,
                     fontWeight = FontWeight.SemiBold
                 )
             )
@@ -214,7 +215,7 @@ fun CinematicHero(
                         style = MaterialTheme.typography.titleSmall
                     )
                 }
-                CertBadge(currentMedia.certification ?: "PG-13")
+                currentMedia.certification?.takeIf { it.isNotBlank() }?.let { CertBadge(it) }
                 QualityBadge(currentMedia.quality)
             }
 
@@ -238,7 +239,7 @@ fun CinematicHero(
             ) {
                 HeroActionButton(
                     label = "Play",
-                    icon = { Icon(Icons.Default.PlayArrow, null, Modifier.size(26.dp)) },
+                    icon = { Icon(Icons.Default.PlayArrow, null, Modifier.size(20.dp)) },
                     primary = true,
                     focusRequester = playButtonFocusRequester,
                     onClick = { onPlayClick(currentMedia) },
@@ -374,7 +375,7 @@ fun HeroActionButton(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
         ) {
             CompositionLocalProvider(LocalContentColor provides fg) { icon() }
             Text(

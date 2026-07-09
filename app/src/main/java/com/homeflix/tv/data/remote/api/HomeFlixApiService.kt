@@ -163,6 +163,10 @@ interface HomeFlixApiService {
     @POST("recommendations/track-click/{id}")
     suspend fun trackRecommendationClick(@Path("id") id: String): Response<Unit>
     
+    // Notification endpoints (display-only)
+    @GET("notifications")
+    suspend fun getNotifications(@Query("limit") limit: Int = 50): Response<NotificationsResponseDto>
+
     // Genre endpoints
     @GET("genres")
     suspend fun getAllGenres(): Response<List<GenreDto>>
