@@ -171,15 +171,17 @@ private fun NotificationCard(
 ) {
     // These are local notifications, so always derive a guaranteed image from
     // the referenced media id (the backend backdrop/poster URLs are often empty).
+    // Movies use the real BANNER art (/backdrops/{id} auto-downloads from TMDB),
+    // not the video-frame thumbnail.
     val base = ApiUtils.getBaseUrl()
     val primaryArt = resolveAssetUrl(notification.backdropUrl ?: notification.posterUrl)
         ?: notification.targetId?.let { id ->
             if (notification.targetType == "series") "$base/series/$id/backdrop"
-            else "$base/thumbnails/$id"
+            else "$base/backdrops/$id"
         }
     val fallbackArt = notification.targetId?.let { id ->
         if (notification.targetType == "series") "$base/series/$id/poster"
-        else "$base/posters/$id"
+        else "$base/thumbnails/$id"
     }
     var focused by remember { mutableStateOf(false) }
     val scale by androidx.compose.animation.core.animateFloatAsState(
@@ -214,10 +216,10 @@ private fun NotificationCard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Art (16:9) — larger, with single-swap fallback
+            // Art (16:9) — banner-sized, with single-swap fallback
             Box(
                 modifier = Modifier
-                    .width(190.dp)
+                    .width(210.dp)
                     .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(6.dp))
                     .background(PrimeBgDeep)

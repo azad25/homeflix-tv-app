@@ -87,6 +87,7 @@ fun VideoPlayer(
     isVisible: Boolean,
     onClose: () -> Unit,
     seriesTitle: String? = null,
+    episodeTitle: String? = null,
     nextEpisodeId: Int? = null,
     startTime: Long = 0L,
     forceStartFromBeginning: Boolean = false,
@@ -143,7 +144,12 @@ fun VideoPlayer(
     var externalSubtitleTracks by remember { mutableStateOf<List<com.homeflix.tv.domain.model.SubtitleTrack>>(emptyList()) }
 
     // Next episode is provided by the ViewModel (nextEpisodeId param) — no
-    // client-side scan needed.
+    // client-side scan needed. The player listener below is created once per
+    // media, but series enrichment (which supplies nextEpisodeId) arrives
+    // asynchronously AFTER creation — read through rememberUpdatedState so
+    // STATE_ENDED sees the latest value instead of the stale null.
+    val currentNextEpisodeId by rememberUpdatedState(nextEpisodeId)
+    val currentOnPlayNext by rememberUpdatedState(onPlayNext)
 
     // TV remote control focus
     val rootFocusRequester = remember { FocusRequester() }
@@ -242,10 +248,11 @@ fun VideoPlayer(
         }
     }
 
-    // Auto-hide controls
-    LaunchedEffect(showControls, isPlaying) {
-        if (showControls && isPlaying) {
-            delay(3000)
+    // Auto-hide controls — also while PAUSED (slightly longer dwell), so the
+    // Netflix-style pause overlay can fade in without pressing Back.
+    LaunchedEffect(showControls, isPlaying, showSettings) {
+        if (showControls && !showSettings) {
+            delay(if (isPlaying) 3_000 else 4_000)
             showControls = false
         }
     }
@@ -457,11 +464,24 @@ fun VideoPlayer(
                             when (playbackState) {
                                 Player.STATE_READY -> {
                                     val currentDuration = this@apply.duration
-                                    
+
                                     if (currentDuration > 0 && currentDuration != C.TIME_UNSET) {
                                         duration = currentDuration
                                     }
-                                    
+
+                                    // END GUARD: a resume position at/near the end
+                                    // (fully-watched episode from Continue Watching)
+                                    // would fire STATE_ENDED instantly and close the
+                                    // player. Restart from the beginning instead.
+                                    if (!resumeSeekAttempted && shouldResumePlayback &&
+                                        currentDuration > 0 && currentDuration != C.TIME_UNSET &&
+                                        this@apply.currentPosition >= currentDuration - 5_000
+                                    ) {
+                                        resumeSeekAttempted = true
+                                        this@apply.seekTo(0)
+                                        android.util.Log.w("VideoPlayer", "Resume position at end of media — restarting from 0")
+                                    }
+
                                     // CRITICAL FIX: Always set loading flags to false when ready
                                     isBuffering = false
                                     isMediaLoading = false
@@ -520,8 +540,11 @@ fun VideoPlayer(
                                     savePlaybackProgress()
 
                                     // Autoplay the next episode when one exists
-                                    if (nextEpisodeId != null && onPlayNext != null) {
-                                        onPlayNext(nextEpisodeId)
+                                    // (read latest values — enrichment is async)
+                                    val nextId = currentNextEpisodeId
+                                    val playNext = currentOnPlayNext
+                                    if (nextId != null && playNext != null) {
+                                        playNext(nextId)
                                     } else {
                                         onClose()
                                     }
@@ -801,19 +824,20 @@ fun VideoPlayer(
                     Text(
                         text = if (isEpisode) (seriesTitle ?: media.title) else media.title,
                         color = Color.White,
-                        fontSize = 20.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
                     if (isEpisode) {
                         val se = if (media.seasonNumber != null && media.episodeNumber != null)
                             "S${media.seasonNumber}:E${media.episodeNumber} · " else ""
-                        // When seriesTitle is present, media.title is the episode title.
-                        val epLine = (se + media.title).trim()
+                        // Prefer the real TMDB episode title from enrichment —
+                        // media.title is often just the media file name.
+                        val epLine = (se + (episodeTitle ?: media.title)).trim().trimEnd('·').trim()
                         if (epLine.isNotBlank()) {
                             Text(
                                 text = epLine,
                                 color = Color.White.copy(alpha = 0.75f),
-                                fontSize = 15.sp
+                                fontSize = 13.sp
                             )
                         }
                     }
@@ -835,6 +859,13 @@ fun VideoPlayer(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        // Elapsed time, left of the bar
+                        Text(
+                            text = formatTime(currentPosition.coerceAtLeast(0)),
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -902,7 +933,7 @@ fun VideoPlayer(
                         Text(
                             text = formatTime((duration - currentPosition).coerceAtLeast(0)),
                             color = Color.White.copy(alpha = 0.9f),
-                            fontSize = 15.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -966,6 +997,105 @@ fun VideoPlayer(
                 }
             }
 
+            // ── NETFLIX-STYLE PAUSE OVERLAY ────────────────────────────
+            // When paused and the controls have faded out, fade in an ambient
+            // info panel: what you're watching + synopsis + a banner still.
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !isPlaying && !showControls && !showSettings && !isMediaLoading && !isBuffering && duration > 0,
+                enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(600)),
+                exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(250))
+            ) {
+              Box(Modifier.fillMaxSize()) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.92f),
+                                    Color.Black.copy(alpha = 0.55f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 64.dp, vertical = 56.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(0.55f)) {
+                        Text(
+                            text = "You're watching",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        val isEp = media.type == MediaType.EPISODE
+                        Text(
+                            text = if (isEp) (seriesTitle ?: media.title) else media.title,
+                            color = Color.White,
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        if (isEp && media.seasonNumber != null && media.episodeNumber != null) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "S${media.seasonNumber}:E${media.episodeNumber} · ${episodeTitle ?: media.title}",
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        media.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = desc,
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 13.sp,
+                                lineHeight = 19.sp,
+                                maxLines = 4,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = "Paused",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Spacer(Modifier.width(48.dp))
+                    // Banner still on the right — episodes use the SERIES
+                    // backdrop (episode media has no backdrop of its own).
+                    val pauseArt = if (media.type == MediaType.EPISODE && media.seriesId != null)
+                        "${ApiUtils.getBaseUrl()}/series/${media.seriesId}/backdrop"
+                    else ApiUtils.getBackdropUrl(media)
+                    val pauseArtKey = if (media.type == MediaType.EPISODE && media.seriesId != null)
+                        "series_backdrop_${media.seriesId}" else "backdrop_${media.id}"
+                    coil.compose.AsyncImage(
+                        model = coil.request.ImageRequest.Builder(context)
+                            .data(pauseArt)
+                            .memoryCacheKey(pauseArtKey)
+                            .diskCacheKey(pauseArtKey)
+                            .crossfade(false)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier
+                            .weight(0.45f)
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                }
+              }
+            }
+
             // Netflix-style loading indicator - shows during initial load AND buffering
             if (isMediaLoading || isBuffering) {
                 Box(
@@ -1011,7 +1141,7 @@ fun VideoPlayer(
                             Text(
                                 text = subtitleToastMessage,
                                 color = Color.White,
-                                fontSize = 16.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium
                             )
                         }
@@ -1172,9 +1302,9 @@ private fun NetflixPillButton(
         Text(
             text = label,
             color = if (focused) Color.Black else Color.White,
-            fontSize = 15.sp,
+            fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 13.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp)
         )
     }
 }

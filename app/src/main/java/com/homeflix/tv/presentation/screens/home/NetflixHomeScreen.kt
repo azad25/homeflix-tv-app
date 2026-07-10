@@ -59,6 +59,13 @@ fun NetflixHomeScreen(
     val heroPlayButtonFocusRequester = remember { FocusRequester() }
     val firstRowFocusRequester = remember { FocusRequester() }
     val latestMoviesFocusRequester = remember { FocusRequester() }
+    // Per-section requesters for the deterministic UP chain (rows scrolled out
+    // of view are disposed, so default focus search can't find them — each row
+    // explicitly scrolls to + focuses the row above it).
+    val featuredFocusRequester = remember { FocusRequester() }
+    val top10FocusRequester = remember { FocusRequester() }
+    val trendingFocusRequester = remember { FocusRequester() }
+    val actionFocusRequester = remember { FocusRequester() }
     
     // Professional focus state management
     var currentFocusArea by remember { mutableStateOf(FocusArea.HERO) }
@@ -102,10 +109,19 @@ fun NetflixHomeScreen(
 
     // UP from the first content row → scroll list to top and focus the hero
     // (fixes "can't scroll back to top" when the hero item is disposed).
+    // Focus is retried: right after the scroll the freshly-composed hero's
+    // FocusRequester may not be attached yet, and a single silent failure
+    // left focus stranded at the bottom.
     val onNavigateUpToHero: () -> Unit = {
         coroutineScope.launch {
             listState.animateScrollToItem(0)
-            try { heroPlayButtonFocusRequester.requestFocus() } catch (_: Exception) {}
+            repeat(8) {
+                try {
+                    heroPlayButtonFocusRequester.requestFocus()
+                    listState.scrollToItem(0, 0)
+                    return@launch
+                } catch (_: Exception) { delay(50) }
+            }
         }
     }
     
@@ -189,6 +205,51 @@ fun NetflixHomeScreen(
                 
                 when (currentState) {
                     is HomeUiState.Success -> {
+                        // ── Deterministic UP chain ─────────────────────────
+                        // Section presence + LazyColumn item indices, so every
+                        // row can scroll to and focus the row above it.
+                        val moviesOnlyHero = currentState.featuredMedia.filter { it.type == MediaType.MOVIE }
+                        val hasHero = moviesOnlyHero.isNotEmpty()
+                        val hasCW = currentState.continueWatching.isNotEmpty()
+                        val hasFeatured = currentState.latestMovies.isNotEmpty()
+                        val hasTop10 = currentState.popularMovies.isNotEmpty()
+                        val hasTrending = currentState.trendingMovies.isNotEmpty()
+                        val heroCount = if (hasHero) 1 else 0
+                        val cwIndex = heroCount + 1 // +1 for spacer item
+                        val featuredIndex = cwIndex + (if (hasCW) 1 else 0)
+                        val top10Index = featuredIndex + (if (hasFeatured) 1 else 0)
+                        val trendingIndex = top10Index + (if (hasTop10) 1 else 0)
+
+                        val navUpTo: (Int, FocusRequester) -> Unit = { itemIndex, requester ->
+                            coroutineScope.launch {
+                                listState.animateScrollToItem(itemIndex)
+                                repeat(6) {
+                                    try { requester.requestFocus(); return@launch } catch (_: Exception) { delay(50) }
+                                }
+                            }
+                        }
+                        // UP from each section → nearest present section above it
+                        val upFromFeatured: () -> Unit =
+                            if (hasCW) ({ navUpTo(cwIndex, firstRowFocusRequester) }) else onNavigateUpToHero
+                        val upFromTop10: () -> Unit = when {
+                            hasFeatured -> ({ navUpTo(featuredIndex, featuredFocusRequester) })
+                            hasCW -> ({ navUpTo(cwIndex, firstRowFocusRequester) })
+                            else -> onNavigateUpToHero
+                        }
+                        val upFromTrending: () -> Unit = when {
+                            hasTop10 -> ({ navUpTo(top10Index, top10FocusRequester) })
+                            hasFeatured -> ({ navUpTo(featuredIndex, featuredFocusRequester) })
+                            hasCW -> ({ navUpTo(cwIndex, firstRowFocusRequester) })
+                            else -> onNavigateUpToHero
+                        }
+                        val upFromAction: () -> Unit = when {
+                            hasTrending -> ({ navUpTo(trendingIndex, trendingFocusRequester) })
+                            hasTop10 -> ({ navUpTo(top10Index, top10FocusRequester) })
+                            hasFeatured -> ({ navUpTo(featuredIndex, featuredFocusRequester) })
+                            hasCW -> ({ navUpTo(cwIndex, firstRowFocusRequester) })
+                            else -> onNavigateUpToHero
+                        }
+
                         LazyColumn(
                             state = listState,
                             modifier = Modifier
@@ -198,7 +259,7 @@ fun NetflixHomeScreen(
                         ) {
                         // HERO SECTION as LazyColumn item
                         if (currentState.featuredMedia.isNotEmpty()) {
-                            val moviesOnly = currentState.featuredMedia.filter { it.type == MediaType.MOVIE }
+                            val moviesOnly = moviesOnlyHero
                             if (moviesOnly.isNotEmpty()) {
                                 item {
                                     val safeIndex = currentHeroIndex % moviesOnly.size
@@ -262,8 +323,8 @@ fun NetflixHomeScreen(
                                     onMediaClick = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
-                                    focusRequester = if (currentState.continueWatching.isEmpty()) firstRowFocusRequester else null,
-                                    onNavigateUp = onNavigateUpToHero,
+                                    focusRequester = featuredFocusRequester,
+                                    onNavigateUp = upFromFeatured,
                                     modifier = Modifier.padding(bottom = 28.dp)
                                 )
                             }
@@ -278,6 +339,8 @@ fun NetflixHomeScreen(
                                     onMediaClick = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
+                                    focusRequester = top10FocusRequester,
+                                    onNavigateUp = upFromTop10,
                                     modifier = Modifier.padding(bottom = 28.dp)
                                 )
                             }
@@ -292,6 +355,8 @@ fun NetflixHomeScreen(
                                     onMediaClick = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
+                                    focusRequester = trendingFocusRequester,
+                                    onNavigateUp = upFromTrending,
                                     modifier = Modifier.padding(bottom = 24.dp)
                                 )
                             }
@@ -306,6 +371,8 @@ fun NetflixHomeScreen(
                                     onMediaClick = { media ->
                                         navController.navigate(Screen.Details.createRoute(media.id.toString()))
                                     },
+                                    focusRequester = actionFocusRequester,
+                                    onNavigateUp = upFromAction,
                                     modifier = Modifier.padding(bottom = 24.dp)
                                 )
                             }

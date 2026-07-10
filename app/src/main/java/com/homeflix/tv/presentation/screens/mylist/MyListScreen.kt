@@ -98,6 +98,24 @@ fun MyListScreen(
                 }
 
                 is MyListUiState.Success -> {
+                    // Incremental rendering: start with 3 rows and append as the
+                    // user scrolls near the bottom — the full list (with every
+                    // poster request) never loads up front.
+                    var visibleCount by remember(state.movies.size) {
+                        mutableStateOf(minOf(18, state.movies.size))
+                    }
+                    val shouldLoadMore by remember {
+                        derivedStateOf {
+                            val last = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                            last >= gridState.layoutInfo.totalItemsCount - 7
+                        }
+                    }
+                    LaunchedEffect(shouldLoadMore) {
+                        if (shouldLoadMore && visibleCount < state.movies.size) {
+                            visibleCount = minOf(visibleCount + 18, state.movies.size)
+                        }
+                    }
+
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(6),
                         state = gridState,
@@ -173,7 +191,7 @@ fun MyListScreen(
                                     modifier = Modifier.padding(top = 8.dp)
                                 )
                             }
-                            items(state.movies, key = { it.id }) { media ->
+                            items(state.movies.take(visibleCount), key = { it.id }) { media ->
                                 PosterCard(
                                     posterUrl = ApiUtils.getPosterUrl(media),
                                     fallbackUrl = ApiUtils.getThumbnailUrl(media),

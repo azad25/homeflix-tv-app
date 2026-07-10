@@ -520,9 +520,6 @@ private fun EpisodeTile(
                         )
                     }
                 }
-                episode.airDate?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, color = PrimeTextDim, style = MaterialTheme.typography.labelMedium)
-                }
                 episode.description?.takeIf { it.isNotBlank() }?.let { desc ->
                     Text(
                         text = desc,

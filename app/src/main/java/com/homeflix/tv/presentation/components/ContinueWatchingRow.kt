@@ -73,23 +73,26 @@ fun ContinueWatchingRow(
     }
     if (validItems.isEmpty()) return
 
-    Column(
-        modifier = modifier.then(
-            if (applyHorizontalPadding) Modifier.padding(start = 48.dp) else Modifier
-        )
-    ) {
+    // Edge padding lives in the LazyRow contentPadding (not the parent Column)
+    // so the scaled focus border of the FIRST card isn't clipped at the row's
+    // left bound — the row spans full width and clips only at the screen edge.
+    Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = "Continue Watching",
             style = MaterialTheme.typography.titleLarge.copy(
                 fontWeight = FontWeight.SemiBold,
                 color = TextPrimary
             ),
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier.padding(
+                start = if (applyHorizontalPadding) 48.dp else 0.dp,
+                bottom = 8.dp
+            )
         )
 
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(end = 48.dp)
+            contentPadding = if (applyHorizontalPadding)
+                PaddingValues(horizontal = 48.dp) else PaddingValues(end = 48.dp)
         ) {
             items(validItems, key = { it.media.id }) { item ->
                 ContinueWatchingCard(

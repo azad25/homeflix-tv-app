@@ -1,12 +1,18 @@
 package com.homeflix.tv.presentation.screens.player
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import com.homeflix.tv.presentation.components.VideoPlayer
+import kotlinx.coroutines.delay
 
 
 @UnstableApi
@@ -32,8 +38,16 @@ fun VideoPlayerScreen(
         }
         
         is VideoPlayerUiState.Error -> {
-            // Show error message and navigate back
+            // Show the error briefly, then navigate back — an instant close
+            // looks like the player "randomly quit".
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "Couldn't play this title", color = Color.White)
+            }
             LaunchedEffect(state.message) {
+                delay(1500)
                 onNavigateBack()
             }
         }
@@ -56,9 +70,18 @@ fun VideoPlayerScreen(
                 state.seasonEpisodes.getOrNull(state.currentIndex + 1)?.id
             else null
 
+            // Real episode title from the season list (media.title is often
+            // just the file name for episodes).
+            val currentEpisode = if (state.currentIndex >= 0)
+                state.seasonEpisodes.getOrNull(state.currentIndex)
+            else null
+            val episodeTitle = currentEpisode?.episodeTitle?.takeIf { it.isNotBlank() }
+                ?: currentEpisode?.title?.takeIf { it.isNotBlank() }
+
             VideoPlayer(
                 media = state.media,
                 seriesTitle = state.seriesTitle,
+                episodeTitle = episodeTitle,
                 nextEpisodeId = nextEpisodeId,
                 isVisible = true,
                 onClose = onNavigateBack,

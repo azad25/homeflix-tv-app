@@ -277,19 +277,19 @@ fun SearchScreen(
                     Text(
                         text = "Top Searches",
                         color = Color.White,
-                        fontSize = 32.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 24.dp)
                     )
                     
                     // Top searches — landscape thumb+logo grid
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(5),
+                        columns = GridCells.Fixed(4),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(topSearches.take(9), key = { it.id }) { media ->
+                        items(topSearches.take(8), key = { it.id }) { media ->
                             PosterCard(
                                 posterUrl = ApiUtils.getPosterUrl(media),
                                 fallbackUrl = ApiUtils.getThumbnailUrl(media),
@@ -305,7 +305,7 @@ fun SearchScreen(
                     Text(
                         text = "Search Results",
                         color = Color.White,
-                        fontSize = 24.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
@@ -327,18 +327,18 @@ fun SearchScreen(
                                 Text(
                                     text = "Top Searches",
                                     color = Color.White,
-                                    fontSize = 32.sp,
+                                    fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(bottom = 24.dp)
                                 )
                                 
                                 LazyVerticalGrid(
-                                    columns = GridCells.Fixed(5),
+                                    columns = GridCells.Fixed(4),
                                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                                     verticalArrangement = Arrangement.spacedBy(14.dp),
                                     modifier = Modifier.fillMaxSize()
                                 ) {
-                                    items(topSearches.take(9), key = { it.id }) { media ->
+                                    items(topSearches.take(8), key = { it.id }) { media ->
                                         PosterCard(
                                 posterUrl = ApiUtils.getPosterUrl(media),
                                 fallbackUrl = ApiUtils.getThumbnailUrl(media),
@@ -352,7 +352,7 @@ fun SearchScreen(
                             } else {
                                 val movieResults = currentState.results.filter { it.type == MediaType.MOVIE }
                                 LazyVerticalGrid(
-                                    columns = GridCells.Fixed(5),
+                                    columns = GridCells.Fixed(4),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     verticalArrangement = Arrangement.spacedBy(16.dp),
                                     modifier = Modifier.fillMaxSize()
@@ -377,18 +377,18 @@ fun SearchScreen(
                             Text(
                                 text = "Top Searches",
                                 color = Color.White,
-                                fontSize = 32.sp,
+                                fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(bottom = 24.dp)
                             )
                             
                             LazyVerticalGrid(
-                                columns = GridCells.Fixed(5),
+                                columns = GridCells.Fixed(4),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                items(topSearches.take(15), key = { it.id }) { media ->
+                                items(topSearches.take(12), key = { it.id }) { media ->
                                     PosterCard(
                                         posterUrl = ApiUtils.getPosterUrl(media),
                                         fallbackUrl = ApiUtils.getThumbnailUrl(media),

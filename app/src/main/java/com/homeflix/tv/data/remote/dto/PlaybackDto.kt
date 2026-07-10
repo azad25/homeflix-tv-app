@@ -11,8 +11,11 @@ data class PlaybackProgressDto(
     val mediaId: Int,
     @SerializedName("user_id")
     val userId: String,
-    val progress: Long,
-    val duration: Long,
+    // Backend semantics: position = seconds played, progress = percentage
+    // (0-100), duration = seconds. All floats.
+    val position: Double = 0.0,
+    val progress: Double = 0.0,
+    val duration: Double = 0.0,
     val completed: Boolean = false,
     @SerializedName("last_watched")
     val lastWatched: String,
@@ -167,8 +170,10 @@ fun PlaybackProgressDto.toDomain(): PlaybackProgress {
         id = id,
         mediaId = mediaId,
         userId = userId,
-        progress = progress,
-        duration = duration,
+        // Domain contract: progress = seconds played. The backend keeps the
+        // seconds in `position` (its `progress` field is a 0-100 percentage).
+        progress = position.toLong(),
+        duration = duration.toLong(),
         completed = completed,
         lastWatched = parseDate(lastWatched),
         createdAt = parseDate(createdAt),

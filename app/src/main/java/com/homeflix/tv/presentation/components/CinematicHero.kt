@@ -94,28 +94,19 @@ fun CinematicHero(
             }
         }
 
-        // Prime-style gradient: strong left panel + fade to page bg at bottom
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            PrimeBgDeep.copy(alpha = 0.94f),
-                            PrimeBgDeep.copy(alpha = 0.55f),
-                            Color.Transparent
-                        ),
-                        endX = 1400f
-                    )
-                )
-        )
+        // Video stays clean at the top; only the bottom blends into the page
+        // black so the rows appear to sit on the hero (Netflix-style scrim).
         Box(
             Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, PrimeBg),
-                        startY = 750f
+                        colors = listOf(
+                            Color.Transparent,
+                            PrimeBg.copy(alpha = 0.55f),
+                            PrimeBg
+                        ),
+                        startY = 460f
                     )
                 )
         )

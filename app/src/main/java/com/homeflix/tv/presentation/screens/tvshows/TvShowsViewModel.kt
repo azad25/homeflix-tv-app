@@ -117,9 +117,15 @@ class TvShowsViewModel @Inject constructor(
                     items
                         .filterNotNull()
                         .filter {
-                            it.media.type == MediaType.EPISODE &&
+                            // Backend marks episode items as type "tv" (mapped to
+                            // TV_SHOW) and puts the SERIES id in media.id — key off
+                            // series_id presence, not the type enum.
+                            (it.media.type == MediaType.EPISODE || it.media.type == MediaType.TV_SHOW) &&
                                 it.media.seriesId != null && it.media.seriesId > 0 &&
                                 it.durationSeconds > 0 && it.progressSeconds > 0 &&
+                                // Skip fully-watched episodes — resuming at the end
+                                // fires STATE_ENDED instantly (player auto-close)
+                                it.progressSeconds < it.durationSeconds * 0.96f &&
                                 it.lastWatchedAt != null
                         }
                         .sortedByDescending { it.lastWatchedAt?.time ?: 0L }
@@ -131,7 +137,9 @@ class TvShowsViewModel @Inject constructor(
                             ContinueWatchingSeries(
                                 seriesId = sid,
                                 seriesTitle = titleById[sid] ?: item.media.title,
-                                episodeMediaId = item.media.id,
+                                // item.mediaId is the EPISODE media id; the nested
+                                // media.id holds the series id on this endpoint.
+                                episodeMediaId = item.mediaId,
                                 seasonNumber = item.media.seasonNumber,
                                 episodeNumber = item.media.episodeNumber,
                                 progressSeconds = item.progressSeconds,

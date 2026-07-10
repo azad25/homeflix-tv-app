@@ -43,7 +43,8 @@ fun Top10Row(
     mediaList: List<Media>,
     onMediaClick: (Media) -> Unit,
     modifier: Modifier = Modifier,
-    focusRequester: FocusRequester? = null
+    focusRequester: FocusRequester? = null,
+    onNavigateUp: (() -> Unit)? = null
 ) {
     if (mediaList.isEmpty()) return
     val items = mediaList.take(10)
@@ -67,6 +68,7 @@ fun Top10Row(
                     media = media,
                     rank = index + 1,
                     onClick = { onMediaClick(media) },
+                    onNavigateUp = onNavigateUp,
                     modifier = if (index == 0 && focusRequester != null)
                         Modifier.focusRequester(focusRequester) else Modifier
                 )
@@ -80,6 +82,7 @@ private fun Top10Card(
     media: Media,
     rank: Int,
     onClick: () -> Unit,
+    onNavigateUp: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -91,10 +94,13 @@ private fun Top10Card(
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .onFocusChanged { focused = it.isFocused }
             .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown &&
-                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
-                ) {
-                    onClick(); true
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.key) {
+                        Key.Enter, Key.DirectionCenter -> { onClick(); true }
+                        Key.DirectionUp ->
+                            if (onNavigateUp != null) { onNavigateUp(); true } else false
+                        else -> false
+                    }
                 } else false
             }
             .focusable()

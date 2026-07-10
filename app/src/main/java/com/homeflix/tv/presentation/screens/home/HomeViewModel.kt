@@ -91,16 +91,17 @@ class HomeViewModel @Inject constructor(
                                 sortedByRating.take(20)
                             }
                             
-                            // Fetch popular from dedicated API endpoint
-                            val popularMovies = try {
-                                val popularResponse = mediaRepository.getPopularRecommendations(20)
-                                if (popularResponse.isSuccessful) {
-                                    popularResponse.body()?.map { it.toDomain() } ?: sortedByViews.take(20)
-                                } else sortedByViews.take(20)
-                            } catch (e: Exception) {
-                                Log.w("HomeViewModel", "Popular API failed, using fallback", e)
-                                sortedByViews.take(20)
-                            }
+                            // TOP 10: deterministic most-watched ranking. The
+                            // /recommendations/popular endpoint returns a RANDOM
+                            // order on every call, which made Top 10 reshuffle on
+                            // each visit — rank by view count (stable tie-breaks).
+                            val popularMovies = movies
+                                .sortedWith(
+                                    compareByDescending<Media> { it.viewCount }
+                                        .thenByDescending { it.rating }
+                                        .thenBy { it.id }
+                                )
+                                .take(20)
                             
                             val latestMovies = sortedByDate.take(20) // Latest by creation date
                             

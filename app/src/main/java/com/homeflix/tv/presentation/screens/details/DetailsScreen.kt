@@ -91,11 +91,12 @@ fun DetailsScreen(
             .fillMaxSize()
             .background(PrimeBg)
             .onKeyEvent { keyEvent ->
+                // NOTE: LEFT is NOT intercepted here — a root LEFT handler
+                // consumed every left press and broke in-row navigation
+                // (More Like This). The sidebar opens from the leftmost
+                // focusables instead (Play button / first row card).
                 if (keyEvent.type == KeyEventType.KeyDown) {
                     when (keyEvent.key) {
-                        Key.DirectionLeft -> {
-                            if (!showSidebar) { showSidebar = true; true } else false
-                        }
                         Key.Back -> {
                             if (showSidebar) { showSidebar = false; true } else false
                         }
@@ -109,8 +110,8 @@ fun DetailsScreen(
                 val media = state.media
 
                 LaunchedEffect(media.id) {
-                    // Focus Play, then pin to top so the tall hero + focus don't
-                    // leave the page scrolled into "More like this".
+                    // Focus Play; the hero item is exactly viewport-height so
+                    // focusing it never scrolls the video out of view.
                     delay(350)
                     repeat(8) {
                         try { playFocusRequester.requestFocus(); return@repeat } catch (_: Exception) { delay(40) }
@@ -119,53 +120,47 @@ fun DetailsScreen(
                     detailListState.scrollToItem(0)
                 }
 
+                // NETFLIX LAYOUT: the video is a FIXED full-bleed layer behind
+                // the content — scrolling and focus can never clip or push it.
+                // Content (info + rows) scrolls OVER it.
+                Box(Modifier.fillMaxSize()) {
+                    // Backdrop -> auto-playing muted preview (fixed layer)
+                    BackgroundVideo(
+                        backdropUrl = ApiUtils.getBackdropUrl(media),
+                        videoUrl = ApiUtils.getPreviewClipUrl(media.id),
+                        startDelayMs = 2200,
+                        contentDescription = media.title
+                    )
+                    // Clean video at the top; bottom blends into page black
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        PrimeBg.copy(alpha = 0.6f),
+                                        PrimeBg
+                                    ),
+                                    startY = 500f
+                                )
+                            )
+                    )
+                }
+
                 LazyColumn(state = detailListState, modifier = Modifier.fillMaxSize()) {
                     item {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(440.dp)
+                                .fillParentMaxHeight()
                         ) {
-                            // Backdrop -> auto-playing muted preview
-                            BackgroundVideo(
-                                backdropUrl = ApiUtils.getBackdropUrl(media),
-                                videoUrl = ApiUtils.getPreviewClipUrl(media.id),
-                                startDelayMs = 2200,
-                                contentDescription = media.title
-                            )
-
-                            // Prime gradients: strong left panel + fade to page bg
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            colors = listOf(
-                                                PrimeBgDeep.copy(alpha = 0.96f),
-                                                PrimeBgDeep.copy(alpha = 0.6f),
-                                                Color.Transparent
-                                            ),
-                                            endX = 1500f
-                                        )
-                                    )
-                            )
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(Color.Transparent, PrimeBg),
-                                            startY = 850f
-                                        )
-                                    )
-                            )
-
                             // Info column
                             Column(
                                 modifier = Modifier
                                     .align(Alignment.BottomStart)
-                                    .padding(start = 56.dp, bottom = 40.dp, end = 480.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp)
+                                    .padding(start = 48.dp, bottom = 36.dp, end = 480.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 // Logo or title
                                 val logoUrl = ApiUtils.getLogoUrl(media)
@@ -310,7 +305,7 @@ fun DetailsScreen(
                                         (state.watchProgress ?: 0f) < 0.97f
                                     HeroActionButton(
                                         label = if (canResume) "Resume" else "Play",
-                                        icon = { Icon(Icons.Default.PlayArrow, null, Modifier.size(26.dp)) },
+                                        icon = { Icon(Icons.Default.PlayArrow, null, Modifier.size(20.dp)) },
                                         primary = true,
                                         focusRequester = playFocusRequester,
                                         onClick = {
@@ -318,7 +313,9 @@ fun DetailsScreen(
                                             navController.navigate(
                                                 Screen.VideoPlayer.createRoute(media.id, startTime = start)
                                             )
-                                        }
+                                        },
+                                        // Leftmost focusable: LEFT reveals the nav rail
+                                        onNavigateLeft = { showSidebar = true }
                                     )
                                     if (canResume) {
                                         HeroActionButton(
@@ -352,17 +349,21 @@ fun DetailsScreen(
                         }
                     }
 
-                    // More like this
+                    // More like this — solid background so it reads as a sheet
+                    // sliding over the video when focused/scrolled up.
                     if (similar.isNotEmpty()) {
                         item {
-                            ThumbLogoRow(
-                                title = "More like this",
-                                mediaList = similar,
-                                onMediaClick = { m ->
-                                    navController.navigate(Screen.Details.createRoute(m.id.toString()))
-                                },
-                                modifier = Modifier.padding(top = 8.dp, bottom = 48.dp)
-                            )
+                            Box(Modifier.background(PrimeBg)) {
+                                ThumbLogoRow(
+                                    title = "More like this",
+                                    mediaList = similar,
+                                    onMediaClick = { m ->
+                                        navController.navigate(Screen.Details.createRoute(m.id.toString()))
+                                    },
+                                    onNavigateLeftAtStart = { showSidebar = true },
+                                    modifier = Modifier.padding(top = 16.dp, bottom = 48.dp)
+                                )
+                            }
                         }
                     }
                 }

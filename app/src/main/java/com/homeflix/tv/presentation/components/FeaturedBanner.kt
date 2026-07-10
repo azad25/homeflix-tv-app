@@ -184,7 +184,7 @@ fun FeaturedBanner(
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                side.forEach { media ->
+                side.forEachIndexed { i, media ->
                     SidePick(
                         media = media,
                         onFocused = {
@@ -193,6 +193,8 @@ fun FeaturedBanner(
                             if (idx >= 0) bigIndex = idx
                         },
                         onClick = { onMediaClick(media) },
+                        // Topmost side pick participates in the UP chain
+                        onNavigateUp = if (i == 0) onNavigateUp else null,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -206,6 +208,7 @@ private fun SidePick(
     media: Media,
     onFocused: () -> Unit,
     onClick: () -> Unit,
+    onNavigateUp: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -214,8 +217,13 @@ private fun SidePick(
             .fillMaxWidth()
             .onFocusChanged { if (it.isFocused) { focused = true; onFocused() } else focused = false }
             .onKeyEvent { k ->
-                if (k.type == KeyEventType.KeyDown && (k.key == Key.Enter || k.key == Key.DirectionCenter)) {
-                    onClick(); true
+                if (k.type == KeyEventType.KeyDown) {
+                    when (k.key) {
+                        Key.Enter, Key.DirectionCenter -> { onClick(); true }
+                        Key.DirectionUp ->
+                            if (onNavigateUp != null) { onNavigateUp(); true } else false
+                        else -> false
+                    }
                 } else false
             }
             .focusable()

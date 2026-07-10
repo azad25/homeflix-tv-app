@@ -47,9 +47,12 @@ fun BackgroundVideo(
 
     var player by remember { mutableStateOf<ExoPlayer?>(null) }
     var firstFrameRendered by remember { mutableStateOf(false) }
+    var playbackStarted by remember { mutableStateOf(false) }
 
     val videoAlpha by animateFloatAsState(
-        targetValue = if (firstFrameRendered) 1f else 0f,
+        // Reveal only once playback has actually started — the first frame can
+        // render during the paused preload window.
+        targetValue = if (firstFrameRendered && playbackStarted) 1f else 0f,
         animationSpec = tween(durationMillis = 700),
         label = "bg_video_alpha"
     )
@@ -57,17 +60,24 @@ fun BackgroundVideo(
     // (Re)start playback when the target video changes. Background preview is
     // a HomeFlix signature — always kept; we just keep buffers small (below)
     // so it's light on low-RAM TVs.
+    //
+    // PRELOAD strategy: create + prepare the player immediately but PAUSED
+    // (playWhenReady=false), so the clip buffers during the startDelay window.
+    // When the delay elapses and the player is READY, playback starts from
+    // buffer — no visible stutter on the hero.
     LaunchedEffect(videoUrl, playbackEnabled) {
         firstFrameRendered = false
+        playbackStarted = false
         player?.release()
         player = null
         if (videoUrl.isNullOrBlank() || !playbackEnabled) return@LaunchedEffect
 
-        delay(startDelayMs)
+        // Small settle delay so fast hero slide-changes don't spawn players
+        delay(600)
 
         // Small buffers keep the ambient preview light on low-RAM TVs
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-            .setBufferDurationsMs(2_000, 8_000, 1_000, 1_500)
+            .setBufferDurationsMs(3_000, 10_000, 1_500, 2_000)
             .build()
         val exo = ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
@@ -75,7 +85,7 @@ fun BackgroundVideo(
             setMediaItem(MediaItem.fromUri(videoUrl))
             repeatMode = Player.REPEAT_MODE_ONE
             volume = 0f
-            playWhenReady = true
+            playWhenReady = false // buffer silently during the delay
             addListener(object : Player.Listener {
                 override fun onRenderedFirstFrame() {
                     firstFrameRendered = true
@@ -89,6 +99,16 @@ fun BackgroundVideo(
             prepare()
         }
         player = exo
+
+        // Wait out the remaining reveal delay while the player buffers, then
+        // hold up to 5 extra seconds for READY before starting playback.
+        delay((startDelayMs - 600).coerceAtLeast(0))
+        var waited = 0L
+        while (exo.playbackState != Player.STATE_READY && waited < 5_000) {
+            delay(200); waited += 200
+        }
+        exo.playWhenReady = true
+        playbackStarted = true
     }
 
     // Hard lifecycle guarantees: never play while not visible

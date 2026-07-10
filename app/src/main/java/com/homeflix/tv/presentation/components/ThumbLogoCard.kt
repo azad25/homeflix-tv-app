@@ -8,7 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,22 +35,38 @@ import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.presentation.theme.PrimeTextDim
 import com.homeflix.tv.presentation.theme.TextPrimary
 import com.homeflix.tv.util.ApiUtils
+import kotlinx.coroutines.launch
 
 /**
  * Landscape 16:9 card built from a THUMBNAIL/backdrop with the title LOGO
  * composited over it (falls back to text when no logo). This is the
  * Prime/Netflix "art + logo" card — used to mix with plain 2:3 posters so the
  * UI isn't a wall of identical posters.
+ *
+ * The logo position varies per title (left/center/right, derived from the
+ * media id) so rows don't look like every logo was stamped in the same spot.
  */
 @Composable
 fun ThumbLogoCard(
     media: Media,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    width: Dp? = 300.dp // null → fill the width given by the caller (grid cell)
+    width: Dp? = 300.dp, // null → fill the width given by the caller (grid cell)
+    onNavigateLeft: (() -> Unit)? = null,
+    onNavigateRight: (() -> Unit)? = null,
+    onNavigateUp: (() -> Unit)? = null
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(if (focused) 1.06f else 1f, tween(160), label = "tl_scale")
+
+    // Dynamic logo anchor: stable per title, varied across a row
+    val logoAlignment = remember(media.id) {
+        when (media.id % 3) {
+            0 -> Alignment.BottomStart
+            1 -> Alignment.BottomCenter
+            else -> Alignment.BottomEnd
+        }
+    }
 
     Box(
         modifier = modifier
@@ -58,8 +75,17 @@ fun ThumbLogoCard(
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .onFocusChanged { focused = it.isFocused }
             .onKeyEvent { k ->
-                if (k.type == KeyEventType.KeyDown && (k.key == Key.Enter || k.key == Key.DirectionCenter)) {
-                    onClick(); true
+                if (k.type == KeyEventType.KeyDown) {
+                    when (k.key) {
+                        Key.Enter, Key.DirectionCenter -> { onClick(); true }
+                        Key.DirectionLeft ->
+                            if (onNavigateLeft != null) { onNavigateLeft(); true } else false
+                        Key.DirectionRight ->
+                            if (onNavigateRight != null) { onNavigateRight(); true } else false
+                        Key.DirectionUp ->
+                            if (onNavigateUp != null) { onNavigateUp(); true } else false
+                        else -> false
+                    }
                 } else false
             }
             .focusable()
@@ -92,12 +118,12 @@ fun ThumbLogoCard(
                 )
         )
 
-        // Logo composited bottom-left, text fallback
+        // Logo composited at the per-title anchor, text fallback
         val logoUrl = ApiUtils.getLogoUrl(media)
         var logoOk by remember(media.id) { mutableStateOf(logoUrl != null) }
         Box(
             modifier = Modifier
-                .align(Alignment.BottomStart)
+                .align(if (logoOk && logoUrl != null) logoAlignment else Alignment.BottomStart)
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             if (logoOk && logoUrl != null) {
@@ -110,7 +136,7 @@ fun ThumbLogoCard(
                     contentDescription = media.title,
                     contentScale = ContentScale.Fit,
                     onError = { logoOk = false },
-                    modifier = Modifier.heightIn(max = 40.dp).widthIn(max = 180.dp)
+                    modifier = Modifier.heightIn(max = 36.dp).widthIn(max = 170.dp)
                 )
             } else {
                 Column {
@@ -133,6 +159,10 @@ fun ThumbLogoCard(
 /**
  * A horizontal row of [ThumbLogoCard]s with a section title — the landscape
  * counterpart to MediaRow, for mixing card styles across the home page.
+ *
+ * Handles LEFT/RIGHT internally via per-item FocusRequesters so a parent key
+ * handler can never swallow in-row navigation. At the first card, LEFT calls
+ * [onNavigateLeftAtStart] (e.g. reveal the sidebar).
  */
 @Composable
 fun ThumbLogoRow(
@@ -140,9 +170,17 @@ fun ThumbLogoRow(
     mediaList: List<Media>,
     onMediaClick: (Media) -> Unit,
     modifier: Modifier = Modifier,
-    focusRequester: FocusRequester? = null
+    focusRequester: FocusRequester? = null,
+    onNavigateUp: (() -> Unit)? = null,
+    onNavigateLeftAtStart: (() -> Unit)? = null
 ) {
     if (mediaList.isEmpty()) return
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val itemRequesters = remember(mediaList.size) {
+        List(minOf(mediaList.size, 30)) { FocusRequester() }
+    }
+
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = title,
@@ -150,14 +188,20 @@ fun ThumbLogoRow(
             modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)
         )
         LazyRow(
+            state = listState,
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(mediaList, key = { it.id }) { media ->
+            itemsIndexed(mediaList, key = { _, m -> m.id }) { index, media ->
                 ThumbLogoCard(
                     media = media,
                     onClick = { onMediaClick(media) },
-                    modifier = if (media == mediaList.first() && focusRequester != null)
+                    // In-row LEFT/RIGHT is left to the focus system (works now
+                    // that no parent consumes direction keys); only the first
+                    // card's LEFT is intercepted for the sidebar reveal.
+                    onNavigateLeft = if (index == 0) onNavigateLeftAtStart else null,
+                    onNavigateUp = onNavigateUp,
+                    modifier = if (index == 0 && focusRequester != null)
                         Modifier.focusRequester(focusRequester) else Modifier
                 )
             }

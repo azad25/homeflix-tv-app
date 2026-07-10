@@ -171,13 +171,84 @@ fun TvShowsScreen(
                 }
                 
                 is TvShowsUiState.Success -> {
+                    // ── Section presence + item indices for a deterministic
+                    // UP chain (disposed rows can't be reached by default
+                    // focus search; each row scrolls to + focuses the row
+                    // above it).
+                    val hasHero = currentState.featuredSeries.isNotEmpty()
+                    val hasCW = currentState.continueWatchingSeries.isNotEmpty()
+                    val popularSeries = remember(currentState.series) {
+                        currentState.series.sortedByDescending { it.rating }.take(15)
+                    }
+                    val hasPopular = popularSeries.isNotEmpty()
+                    val genreBuckets = listOf(
+                        "Action" to listOf("action", "adventure"),
+                        "Drama" to listOf("drama"),
+                        "Comedy" to listOf("comedy"),
+                        "Sci-Fi & Fantasy" to listOf("sci-fi", "science fiction", "fantasy"),
+                        "Crime & Mystery" to listOf("crime", "mystery", "thriller"),
+                        "Animation" to listOf("animation", "kids")
+                    )
+                    val genreRows = remember(currentState.series) {
+                        genreBuckets.mapNotNull { (label, keys) ->
+                            val list = currentState.series.filter { s ->
+                                s.genres.any { g -> keys.any { k -> g.contains(k, ignoreCase = true) } }
+                            }.take(15)
+                            if (list.size >= 3) label to list else null
+                        }
+                    }
+
+                    val heroCount = if (hasHero) 1 else 0
+                    val cwIndex = heroCount
+                    val popularIndex = cwIndex + (if (hasCW) 1 else 0)
+                    val firstGenreIndex = popularIndex + (if (hasPopular) 1 else 0)
+                    val allIndex = firstGenreIndex + genreRows.size
+
+                    val popularFocusRequester = remember { FocusRequester() }
+                    val genreFocusRequesters = remember(genreRows.size) {
+                        List(genreRows.size) { FocusRequester() }
+                    }
+                    val allFocusRequester = remember { FocusRequester() }
+
+                    val scope = rememberCoroutineScope()
+                    val upToHero: () -> Unit = {
+                        scope.launch {
+                            scrollState.animateScrollToItem(0)
+                            repeat(6) {
+                                try { contentFocusRequester.requestFocus(); return@launch } catch (_: Exception) { delay(50) }
+                            }
+                        }
+                    }
+                    val navUpTo: (Int, FocusRequester) -> Unit = { itemIndex, requester ->
+                        scope.launch {
+                            scrollState.animateScrollToItem(itemIndex)
+                            repeat(6) {
+                                try { requester.requestFocus(); return@launch } catch (_: Exception) { delay(50) }
+                            }
+                        }
+                    }
+                    val upFromPopular: () -> Unit =
+                        if (hasCW) ({ navUpTo(cwIndex, continueWatchingFocusRequester) }) else upToHero
+                    fun upFromGenre(i: Int): () -> Unit = when {
+                        i > 0 -> ({ navUpTo(firstGenreIndex + i - 1, genreFocusRequesters[i - 1]) })
+                        hasPopular -> ({ navUpTo(popularIndex, popularFocusRequester) })
+                        hasCW -> ({ navUpTo(cwIndex, continueWatchingFocusRequester) })
+                        else -> upToHero
+                    }
+                    val upFromAll: () -> Unit = when {
+                        genreRows.isNotEmpty() -> ({ navUpTo(allIndex - 1, genreFocusRequesters.last()) })
+                        hasPopular -> ({ navUpTo(popularIndex, popularFocusRequester) })
+                        hasCW -> ({ navUpTo(cwIndex, continueWatchingFocusRequester) })
+                        else -> upToHero
+                    }
+
                     LazyColumn(
                         state = scrollState,
                         modifier = Modifier.fillMaxSize(),
                         userScrollEnabled = true
                     ) {
                         // Hero slider section for featured series
-                        if (currentState.featuredSeries.isNotEmpty()) {
+                        if (hasHero) {
                             item {
                                 TvShowsHeroSlider(
                                     featuredSeries = currentState.featuredSeries,
@@ -188,10 +259,10 @@ fun TvShowsScreen(
                                 )
                             }
                         }
-                        
+
                         // Continue Watching — one card per series (series banner),
                         // resumes the in-progress episode from its saved position.
-                        if (currentState.continueWatchingSeries.isNotEmpty()) {
+                        if (hasCW) {
                             item {
                                 ContinueWatchingSeriesRow(
                                     items = currentState.continueWatchingSeries,
@@ -199,49 +270,39 @@ fun TvShowsScreen(
                                         navController.navigate(Screen.VideoPlayer.createRoute(episodeMediaId, startTime = startMs))
                                     },
                                     focusRequester = continueWatchingFocusRequester,
+                                    onNavigateUp = upToHero,
                                     modifier = Modifier.padding(bottom = 24.dp)
                                 )
                             }
                         }
-                        
-                        // Popular series row (by rating)
-                        val popularSeries = currentState.series.sortedByDescending { it.rating }.take(15)
-                        if (popularSeries.isNotEmpty()) {
+
+                        // Popular series — banner (thumb + logo) cards
+                        if (hasPopular) {
                             item {
                                 TvSeriesRow(
                                     title = "Popular Series",
                                     seriesList = popularSeries,
                                     onSeriesClick = { series ->
                                         navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
-                                    }
+                                    },
+                                    focusRequester = popularFocusRequester,
+                                    onNavigateUp = upFromPopular
                                 )
                             }
                         }
 
-                        // Genre-grouped rows (home-like density, built client-side
-                        // from series.genres). Each shown only if it has enough.
-                        val genreBuckets = listOf(
-                            "Action" to listOf("action", "adventure"),
-                            "Drama" to listOf("drama"),
-                            "Comedy" to listOf("comedy"),
-                            "Sci-Fi & Fantasy" to listOf("sci-fi", "science fiction", "fantasy"),
-                            "Crime & Mystery" to listOf("crime", "mystery", "thriller"),
-                            "Animation" to listOf("animation", "kids")
-                        )
-                        genreBuckets.forEach { (label, keys) ->
-                            val list = currentState.series.filter { s ->
-                                s.genres.any { g -> keys.any { k -> g.contains(k, ignoreCase = true) } }
-                            }.take(15)
-                            if (list.size >= 3) {
-                                item {
-                                    TvSeriesRow(
-                                        title = label,
-                                        seriesList = list,
-                                        onSeriesClick = { series ->
-                                            navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
-                                        }
-                                    )
-                                }
+                        // Genre-grouped banner rows
+                        genreRows.forEachIndexed { gi, (label, list) ->
+                            item {
+                                TvSeriesRow(
+                                    title = label,
+                                    seriesList = list,
+                                    onSeriesClick = { series ->
+                                        navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
+                                    },
+                                    focusRequester = genreFocusRequesters[gi],
+                                    onNavigateUp = upFromGenre(gi)
+                                )
                             }
                         }
 
@@ -252,7 +313,9 @@ fun TvShowsScreen(
                                 seriesList = currentState.series,
                                 onSeriesClick = { series ->
                                     navController.navigate(Screen.TvSeriesDetails.createRoute(series.id.toString()))
-                                }
+                                },
+                                focusRequester = allFocusRequester,
+                                onNavigateUp = upFromAll
                             )
                         }
 
@@ -425,7 +488,7 @@ private fun TvShowsHeroSlider(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 4.dp)) {
                         HeroActionButton(
                             label = "Episodes",
-                            icon = { Icon(Icons.Default.PlayArrow, null, Modifier.size(26.dp)) },
+                            icon = { Icon(Icons.Default.PlayArrow, null, Modifier.size(20.dp)) },
                             primary = true,
                             focusRequester = contentFocusRequester,
                             onClick = { onSeriesClick(targetSeries) }
@@ -458,91 +521,50 @@ private fun TvShowsHeroSlider(
     }
 }
 
+/**
+ * Banner-card row for TV series — Prime/Netflix "art + logo" cards (16:9
+ * backdrop with the series logo composited at a per-title anchor), replacing
+ * the old wall of 2:3 posters.
+ */
 @Composable
 private fun TvSeriesRow(
     title: String,
     seriesList: List<TvSeries>,
     onSeriesClick: (TvSeries) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
+    onNavigateUp: (() -> Unit)? = null
 ) {
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    val itemFocusRequesters = remember(seriesList.size) {
-        List(minOf(seriesList.size, 20)) { FocusRequester() }
-    }
-    
+
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(bottom = 24.dp)
     ) {
-        // Section Title
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineSmall.copy(
+            style = MaterialTheme.typography.titleLarge.copy(
                 fontWeight = FontWeight.SemiBold,
                 color = TextPrimary
             ),
-            modifier = Modifier.padding(start = 24.dp, bottom = 8.dp)
+            modifier = Modifier.padding(start = 48.dp, bottom = 8.dp)
         )
-        
-        // Horizontal scrollable row
+
         LazyRow(
             state = listState,
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 48.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             userScrollEnabled = true,
             modifier = Modifier.fillMaxWidth()
         ) {
-            itemsIndexed(seriesList) { index, series ->
-                val itemFocusRequester = if (index < itemFocusRequesters.size) itemFocusRequesters[index] else null
-                
-                TvSeriesCard(
+            itemsIndexed(seriesList, key = { _, s -> s.id }) { index, series ->
+                TvSeriesBannerCard(
                     series = series,
                     onClick = { onSeriesClick(series) },
-                    modifier = Modifier
-                        .width(110.dp)
-                        .then(
-                            if (itemFocusRequester != null) {
-                                Modifier.focusRequester(itemFocusRequester)
-                            } else {
-                                Modifier
-                            }
-                        )
-                        .onFocusChanged { focusState ->
-                            if (focusState.isFocused) {
-                                // Auto-scroll to focused item
-                                coroutineScope.launch {
-                                    val targetIndex = when {
-                                        index == 0 -> 0
-                                        index >= seriesList.size - 2 -> maxOf(0, seriesList.size - 3)
-                                        else -> maxOf(0, index - 1)
-                                    }
-                                    listState.animateScrollToItem(targetIndex)
-                                }
-                            }
-                        }
-                        .onKeyEvent { keyEvent ->
-                            if (keyEvent.type == KeyEventType.KeyDown) {
-                                when (keyEvent.key) {
-                                    Key.DirectionLeft -> {
-                                        if (index > 0 && index - 1 < itemFocusRequesters.size) {
-                                            itemFocusRequesters[index - 1].requestFocus()
-                                            true
-                                        } else {
-                                            false // Let system handle (moves to sidebar)
-                                        }
-                                    }
-                                    Key.DirectionRight -> {
-                                        if (index < seriesList.size - 1 && index + 1 < itemFocusRequesters.size) {
-                                            itemFocusRequesters[index + 1].requestFocus()
-                                        }
-                                        true
-                                    }
-                                    else -> false
-                                }
-                            } else false
-                        }
+                    onNavigateUp = onNavigateUp,
+                    modifier = if (index == 0 && focusRequester != null)
+                        Modifier.focusRequester(focusRequester) else Modifier
                 )
             }
         }
@@ -550,135 +572,126 @@ private fun TvSeriesRow(
 }
 
 @Composable
-private fun TvSeriesCard(
+private fun TvSeriesBannerCard(
     series: TvSeries,
     onClick: () -> Unit,
+    onNavigateUp: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
-    
-    // Netflix-style scale animation on focus (matching MediaCard)
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.1f else 1.0f,
-        animationSpec = tween(durationMillis = 200),
+        targetValue = if (isFocused) 1.06f else 1.0f,
+        animationSpec = tween(durationMillis = 160),
         label = "tv_series_card_scale"
     )
-    
-    // Netflix-style card with proper z-index management
+
+    // Dynamic logo anchor: stable per series, varied across a row
+    val logoAlignment = remember(series.id) {
+        when (series.id % 3) {
+            0 -> Alignment.BottomStart
+            1 -> Alignment.BottomCenter
+            else -> Alignment.BottomEnd
+        }
+    }
+
     Box(
         modifier = modifier
-            .aspectRatio(2f / 3f)
-            .onFocusChanged { focusState ->
-                isFocused = focusState.isFocused
-            }
-            .focusable()
+            .width(280.dp)
+            .aspectRatio(16f / 9f)
             .graphicsLayer(scaleX = scale, scaleY = scale)
+            .onFocusChanged { isFocused = it.isFocused }
             .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown &&
-                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter ||
-                     keyEvent.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER)) {
-                    onClick()
-                    true
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    when (keyEvent.key) {
+                        Key.Enter, Key.DirectionCenter -> { onClick(); true }
+                        Key.DirectionUp ->
+                            if (onNavigateUp != null) { onNavigateUp(); true } else false
+                        else -> false
+                    }
                 } else false
             }
+            .focusable()
             .clickable { onClick() }
+            .clip(RoundedCornerShape(8.dp))
             .then(
-                if (isFocused) {
-                    Modifier
-                        .border(2.dp, Color.White, RoundedCornerShape(6.dp))
-                        .zIndex(10f)
-                } else {
-                    Modifier.zIndex(1f)
-                }
+                if (isFocused) Modifier.border(2.dp, Color.White, RoundedCornerShape(8.dp))
+                else Modifier
             )
     ) {
-        Card(
-            modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(6.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = Color.Transparent
-            ),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = if (isFocused) 8.dp else 2.dp
-            )
+        // Series backdrop with a single-swap poster fallback
+        var failed by remember(series.id) { mutableStateOf(false) }
+        AsyncImage(
+            model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                .data(
+                    if (failed) "${ApiUtils.getBaseUrl()}/posters/${series.id}"
+                    else ApiUtils.getSeriesBackdropUrl(series)
+                )
+                .memoryCacheKey(if (failed) "series_poster_${series.id}" else "series_backdrop_${series.id}")
+                .diskCacheKey(if (failed) "series_poster_${series.id}" else "series_backdrop_${series.id}")
+                .crossfade(false)
+                .build(),
+            contentDescription = series.title,
+            contentScale = ContentScale.Crop,
+            onError = { if (!failed) failed = true },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Legibility gradient
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                        startY = 120f
+                    )
+                )
+        )
+
+        // Series logo at the per-title anchor, text fallback
+        var logoOk by remember(series.id) { mutableStateOf(true) }
+        Box(
+            modifier = Modifier
+                .align(if (logoOk) logoAlignment else Alignment.BottomStart)
+                .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
-            Box {
-                // Series image with proper fallback chain (matching web app exactly)
-                var currentImageUrl by remember { mutableStateOf(ApiUtils.getSeriesPosterUrl(series)) }
-                var fallbackLevel by remember { mutableStateOf(0) }
-                
-                if (fallbackLevel >= 3) {
-                    // Final fallback: Gradient with series title
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                    colors = listOf(
-                                        PrimeBlue.copy(alpha = 0.8f),
-                                        PrimeBlue.copy(alpha = 0.6f)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
+            if (logoOk) {
+                AsyncImage(
+                    model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                        .data(ApiUtils.getSeriesLogoUrl(series.id))
+                        .memoryCacheKey("series_logo_${series.id}")
+                        .diskCacheKey("series_logo_${series.id}")
+                        .build(),
+                    contentDescription = series.title,
+                    contentScale = ContentScale.Fit,
+                    onError = { logoOk = false },
+                    modifier = Modifier.heightIn(max = 34.dp).widthIn(max = 160.dp)
+                )
+            } else {
+                Column {
+                    Text(
+                        text = series.title,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = TextPrimary),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (series.rating > 0) {
                             Text(
-                                text = series.title.take(1).uppercase(),
-                                style = MaterialTheme.typography.displayLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+                                "★ ${String.format("%.1f", series.rating)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
                             )
+                        }
+                        if (series.totalSeasons > 0) {
                             Text(
-                                text = series.title,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = Color.White,
-                                    textAlign = TextAlign.Center
-                                ),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(horizontal = 8.dp)
+                                "${series.totalSeasons} Season${if (series.totalSeasons != 1) "s" else ""}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
                             )
                         }
                     }
-                } else {
-                    // Try poster with proper fallback chain (matching web app exactly)
-                    AsyncImage(
-                        model = currentImageUrl,
-                        contentDescription = series.title,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(6.dp)),
-                        contentScale = ContentScale.Crop,
-                        onError = {
-                            when (fallbackLevel) {
-                                0 -> {
-                                    // First fallback: Try /api/posters/{id} endpoint (matching web app)
-                                    currentImageUrl = "${ApiUtils.getBaseUrl()}/posters/${series.id}"
-                                    fallbackLevel = 1
-                                    android.util.Log.d("TvSeriesCard", "Fallback to posters API: $currentImageUrl")
-                                }
-                                1 -> {
-                                    // Second fallback: Try thumbnail endpoint (matching web app)
-                                    currentImageUrl = "${ApiUtils.getBaseUrl()}/thumbnails/${series.id}"
-                                    fallbackLevel = 2
-                                    android.util.Log.d("TvSeriesCard", "Fallback to thumbnail: $currentImageUrl")
-                                }
-                                2 -> {
-                                    // Final fallback to gradient
-                                    fallbackLevel = 3
-                                    android.util.Log.d("TvSeriesCard", "All image sources failed, showing gradient")
-                                }
-                            }
-                        }
-                    )
                 }
-                
-
             }
         }
     }

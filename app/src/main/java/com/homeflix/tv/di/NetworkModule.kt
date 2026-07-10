@@ -42,6 +42,20 @@ object NetworkModule {
         return OkHttpClient.Builder()
             // LOCAL-first, domain-fallback server selection (must run first)
             .addInterceptor(com.homeflix.tv.util.ServerFailoverInterceptor())
+            // The backend keys playback progress / my-list / recently-watched
+            // on the X-User-ID header (defaults to "anonymous" when absent).
+            // The web app writes as user "1"; send the same identity on EVERY
+            // request so TV and web share one watch history. Only two POST
+            // endpoints set it explicitly before — GETs silently read the
+            // empty "anonymous" profile, which is why Resume never appeared.
+            .addInterceptor { chain ->
+                val request = chain.request()
+                if (request.header("X-User-ID") == null) {
+                    chain.proceed(request.newBuilder().header("X-User-ID", "1").build())
+                } else {
+                    chain.proceed(request)
+                }
+            }
             .addInterceptor(loggingInterceptor)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
