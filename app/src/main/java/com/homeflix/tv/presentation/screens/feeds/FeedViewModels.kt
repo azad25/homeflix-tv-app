@@ -239,6 +239,37 @@ internal object Rows {
         return out.values.sortedByDescending { hasClip(it) }
     }
 
+    private val isoDate = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US).apply {
+        timeZone = java.util.TimeZone.getTimeZone("UTC")
+    }
+
+    fun addedAt(series: TvSeries): Long =
+        series.createdAt?.take(19)?.let { runCatching { isoDate.parse(it)?.time }.getOrNull() } ?: 0L
+
+    /**
+     * Home billboard: the most recently added titles released in [year] — movies
+     * and shows together, newest addition first. Tops up with last year's newest
+     * additions, then the newest additions overall, so it's never thin.
+     */
+    fun heroThisYear(
+        movies: List<Media>,
+        series: List<TvSeries>,
+        year: Int = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR),
+        size: Int = 6
+    ): List<Tile> {
+        data class Pick(val added: Long, val year: Int?, val tile: Tile)
+        val all = movies.filter { it.type == MediaType.MOVIE }
+            .map { Pick(it.createdAt?.time ?: 0L, it.year, Tiles.movie(it, "hero")) } +
+            series.map { Pick(addedAt(it), it.year, Tiles.series(it, "hero")) }
+        val newestFirst = all.sortedByDescending { it.added }
+        val picks = LinkedHashMap<String, Tile>()
+        fun take(from: List<Pick>) = from.forEach { if (picks.size < size) picks.putIfAbsent(it.tile.key, it.tile) }
+        take(newestFirst.filter { it.year == year })
+        if (picks.size < 3) take(newestFirst.filter { it.year == year - 1 })
+        if (picks.size < 3) take(newestFirst)
+        return picks.values.toList()
+    }
+
     /** Prefer a title with a trailer, a logo and a backdrop for billboards. */
     fun heroPick(candidates: List<Media>): Media? =
         candidates.maxByOrNull { m ->
@@ -284,12 +315,12 @@ class HomeFeedViewModel @Inject constructor(
         val trendingD = async { load.trending() }
         val recentD = async { load.recentlyWatched() }
         val seriesD = async { load.series() }
-        val recsD = async { load.recommendations() }
         val movies = moviesD.await()
         val series = seriesD.await()
         if (movies.isEmpty() && series.isEmpty()) error("no content")
         val latest = Rows.byDate(movies)
-        val heroes = Rows.heroMix(latest.take(12), recsD.await().filter { it.type == MediaType.MOVIE })
+        // Billboard: the newest additions released this year (movies and shows).
+        val heroTiles = Rows.heroThisYear(movies, series)
         val rows = buildList {
             Rows.continueWatching(recentD.await(), series)?.let(::add)
             Rows.top10(movies).takeIf { it.size >= 5 }?.let { top ->
@@ -305,7 +336,6 @@ class HomeFeedViewModel @Inject constructor(
             }
             addAll(Rows.genreRows("h", latest))
         }
-        val heroTiles = heroes.map { Tiles.movie(it, "hero") }
         Feed(hero = heroTiles.firstOrNull(), rows = rows, heroes = heroTiles)
     }
 }

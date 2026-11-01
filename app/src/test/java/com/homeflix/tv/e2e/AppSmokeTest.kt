@@ -170,7 +170,14 @@ class AppSmokeTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             check(waitForText("Inception")) { "home never loaded" }
             pump(1_000)
-            press(Key.DirectionRight)        // More Info
+            // Home's billboard leads with this year's newest addition (a show in the
+            // test data), so open a movie from the Movies tab's billboard instead.
+            check(waitForText("Shaque")) { "Home billboard should lead with this year's newest addition" }
+            press(Key.DirectionUp)            // nav: Home
+            press(Key.DirectionRight, 2)      // Shows, Movies (switches on rest)
+            pump(2_500)
+            press(Key.DirectionDown)          // Movies billboard: Play
+            press(Key.DirectionRight)         // More Info
             press(Key.Enter)
             check(waitForText("More Like This")) { "movie page didn't open" }
             dump("movie-page")
