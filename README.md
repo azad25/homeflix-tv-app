@@ -1,6 +1,6 @@
 # 🎬 HomeFlix TV — Android TV Streaming Client
 
-**Version 4.0** — A Netflix/Prime‑grade Android TV client for the HomeFlix media server. Full‑bleed cinematic UI with auto‑playing background previews, a red‑and‑black HomeFlix theme, D‑pad‑first navigation, and an ExoPlayer video pipeline that buffers ahead for smooth playback. Built with Jetpack Compose and deliberately tuned to stay light on low‑RAM TVs (e.g. a 2 GB Sony Android TV).
+**Version 5.8** — A Netflix/Prime‑grade Android TV client for the HomeFlix media server. Full‑bleed cinematic UI with auto‑playing background previews, a red‑and‑black HomeFlix theme, D‑pad‑first navigation, and an ExoPlayer video pipeline that buffers ahead for smooth playback. Built with Jetpack Compose and deliberately tuned to stay light on low‑RAM TVs (e.g. a 2 GB Sony Android TV).
 
 ![Android TV](https://img.shields.io/badge/Android-TV-3DDC84?style=flat&logo=android) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=flat&logo=kotlin) ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=jetpack-compose) ![Media3 ExoPlayer](https://img.shields.io/badge/Media3-ExoPlayer-FF0000?style=flat) ![Hilt](https://img.shields.io/badge/Hilt-DI-2196F3?style=flat)
 
@@ -162,6 +162,29 @@ buildConfigField("String", "FALLBACK_BASE_URL", "\"https://your-domain/api/\"")
 The app icon (adaptive red "H▶" on black) lives in `res/drawable/ic_launcher_foreground.xml` + `ic_launcher_background.xml`; the TV banner is `res/drawable-nodpi/app_banner.png`.
 
 ---
+
+## 11. Releasing updates (v5)
+
+Since 5.2 the app updates itself from your HomeFlix server, so there's no need to sideload each build.
+
+1. Bump `versionCode` (and `versionName`) in `app/build.gradle.kts`.
+2. Build:
+   ```bash
+   ./gradlew assembleRelease
+   ```
+3. Publish `app/build/outputs/apk/release/app-release.apk` on the server. Either copy it into `backend/app-updates/tv/`, or upload it:
+   ```bash
+   curl -F apk=@app-release.apk -F notes="What's new" http://<server>:8252/api/admin/app/tv/upload
+   ```
+
+Connected TVs are told right away; the others check at launch, every 6 hours and when the app comes back to the foreground. The TV downloads and verifies the build, then shows **Update available**, which needs one OK press. Builds must be signed with the repo's sideload key (`app/keystore`), which both build types already use.
+
+Tests, including an optional end-to-end run against a real server:
+```bash
+./gradlew testDebugUnitTest -Phomeflix.e2e.server=<server-ip>:8252
+```
+
+See `docs/V5_PLAN.md` for what changed in v5.
 
 ## © Copyright
 © 2025 Homeflix Studios. All Rights Reserved.
