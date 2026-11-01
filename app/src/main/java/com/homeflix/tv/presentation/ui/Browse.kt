@@ -11,6 +11,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,7 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -305,7 +306,19 @@ fun TileRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(tileHeightFor(row.style))
-                    .focusRestorer()
+                    // Entering a row (▲/▼) lands on its remembered tile — the one
+                    // pinned at the keyline — never on whatever sits under the
+                    // previous row's (possibly expanded) tile.
+                    .focusProperties {
+                        enter = {
+                            val idx = focusedIndex.coerceIn(0, (row.tiles.size - 1).coerceAtLeast(0))
+                            val composed = state.layoutInfo.visibleItemsInfo.any { it.index == idx }
+                            val tile = row.tiles.getOrNull(idx)
+                            if (composed && tile != null) registry.requesterFor("${row.id}|${tile.key}")
+                            else FocusRequester.Default
+                        }
+                    }
+                    .focusGroup()
                     .throttleKeyRepeat()
             ) {
                 itemsIndexed(row.tiles, key = { _, t -> t.key }, contentType = { _, _ -> row.style }) { index, tile ->

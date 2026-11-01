@@ -71,7 +71,7 @@ fun SearchPage(shell: ShellController, actions: TileActions, vm: SearchViewModel
     val state by vm.state.collectAsState()
     val firstKey = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) { shell.pageAtTop = true }
+    LaunchedEffect(Unit) { shell.pageAtTop = true; shell.pageEntry = firstKey }
     LaunchedEffect(shell.restoreFocusPending) {
         if (!shell.restoreFocusPending) return@LaunchedEffect
         withFrameNanos { }

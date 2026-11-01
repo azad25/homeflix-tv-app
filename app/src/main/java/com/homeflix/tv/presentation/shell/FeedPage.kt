@@ -77,6 +77,14 @@ fun FeedPage(
         }
     }
 
+    // ▼ from the top nav enters this page at its billboard (or first tile).
+    LaunchedEffect(state.feed.hero != null, state.feed.rows.firstOrNull()?.id) {
+        shell.pageEntry = when {
+            state.feed.hero != null -> heroPlay
+            else -> state.feed.rows.firstOrNull()?.let { r -> r.tiles.firstOrNull()?.let { registry.requesterFor("${r.id}|${it.key}") } }
+        }
+    }
+
     // Put focus back where the user left it (launch, return from a screen, OK on a tab).
     val ready = !state.feed.isEmpty
     LaunchedEffect(shell.restoreFocusPending, ready) {

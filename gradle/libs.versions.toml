@@ -30,6 +30,8 @@ kotlinxSerialization = "1.7.0"
 materialIconsExtended = "1.2.1"
 
 [libraries]
+robolectric = { group = "org.robolectric", name = "robolectric", version = "4.14.1" }
+androidx-test-core = { group = "androidx.test", name = "core-ktx", version = "1.6.1" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version = "1.4.1" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version = "1.0.1" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeKtx" }

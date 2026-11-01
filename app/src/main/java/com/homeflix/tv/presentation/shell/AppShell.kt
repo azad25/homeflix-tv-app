@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -84,6 +85,8 @@ class ShellController(initialTab: ShellTab) {
     /** Keeps the nav focusable while we move focus up into it from deep in a page. */
     internal var forceNav by mutableStateOf(false)
     internal var navFocusRequest by mutableIntStateOf(0)
+    /** Where ▼ from the nav lands (the page's billboard / first item). */
+    var pageEntry: FocusRequester? by mutableStateOf(null)
 
     val navVisible: Boolean get() = navFocused || pageAtTop || forceNav
 
@@ -146,6 +149,7 @@ fun AppShell(
     }
 }
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 private fun TopNav(shell: ShellController, menuOpen: Boolean, onToggleMenu: () -> Unit) {
     val visible = shell.navVisible || menuOpen
@@ -186,7 +190,9 @@ private fun TopNav(shell: ShellController, menuOpen: Boolean, onToggleMenu: () -
                     shell.navFocused = it.hasFocus
                     if (it.hasFocus) shell.forceNav = false
                 }
-                .focusProperties { canFocus = visible }
+                // Entering the nav from the page always lands on the current tab.
+                .focusProperties { enter = { requesters.getValue(shell.selected) } }
+                .focusGroup()
         ) {
             Text("HOMEFLIX", color = Tv.Red, fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             Spacer(Modifier.weight(1f))
@@ -197,6 +203,7 @@ private fun TopNav(shell: ShellController, menuOpen: Boolean, onToggleMenu: () -
                         selected = shell.selected == tab,
                         requester = requesters.getValue(tab),
                         canFocus = visible,
+                        down = shell.pageEntry,
                         onFocused = { focusedTab = tab },
                         onClick = {
                             shell.selected = tab
@@ -219,6 +226,7 @@ private fun NavItem(
     selected: Boolean,
     requester: FocusRequester,
     canFocus: Boolean,
+    down: FocusRequester?,
     onFocused: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -237,7 +245,10 @@ private fun NavItem(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .focusRequester(requester)
-            .focusProperties { this.canFocus = canFocus }
+            .focusProperties {
+                this.canFocus = canFocus
+                if (down != null) this.down = down
+            }
             .onFocusChanged {
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
