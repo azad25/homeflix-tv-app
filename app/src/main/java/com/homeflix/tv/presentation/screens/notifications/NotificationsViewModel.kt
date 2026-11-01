@@ -23,6 +23,16 @@ class NotificationsViewModel @Inject constructor(
         loadNotifications()
     }
 
+    /** The user opened the Notifications screen: mark everything as read (clears the bell's dot). */
+    fun markAllRead() {
+        val current = (_uiState.value as? NotificationsUiState.Success)?.notifications ?: return
+        val unread = current.filter { !it.read }
+        if (unread.isEmpty()) return
+        viewModelScope.launch {
+            unread.forEach { runCatching { mediaRepository.markNotificationRead(it.id) } }
+        }
+    }
+
     fun loadNotifications() {
         viewModelScope.launch {
             if (_uiState.value !is NotificationsUiState.Success) {
@@ -40,6 +50,10 @@ class NotificationsViewModel @Inject constructor(
         }
     }
 }
+
+/** Unread count for the bell in the top nav. */
+val NotificationsUiState.unreadCount: Int
+    get() = (this as? NotificationsUiState.Success)?.notifications?.count { !it.read } ?: 0
 
 sealed class NotificationsUiState {
     object Loading : NotificationsUiState()

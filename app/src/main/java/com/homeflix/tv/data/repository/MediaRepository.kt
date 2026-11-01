@@ -562,6 +562,9 @@ class MediaRepository @Inject constructor(
     }
 
     // Notifications (display-only)
+    override suspend fun markNotificationRead(id: String): Boolean =
+        runCatching { apiService.markNotificationRead(id).isSuccessful }.getOrDefault(false)
+
     override suspend fun getNotifications(limit: Int): List<com.homeflix.tv.domain.model.Notification> {
         return try {
             val response = apiService.getNotifications(limit)

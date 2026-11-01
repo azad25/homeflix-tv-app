@@ -24,6 +24,7 @@ import com.homeflix.tv.presentation.screens.feeds.MoviesFeedViewModel
 import com.homeflix.tv.presentation.screens.feeds.MyHomeFlixViewModel
 import com.homeflix.tv.presentation.screens.feeds.ShowsFeedViewModel
 import com.homeflix.tv.presentation.screens.notifications.NotificationsScreen
+import com.homeflix.tv.presentation.screens.notifications.unreadCount
 import com.homeflix.tv.presentation.screens.player.VideoPlayerScreen
 import com.homeflix.tv.presentation.screens.search.SearchPage
 import com.homeflix.tv.presentation.screens.tvshows.TvSeriesDetailsScreen
@@ -103,6 +104,10 @@ fun HomeFlixNavigation(
             NotificationsScreen(navigator = navigator)
         }
 
+        composable(Screen.About.route) {
+            com.homeflix.tv.presentation.screens.settings.AboutScreen()
+        }
+
         composable(Screen.Settings.route) {
             com.homeflix.tv.presentation.screens.settings.SettingsScreen()
         }
@@ -157,11 +162,18 @@ private fun BrowseShell(
     previewPlayer: PreviewPlayer,
     updater: com.homeflix.tv.update.AppUpdater?
 ) {
+    // Bell badge in the top nav; re-checked whenever we come back to browsing.
+    val notificationsVm: com.homeflix.tv.presentation.screens.notifications.NotificationsViewModel = hiltViewModel(entry)
+    val notificationsState by notificationsVm.uiState.collectAsState()
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { notificationsVm.loadNotifications() }
+    val unread = notificationsState.unreadCount
     AppShell(
         previewPlayer = previewPlayer,
         actions = navigator,
         onOpenNotifications = { navigator.go(Screen.Notifications.route) },
         onOpenSettings = { navigator.go(Screen.Settings.route) },
+        onOpenAbout = { navigator.go(Screen.About.route) },
+        unreadNotifications = unread,
         updater = updater
     ) { tab, shell ->
         when (tab) {
@@ -207,6 +219,7 @@ sealed class Screen(val route: String) {
         val arguments = listOf(navArgument("mediaId") { type = NavType.StringType })
     }
     object Settings : Screen("settings")
+    object About : Screen("about")
     object VideoPlayer : Screen("player/{mediaId}?startTime={startTime}&forceStart={forceStart}&exact={exact}") {
         fun createRoute(mediaId: Int, startTime: Long = 0L, forceStartFromBeginning: Boolean = false, exact: Boolean = false) =
             "player/$mediaId?startTime=$startTime&forceStart=$forceStartFromBeginning&exact=$exact"

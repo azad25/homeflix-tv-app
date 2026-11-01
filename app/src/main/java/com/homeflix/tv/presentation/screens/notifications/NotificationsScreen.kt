@@ -75,6 +75,8 @@ import com.homeflix.tv.presentation.ui.Tv
 @Composable
 fun NotificationsScreen(navigator: AppNavigator, vm: NotificationsViewModel = hiltViewModel()) {
     val state by vm.uiState.collectAsState()
+    // Seen = read: clears the red dot on the nav bell.
+    LaunchedEffect(state is NotificationsUiState.Success) { vm.markAllRead() }
     Box(Modifier.fillMaxSize().background(Tv.Background)) {
         when (val s = state) {
             NotificationsUiState.Loading -> LoadingState()

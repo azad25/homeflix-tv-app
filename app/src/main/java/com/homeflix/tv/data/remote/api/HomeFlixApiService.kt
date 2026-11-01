@@ -182,6 +182,9 @@ interface HomeFlixApiService {
     @GET("notifications")
     suspend fun getNotifications(@Query("limit") limit: Int = 50): Response<NotificationsResponseDto>
 
+    @POST("notifications/{id}/read")
+    suspend fun markNotificationRead(@Path("id") id: String): Response<Unit>
+
     // Genre endpoints
     @GET("genres")
     suspend fun getAllGenres(): Response<List<GenreDto>>

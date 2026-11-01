@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
@@ -107,6 +108,8 @@ fun AppShell(
     actions: TileActions,
     onOpenNotifications: () -> Unit,
     onOpenSettings: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
+    unreadNotifications: Int = 0,
     updater: com.homeflix.tv.update.AppUpdater? = null,
     page: @Composable (ShellTab, ShellController) -> Unit
 ) {
@@ -138,6 +141,8 @@ fun AppShell(
             TopNav(
                 shell = shell,
                 menuOpen = menuOpen,
+                unread = unreadNotifications,
+                onNotifications = onOpenNotifications,
                 onToggleMenu = { menuOpen = !menuOpen }
             )
             if (!menuOpen && updater != null) UpdatePrompt(updater)
@@ -147,6 +152,7 @@ fun AppShell(
                     onDismiss = { menuOpen = false; shell.focusNav() },
                     onNotifications = { menuOpen = false; onOpenNotifications() },
                     onSettings = { menuOpen = false; onOpenSettings() },
+                    onAbout = { menuOpen = false; onOpenAbout() },
                     onRefresh = { menuOpen = false; activity?.recreate() },
                     onExit = { activity?.finish() }
                 )
@@ -157,7 +163,13 @@ fun AppShell(
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
-private fun TopNav(shell: ShellController, menuOpen: Boolean, onToggleMenu: () -> Unit) {
+private fun TopNav(
+    shell: ShellController,
+    menuOpen: Boolean,
+    unread: Int,
+    onNotifications: () -> Unit,
+    onToggleMenu: () -> Unit
+) {
     val visible = shell.navVisible || menuOpen
     val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(200), label = "navAlpha")
     val requesters = remember { ShellTab.entries.associateWith { FocusRequester() } }
@@ -221,6 +233,9 @@ private fun TopNav(shell: ShellController, menuOpen: Boolean, onToggleMenu: () -
                 }
             }
             Spacer(Modifier.weight(1f))
+            // Notifications stay on the nav: bell with a red dot while anything is unread.
+            NavBell(unread = unread, canFocus = visible, onClick = onNotifications)
+            Spacer(Modifier.width(10.dp))
             NavIconButton(Icons.Filled.Person, "Profile", canFocus = visible, onClick = onToggleMenu)
         }
     }
@@ -273,6 +288,34 @@ private fun NavItem(
 }
 
 @Composable
+private fun NavBell(unread: Int, canFocus: Boolean, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(30.dp)
+            .focusProperties { this.canFocus = canFocus }
+            .onFocusChanged { focused = it.isFocused }
+            .clip(CircleShape)
+            .background(if (focused) Color.White else Color.Transparent)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+    ) {
+        Icon(Icons.Filled.Notifications, contentDescription = "Notifications",
+            tint = if (focused) Color.Black else Color.White, modifier = Modifier.size(19.dp))
+        if (unread > 0) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 3.dp, end = 3.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Tv.Red)
+            )
+        }
+    }
+}
+
+@Composable
 private fun NavIconButton(icon: ImageVector, description: String, canFocus: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Box(
@@ -290,7 +333,7 @@ private fun NavIconButton(icon: ImageVector, description: String, canFocus: Bool
 }
 
 @Composable
-private fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onSettings: () -> Unit, onRefresh: () -> Unit, onExit: () -> Unit) {
+private fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onSettings: () -> Unit, onAbout: () -> Unit, onRefresh: () -> Unit, onExit: () -> Unit) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { first.requestFocus() } }
     BackHandler(onBack = onDismiss)
@@ -307,6 +350,7 @@ private fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onSe
         ) {
             MenuItem(Icons.Filled.Notifications, "Notifications", onNotifications, Modifier.focusRequester(first))
             MenuItem(Icons.Filled.Settings, "Settings", onSettings)
+            MenuItem(Icons.Filled.Info, "About HomeFlix", onAbout)
             MenuItem(Icons.Filled.Refresh, "Refresh", onRefresh)
             MenuItem(Icons.AutoMirrored.Filled.ExitToApp, "Exit HomeFlix", onExit)
         }

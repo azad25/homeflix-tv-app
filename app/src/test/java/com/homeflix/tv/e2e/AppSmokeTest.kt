@@ -140,6 +140,22 @@ class AppSmokeTest {
             press(Key.DirectionLeft, 3); pump(1_500)
             press(Key.DirectionDown); press(Key.H); press(Key.E); pump(1_500)
             dump("search")
+
+            // Bell on the nav → Notifications; profile menu → About (developer credit).
+            back()                                   // focus the nav (Search tab)
+            press(Key.DirectionRight, 5)             // Home, Shows, Movies, My HomeFlix, bell
+            println("E2E on bell: ${focused()}")
+            press(Key.Enter); pump(2_500)
+            dump("notifications")
+            back(); pump(1_000)
+            back()                                   // nav again
+            press(Key.DirectionRight, 2)             // bell, then profile
+            press(Key.Enter); pump(800)              // menu: Notifications, Settings, About…
+            press(Key.DirectionDown, 2)
+            press(Key.Enter); pump(1_500)
+            dump("about")
+            check(waitForText("Ferdous Azad")) { "About screen didn't show the developer credit" }
+            check(waitForText("ferdousazad12@gmail.com")) { "About screen didn't show the contact" }
         }
     }
 }

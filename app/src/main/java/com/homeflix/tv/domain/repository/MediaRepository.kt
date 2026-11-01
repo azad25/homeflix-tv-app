@@ -54,6 +54,7 @@ interface MediaRepository {
 
     // Notifications (display-only)
     suspend fun getNotifications(limit: Int = 50): List<Notification>
+    suspend fun markNotificationRead(id: String): Boolean = false
 
     // Recommendation methods
     suspend fun getMixedRecommendations(limit: Int = 25): retrofit2.Response<List<com.homeflix.tv.data.remote.dto.MediaDto>>
