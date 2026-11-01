@@ -48,6 +48,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -69,6 +72,33 @@ private val KEYS = ("abcdefghijklmnopqrstuvwxyz1234567890").map { it.toString() 
 @Composable
 fun SearchPage(shell: ShellController, actions: TileActions, vm: SearchViewModel = hiltViewModel()) {
     val state by vm.state.collectAsState()
+    SearchContent(
+        state = state,
+        shell = shell,
+        actions = actions,
+        onType = vm::type,
+        onBackspace = vm::backspace,
+        onClear = vm::clear,
+        onGenre = vm::selectGenre
+    )
+}
+
+/**
+ * Stateless search UI. Text can be entered three ways, all into the same query:
+ * the on-screen keyboard (D-pad + OK), a hardware / Bluetooth keyboard, or the
+ * remote's number keys — typing works wherever focus is on this page.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun SearchContent(
+    state: SearchState,
+    shell: ShellController,
+    actions: TileActions,
+    onType: (String) -> Unit,
+    onBackspace: () -> Unit,
+    onClear: () -> Unit,
+    onGenre: (String) -> Unit
+) {
     val firstKey = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { shell.pageAtTop = true; shell.pageEntry = firstKey }
@@ -80,7 +110,13 @@ fun SearchPage(shell: ShellController, actions: TileActions, vm: SearchViewModel
         shell.restoreFocusPending = false
     }
 
-    Row(Modifier.fillMaxSize().background(Tv.Background).padding(top = Tv.NavHeight + 16.dp)) {
+    Row(
+        Modifier
+            .fillMaxSize()
+            .hardwareTyping(onType, onBackspace, onClear)
+            .background(Tv.Background)
+            .padding(top = Tv.NavHeight + 16.dp)
+    ) {
         // ---------------------------------------------------------------- keyboard + genres
         Column(Modifier.width(340.dp).fillMaxSize().padding(start = Tv.Keyline, end = 16.dp)) {
             Row(
@@ -104,9 +140,9 @@ fun SearchPage(shell: ShellController, actions: TileActions, vm: SearchViewModel
             }
             Column(Modifier.padding(top = 12.dp).focusRestorer(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Key(icon = Icons.Filled.SpaceBar, label = "space", modifier = Modifier.weight(1f)) { vm.type(" ") }
+                    Key(icon = Icons.Filled.SpaceBar, label = "space", modifier = Modifier.weight(1f)) { onType(" ") }
                     Key(icon = Icons.AutoMirrored.Filled.Backspace, label = "delete", modifier = Modifier.weight(1f),
-                        onLongClear = vm::clear) { vm.backspace() }
+                        onLongClear = onClear) { onBackspace() }
                 }
                 KEYS.chunked(6).forEachIndexed { r, rowKeys ->
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -114,14 +150,14 @@ fun SearchPage(shell: ShellController, actions: TileActions, vm: SearchViewModel
                             Key(
                                 text = k,
                                 modifier = Modifier.weight(1f).then(if (r == 0 && c == 0) Modifier.focusRequester(firstKey) else Modifier)
-                            ) { vm.type(k) }
+                            ) { onType(k) }
                         }
                     }
                 }
             }
             LazyColumn(Modifier.padding(top = 16.dp).fillMaxWidth(), contentPadding = PaddingValues(bottom = 40.dp)) {
                 items(state.genres, key = { it }) { g ->
-                    GenreItem(g, selected = state.genre == g) { vm.selectGenre(g) }
+                    GenreItem(g, selected = state.genre == g) { onGenre(g) }
                 }
             }
         }
@@ -229,4 +265,35 @@ private fun ResultTile(tile: Tile, onClick: () -> Unit) {
                     .clip(RoundedCornerShape(3.dp)).background(Tv.Red).padding(horizontal = 5.dp, vertical = 2.dp))
         }
     }
+}
+
+/**
+ * Hardware keyboard / remote number keys → search query. Runs as a *preview*
+ * handler so a printable key types even while an on-screen key or a result is
+ * focused; arrows, OK/Enter, Tab and Back are left alone for navigation.
+ */
+internal fun Modifier.hardwareTyping(
+    onType: (String) -> Unit,
+    onBackspace: () -> Unit,
+    onClear: () -> Unit
+): Modifier = onPreviewKeyEvent { e ->
+    if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+    val ne = e.nativeKeyEvent
+    when (ne.keyCode) {
+        android.view.KeyEvent.KEYCODE_DEL -> {
+            if (ne.isCtrlPressed || ne.isAltPressed) onClear() else onBackspace()
+            return@onPreviewKeyEvent true
+        }
+        android.view.KeyEvent.KEYCODE_FORWARD_DEL, android.view.KeyEvent.KEYCODE_CLEAR -> {
+            onClear(); return@onPreviewKeyEvent true
+        }
+    }
+    if (ne.isCtrlPressed || ne.isAltPressed || ne.isMetaPressed) return@onPreviewKeyEvent false
+    val code = ne.unicodeChar
+    if (code == 0) return@onPreviewKeyEvent false
+    val c = code.toChar()
+    if (c.isLetterOrDigit() || c == ' ' || c in "'-&:.,!?") {
+        onType(c.lowercase())
+        true
+    } else false
 }
