@@ -21,12 +21,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Stable sideload key committed to the repo so every CI-built APK has the
+    // same signature and installs as an update over the previous one.
+    // Replace with a secret-backed keystore before publishing to a store.
+    signingConfigs {
+        create("sideload") {
+            storeFile = file("keystore/homeflix-sideload.jks")
+            storePassword = "homeflix"
+            keyAlias = "homeflix"
+            keyPassword = "homeflix"
+        }
+    }
+
     buildTypes {
         debug {
+            signingConfig = signingConfigs.getByName("sideload")
             buildConfigField("String", "BASE_URL", "\"http://192.168.0.109:8252/api/\"")
             buildConfigField("String", "FALLBACK_BASE_URL", "\"https://homeflix.domain.com/api/\"")
         }
         release {
+            signingConfig = signingConfigs.getByName("sideload")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
