@@ -68,9 +68,23 @@ class AppNavigator(private val nav: NavHostController, private val preview: Prev
 @Composable
 fun HomeFlixNavigation(
     previewPlayer: PreviewPlayer,
+    castController: com.homeflix.tv.cast.CastController,
     navController: NavHostController = rememberNavController()
 ) {
     val navigator = remember(navController, previewPlayer) { AppNavigator(navController, previewPlayer) }
+
+    // A cast from the web app: open the player, replacing whatever is on top.
+    val castRequest by castController.playRequests.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(castRequest) {
+        val req = castRequest ?: return@LaunchedEffect
+        previewPlayer.hardStop()
+        navController.navigate(
+            Screen.VideoPlayer.createRoute(req.mediaId, req.positionMs, forceStartFromBeginning = req.positionMs <= 0, exact = true)
+        ) {
+            popUpTo(Screen.Home.route) { inclusive = false }
+        }
+        castController.consumePlayRequest(req)
+    }
 
     NavHost(
         navController = navController,
@@ -86,6 +100,10 @@ fun HomeFlixNavigation(
 
         composable(Screen.Notifications.route) {
             NotificationsScreen(navigator = navigator)
+        }
+
+        composable(Screen.Settings.route) {
+            com.homeflix.tv.presentation.screens.settings.SettingsScreen()
         }
 
         composable(Screen.TvSeriesDetails.route, arguments = Screen.TvSeriesDetails.arguments) { entry ->
@@ -108,11 +126,18 @@ fun HomeFlixNavigation(
             val mediaId = entry.arguments?.getInt("mediaId") ?: 0
             val startTime = entry.arguments?.getLong("startTime") ?: 0L
             val forceStart = entry.arguments?.getBoolean("forceStart") ?: false
+            val exact = entry.arguments?.getBoolean("exact") ?: false
             VideoPlayerScreen(
                 mediaId = mediaId,
                 startTimeMs = startTime,
                 forceStartFromBeginning = forceStart,
+                exactStart = exact,
                 onClose = { navigator.back() },
+                onForceClose = {
+                    if (navController.currentBackStackEntry?.destination?.route == Screen.VideoPlayer.route) {
+                        navController.popBackStack()
+                    }
+                },
                 onPlayNext = { nextId ->
                     navController.navigate(Screen.VideoPlayer.createRoute(nextId, 0L, false)) {
                         popUpTo(Screen.VideoPlayer.route) { inclusive = true }
@@ -129,7 +154,8 @@ private fun BrowseShell(entry: NavBackStackEntry, navigator: AppNavigator, previ
     AppShell(
         previewPlayer = previewPlayer,
         actions = navigator,
-        onOpenNotifications = { navigator.go(Screen.Notifications.route) }
+        onOpenNotifications = { navigator.go(Screen.Notifications.route) },
+        onOpenSettings = { navigator.go(Screen.Settings.route) }
     ) { tab, shell ->
         when (tab) {
             ShellTab.HOME -> {
@@ -169,14 +195,16 @@ sealed class Screen(val route: String) {
         fun createRoute(mediaId: String) = "details/$mediaId"
         val arguments = listOf(navArgument("mediaId") { type = NavType.StringType })
     }
-    object VideoPlayer : Screen("player/{mediaId}?startTime={startTime}&forceStart={forceStart}") {
-        fun createRoute(mediaId: Int, startTime: Long = 0L, forceStartFromBeginning: Boolean = false) =
-            "player/$mediaId?startTime=$startTime&forceStart=$forceStartFromBeginning"
+    object Settings : Screen("settings")
+    object VideoPlayer : Screen("player/{mediaId}?startTime={startTime}&forceStart={forceStart}&exact={exact}") {
+        fun createRoute(mediaId: Int, startTime: Long = 0L, forceStartFromBeginning: Boolean = false, exact: Boolean = false) =
+            "player/$mediaId?startTime=$startTime&forceStart=$forceStartFromBeginning&exact=$exact"
 
         val arguments = listOf(
             navArgument("mediaId") { type = NavType.IntType },
             navArgument("startTime") { type = NavType.LongType; defaultValue = 0L },
-            navArgument("forceStart") { type = NavType.BoolType; defaultValue = false }
+            navArgument("forceStart") { type = NavType.BoolType; defaultValue = false },
+            navArgument("exact") { type = NavType.BoolType; defaultValue = false }
         )
     }
 }

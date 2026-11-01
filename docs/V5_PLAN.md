@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: R8-optimized, about 2.7 MB, version 5.0.
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: R8-optimized, about 2.7 MB, version 5.1.
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 
@@ -54,6 +54,29 @@ Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release bu
 - **Memory pressure:** the app frees the preview decoder and the bitmap cache when the system is low on memory.
 - **Player buffers:** sized to the device (40, 64 or 128 MB). Small caches are bounded, and LeakCanary is included in debug builds.
 - **Build:** R8 for library code, bundled Compose baseline profiles via profileinstaller, Kotlin 2.0.21 (strong skipping), a black splash with no white flash, and no verbose HTTP logging in release.
+
+### Cast from the web app (5.1)
+This implements `docs/TV_CAST_PROTOCOL.md` from the homeflix-wifi `release/v5.5` branch.
+- **Connection:** `CastConnection` keeps `ws://<server>/api/cast/tv/ws` open. It answers ping with pong and reconnects forever with a 1 s → 30 s backoff plus jitter.
+  - It reconnects immediately when the network comes back or the server switches between LAN and remote.
+  - When the server closes the socket, the TV completes the close handshake and dials again.
+- **Commands:** `CastController` handles `play`, `pause`, `resume`, `seek`, `stop`, `volume` and `subtitle`.
+  - Every command is acked. Unknown actions get `unsupported action`, a missing player gets `Nothing is playing`, and a 404 gets `Media not found`.
+  - `play` for the title that's already open just seeks and resumes.
+  - `play` for a different title replaces the player and starts at the exact position the browser sent.
+  - A "Casting from …" notice is shown on the TV.
+- **Status:** sent on every player state change, every 1 s while playing, and after each reconnect. The TV sends `idle` when you press Back.
+- **Background launch:**
+  - With "Display over other apps" granted (Settings → *Allow HomeFlix to open from casting*), the player opens directly.
+  - Otherwise the TV shows a full-screen "tap to play" notification. If nothing opens within 10 s, the browser gets `Open HomeFlix on the TV to start playback`.
+- **Always reachable:** `CastReceiverService` is a foreground service with a minimal "Ready to cast" notification, also started on boot.
+  - It uses the `specialUse` type rather than `dataSync`, because Android 15 caps `dataSync` at 6 h/day and blocks it from starting at boot.
+- **Settings (profile menu → Settings):** casting on/off, cast name (renames live), connection status, and the overlay-permission button.
+- **Tests:** `CastProtocolTest` plays the server side with MockWebServer: hello, ping/pong, every command and its ack, 404, same-title play, status and reconnect.
+- **Granting overlay on TVs that hide the setting:**
+  ```bash
+  adb shell appops set com.homeflix.tv SYSTEM_ALERT_WINDOW allow
+  ```
 
 ## Building
 

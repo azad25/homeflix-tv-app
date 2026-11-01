@@ -30,8 +30,12 @@ object ServerConfig {
         if (activeApiBase != base) {
             activeApiBase = base
             Log.i("ServerConfig", "Active server -> $base")
+            listeners.forEach { runCatching { it(base) } }
         }
     }
+
+    /** Notified when the active server changes (e.g. the cast socket re-dials). */
+    val listeners = java.util.concurrent.CopyOnWriteArrayList<(String) -> Unit>()
 
     fun other(base: String): String = if (base == LOCAL) REMOTE else LOCAL
 

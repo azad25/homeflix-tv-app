@@ -116,6 +116,8 @@ fun VideoPlayerScreen(
     startTimeMs: Long,
     forceStartFromBeginning: Boolean,
     onClose: () -> Unit,
+    onForceClose: () -> Unit = onClose,
+    exactStart: Boolean = false,
     onPlayNext: (Int) -> Unit,
     vm: VideoPlayerViewModel = hiltViewModel()
 ) {
@@ -123,11 +125,12 @@ fun VideoPlayerScreen(
     val player = vm.player
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(mediaId) { vm.load(mediaId, startTimeMs, forceStartFromBeginning) }
+    LaunchedEffect(mediaId, startTimeMs) { vm.load(mediaId, startTimeMs, forceStartFromBeginning, exactStart) }
     LaunchedEffect(vm) {
         vm.events.collect { e ->
             when (e) {
                 PlayerEvent.Close -> onClose()
+                PlayerEvent.ForceClose -> onForceClose()
                 is PlayerEvent.PlayNext -> onPlayNext(e.mediaId)
             }
         }
@@ -309,6 +312,23 @@ fun VideoPlayerScreen(
                 Panel.SPEED -> SpeedPanel(ui.speed) { vm.setSpeed(it); panel = Panel.NONE; showControls() }
                 Panel.NONE -> Unit
             }
+        }
+
+        val castNotice by vm.castNotice.collectAsState()
+        AnimatedVisibility(
+            visible = castNotice != null,
+            enter = fadeIn(tween(250)),
+            exit = fadeOut(tween(400)),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 36.dp)
+        ) {
+            Text(
+                castNotice.orEmpty(),
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xCC000000))
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
+            )
         }
 
         when (val phase = ui.phase) {

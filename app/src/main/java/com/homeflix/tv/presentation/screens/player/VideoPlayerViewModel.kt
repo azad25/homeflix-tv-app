@@ -72,8 +72,9 @@ class VideoPlayerViewModel @Inject constructor(
     private val api: HomeFlixApiService,
     private val progressStore: PlaybackProgressStore,
     private val previewPlayer: PreviewPlayer,
-    @ApplicationScope private val appScope: CoroutineScope
-) : ViewModel() {
+    @ApplicationScope private val appScope: CoroutineScope,
+    private val castController: com.homeflix.tv.cast.CastController
+) : ViewModel(), com.homeflix.tv.cast.CastTarget {
 
     private val _ui = MutableStateFlow(PlayerUiState())
     val ui: StateFlow<PlayerUiState> = _ui.asStateFlow()
@@ -110,15 +111,18 @@ class VideoPlayerViewModel @Inject constructor(
                 Player.STATE_ENDED -> onEnded()
                 Player.STATE_IDLE -> Unit
             }
+            reportCast()
         }
 
         override fun onRenderedFirstFrame() {
             _ui.update { it.copy(phase = PlayerPhase.Ready, isBuffering = false) }
+            reportCast()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _ui.update { it.copy(isPlaying = isPlaying) }
             if (!isPlaying) saveProgress(sync = true)
+            reportCast()
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -137,6 +141,9 @@ class VideoPlayerViewModel @Inject constructor(
     }
 
     val player: ExoPlayer = buildPlayer()
+
+    /** "Casting from Chrome on Mac" notice for the player UI. */
+    val castNotice = castController.notice
 
     private val sessionId = UUID.randomUUID().toString().replace("-", "").take(16)
     private var mediaId: Int = 0
@@ -189,10 +196,15 @@ class VideoPlayerViewModel @Inject constructor(
 
     // ---------------------------------------------------------------- loading
 
-    fun load(id: Int, startMs: Long, forceFromStart: Boolean) {
+    /**
+     * @param exactStart start at [startMs] as given (a cast from the browser),
+     *   instead of applying the saved-progress resume rules.
+     */
+    fun load(id: Int, startMs: Long, forceFromStart: Boolean, exactStart: Boolean = false) {
         if (loadedFor == id) return
         loadedFor = id
         mediaId = id
+        castController.register(this)
         // The full player needs the hardware decoder: make sure no preview holds it.
         previewPlayer.hardStop()
         _ui.value = PlayerUiState(phase = PlayerPhase.Loading)
@@ -208,7 +220,11 @@ class VideoPlayerViewModel @Inject constructor(
 
             // Resolve everything that playback needs in parallel.
             val resumeDeferred = async {
-                if (forceFromStart) 0L else progressStore.resolveResumeMs(id, startMs)
+                when {
+                    forceFromStart -> 0L
+                    exactStart -> startMs.coerceAtLeast(0)
+                    else -> progressStore.resolveResumeMs(id, startMs)
+                }
             }
             val subsDeferred = async { fetchSubtitles(id) }
             val resumeMs = resumeDeferred.await()
@@ -354,6 +370,7 @@ class VideoPlayerViewModel @Inject constructor(
                 else "Something went wrong while playing this title."
             ))
         }
+        reportCast()
     }
 
     private fun onEnded() {
@@ -374,6 +391,7 @@ class VideoPlayerViewModel @Inject constructor(
         retryCount = 0
         startPlayback(pos, playWhenReady = resumePlayingOnStart)
         startTicker()
+        reportCast()
     }
 
     fun onStop() {
@@ -383,6 +401,7 @@ class VideoPlayerViewModel @Inject constructor(
         saveProgress(sync = true)
         tickerJob?.cancel()
         player.stop() // frees decoders + network; media item and position are kept
+        reportCast()
     }
 
     private fun startTicker() {
@@ -390,10 +409,11 @@ class VideoPlayerViewModel @Inject constructor(
         tickerJob = viewModelScope.launch {
             var n = 0
             while (isActive) {
-                delay(5_000)
+                delay(1_000)
                 if (player.isPlaying) {
                     n++
-                    saveProgress(sync = n % 6 == 0) // local every 5 s, server every 30 s
+                    reportCast() // cast remotes follow the position every second
+                    if (n % 5 == 0) saveProgress(sync = n % 30 == 0) // local every 5 s, server every 30 s
                 }
             }
         }
@@ -477,6 +497,7 @@ class VideoPlayerViewModel @Inject constructor(
 
     override fun onCleared() {
         saveProgress(sync = true)
+        castController.unregister(this)
         tickerJob?.cancel()
         player.removeListener(listener)
         player.release()
@@ -486,6 +507,73 @@ class VideoPlayerViewModel @Inject constructor(
         }
         super.onCleared()
     }
+
+    // ---------------------------------------------------------------- casting
+
+    private var castMuted = false
+    private var castVolumeLevel = 1f
+
+    override val castMediaId: Int get() = mediaId
+
+    override fun castSetPlaying(playing: Boolean) {
+        if (stoppedPositionMs >= 0) { resumePlayingOnStart = playing; return } // app in background
+        if (playing) play() else pause()
+    }
+
+    override fun castSeek(positionMs: Long) {
+        if (stoppedPositionMs >= 0) { stoppedPositionMs = positionMs; return }
+        seekTo(positionMs)
+        reportCast()
+    }
+
+    override fun castStop() {
+        close()
+        viewModelScope.launch { _events.emit(PlayerEvent.ForceClose) }
+    }
+
+    override fun castVolume(volume: Float?, muted: Boolean?) {
+        volume?.let { castVolumeLevel = it }
+        muted?.let { castMuted = it }
+        player.volume = if (castMuted) 0f else castVolumeLevel
+        reportCast()
+    }
+
+    override fun castSubtitle(id: String): Boolean {
+        val options = _ui.value.textTracks
+        when {
+            id.isEmpty() -> selectText(null)
+            else -> selectText(options.firstOrNull { it.id == id || it.label.equals(id, true) } ?: options.firstOrNull() ?: return false)
+        }
+        return true
+    }
+
+    override fun castStatus(): com.homeflix.tv.cast.CastStatus {
+        val ui = _ui.value
+        val state = when {
+            ui.phase is PlayerPhase.Error -> com.homeflix.tv.cast.CastState.ERROR
+            endedHandled || player.playbackState == Player.STATE_ENDED -> com.homeflix.tv.cast.CastState.ENDED
+            ui.phase is PlayerPhase.Loading -> com.homeflix.tv.cast.CastState.LOADING
+            player.playbackState == Player.STATE_BUFFERING -> com.homeflix.tv.cast.CastState.BUFFERING
+            player.isPlaying -> com.homeflix.tv.cast.CastState.PLAYING
+            else -> com.homeflix.tv.cast.CastState.PAUSED
+        }
+        val media = ui.media
+        val durMs = player.duration.takeIf { it > 0 } ?: ui.durationMs
+        return com.homeflix.tv.cast.CastStatus(
+            state = state.wire,
+            mediaId = mediaId,
+            mediaType = if (media?.type == MediaType.EPISODE) "episode" else "movie",
+            title = listOfNotNull(ui.title.takeIf { it.isNotBlank() }, ui.subtitle?.takeIf { it.isNotBlank() }).joinToString(" · ")
+                .ifBlank { null },
+            position = (if (stoppedPositionMs >= 0) stoppedPositionMs else player.currentPosition).coerceAtLeast(0) / 1000.0,
+            duration = durMs.coerceAtLeast(0) / 1000.0,
+            volume = castVolumeLevel.toDouble(),
+            muted = castMuted,
+            error = (ui.phase as? PlayerPhase.Error)?.message.orEmpty()
+        )
+    }
+
+    private fun reportCast() = castController.report(castStatus())
 
     // ---------------------------------------------------------------- tracks
 
@@ -540,6 +628,8 @@ sealed interface PlayerPhase {
 
 sealed interface PlayerEvent {
     data object Close : PlayerEvent
+    /** Close even if the screen isn't in front (cast "stop" while the app is backgrounded). */
+    data object ForceClose : PlayerEvent
     data class PlayNext(val mediaId: Int) : PlayerEvent
 }
 

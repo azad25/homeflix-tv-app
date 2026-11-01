@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -105,6 +106,7 @@ fun AppShell(
     previewPlayer: PreviewPlayer,
     actions: TileActions,
     onOpenNotifications: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     page: @Composable (ShellTab, ShellController) -> Unit
 ) {
     var savedTab by rememberSaveable { mutableStateOf(ShellTab.HOME) }
@@ -141,6 +143,7 @@ fun AppShell(
                 ProfileMenu(
                     onDismiss = { menuOpen = false; shell.focusNav() },
                     onNotifications = { menuOpen = false; onOpenNotifications() },
+                    onSettings = { menuOpen = false; onOpenSettings() },
                     onRefresh = { menuOpen = false; activity?.recreate() },
                     onExit = { activity?.finish() }
                 )
@@ -284,7 +287,7 @@ private fun NavIconButton(icon: ImageVector, description: String, canFocus: Bool
 }
 
 @Composable
-private fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onRefresh: () -> Unit, onExit: () -> Unit) {
+private fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onSettings: () -> Unit, onRefresh: () -> Unit, onExit: () -> Unit) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { first.requestFocus() } }
     BackHandler(onBack = onDismiss)
@@ -300,6 +303,7 @@ private fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onRe
                 .padding(vertical = 8.dp)
         ) {
             MenuItem(Icons.Filled.Notifications, "Notifications", onNotifications, Modifier.focusRequester(first))
+            MenuItem(Icons.Filled.Settings, "Settings", onSettings)
             MenuItem(Icons.Filled.Refresh, "Refresh", onRefresh)
             MenuItem(Icons.AutoMirrored.Filled.ExitToApp, "Exit HomeFlix", onExit)
         }

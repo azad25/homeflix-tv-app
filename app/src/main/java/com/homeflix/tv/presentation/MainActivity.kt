@@ -24,6 +24,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var previewPlayer: PreviewPlayer
+    @Inject lateinit var castController: com.homeflix.tv.cast.CastController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -36,7 +37,7 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(LocalDensity provides Density(density = base.density, fontScale = 1f)) {
                 HomeFlixTVTheme {
                     Box(Modifier.fillMaxSize().background(Tv.Background)) {
-                        HomeFlixNavigation(previewPlayer = previewPlayer)
+                        HomeFlixNavigation(previewPlayer = previewPlayer, castController = castController)
                     }
                 }
             }
