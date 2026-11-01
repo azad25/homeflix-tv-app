@@ -53,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -438,7 +439,7 @@ fun HeroBillboard(
     }
 
     val screenH = LocalConfiguration.current.screenHeightDp.dp
-    Box(modifier.fillMaxWidth().height(screenH - 132.dp)) {
+    Box(modifier.fillMaxWidth().height(screenH - 132.dp).clipToBounds()) {
         Crossfade(targetState = tile, animationSpec = tween(600), label = "heroArt") { t ->
             SizedImage(t.backdropUrl, 960.dp, 540.dp, Modifier.fillMaxSize(), alignment = Alignment.TopCenter, crossfadeMs = 0)
         }

@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.platform.LocalConfiguration
@@ -63,7 +64,7 @@ fun DetailHeader(
         if (previewActive) p.request(previewKey, previewUrl, revealDelayMs = 1_800, dwellMs = 600) else p.cancel(previewKey)
     }
     val screenH = LocalConfiguration.current.screenHeightDp.dp
-    Box(modifier.fillMaxWidth().height(screenH - peek)) {
+    Box(modifier.fillMaxWidth().height(screenH - peek).clipToBounds()) {
         SizedImage(backdropUrl, 960.dp, 540.dp, Modifier.fillMaxSize(), alignment = Alignment.TopCenter, crossfadeMs = 300)
         PreviewVideo(previewKey, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().background(Tv.LeftScrim))

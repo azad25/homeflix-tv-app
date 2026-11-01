@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -116,7 +117,9 @@ fun PreviewVideo(key: String, modifier: Modifier = Modifier) {
         label = "previewAlpha"
     )
     val aspect by preview.videoAspect.collectAsState()
-    Box(modifier) {
+    // Cover-scaling zooms the video past the view's edges; a TextureView does not
+    // clip that itself, so clip here or it spills over the rows below the billboard.
+    Box(modifier.clipToBounds()) {
         AndroidView(
             factory = { ctx ->
                 TextureView(ctx).also { tv ->
