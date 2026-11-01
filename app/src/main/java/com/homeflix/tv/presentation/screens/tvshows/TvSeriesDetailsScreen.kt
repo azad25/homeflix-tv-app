@@ -51,6 +51,7 @@ import com.homeflix.tv.core.PreviewPlayer
 import com.homeflix.tv.presentation.navigation.AppNavigator
 import com.homeflix.tv.presentation.shell.ErrorState
 import com.homeflix.tv.presentation.shell.LoadingState
+import com.homeflix.tv.presentation.shell.SubPageTopBar
 import com.homeflix.tv.presentation.ui.DetailHeader
 import com.homeflix.tv.presentation.ui.LocalPreviewPlayer
 import com.homeflix.tv.presentation.ui.ManualFocusScroll
@@ -122,6 +123,7 @@ private fun SeriesContent(series: TvSeries, state: SeriesState, navigator: AppNa
         }
     }
 
+    Box(Modifier.fillMaxSize()) {
     ManualFocusScroll {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             item(key = "header") {
@@ -189,6 +191,8 @@ private fun SeriesContent(series: TvSeries, state: SeriesState, navigator: AppNa
             }
             item(key = "pad") { Spacer(Modifier.height(240.dp)) }
         }
+    }
+    SubPageTopBar(navigator, visible = section == 0)
     }
 }
 

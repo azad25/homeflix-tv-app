@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -117,6 +118,16 @@ fun AppShell(
     val shell = remember { ShellController(savedTab) }
     LaunchedEffect(shell.selected) { savedTab = shell.selected }
     val holder = rememberSaveableStateHolder()
+    // A tab picked from a sub-page's top bar (Details, Series, Settings…).
+    val requestedTab by ShellRequests.tab.collectAsState()
+    LaunchedEffect(requestedTab) {
+        val t = requestedTab ?: return@LaunchedEffect
+        shell.selected = t
+        shell.enterAtTop = true
+        shell.restoreFocusPending = true
+        ShellRequests.tab.value = null
+    }
+    LaunchedEffect(unreadNotifications) { ShellRequests.unread.value = unreadNotifications }
     val activity = LocalContext.current as? Activity
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -179,6 +190,10 @@ private fun TopNav(
     LaunchedEffect(focusedTab) {
         val t = focusedTab ?: return@LaunchedEffect
         delay(280)
+        // Focus can land on a tab by itself while the page is still restoring
+        // its own focus (e.g. right after Back from a movie page): that is not
+        // the user resting on the tab, so don't switch pages for it.
+        if (shell.restoreFocusPending || !shell.navFocused) return@LaunchedEffect
         if (t != shell.selected) shell.selected = t
     }
     LaunchedEffect(shell.navFocusRequest) {
@@ -242,7 +257,7 @@ private fun TopNav(
 }
 
 @Composable
-private fun NavItem(
+internal fun NavItem(
     tab: ShellTab,
     selected: Boolean,
     requester: FocusRequester,
@@ -288,7 +303,7 @@ private fun NavItem(
 }
 
 @Composable
-private fun NavBell(unread: Int, canFocus: Boolean, onClick: () -> Unit) {
+internal fun NavBell(unread: Int, canFocus: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Box(
         contentAlignment = Alignment.Center,
@@ -316,7 +331,7 @@ private fun NavBell(unread: Int, canFocus: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun NavIconButton(icon: ImageVector, description: String, canFocus: Boolean, onClick: () -> Unit) {
+internal fun NavIconButton(icon: ImageVector, description: String, canFocus: Boolean, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Box(
         contentAlignment = Alignment.Center,
@@ -333,7 +348,7 @@ private fun NavIconButton(icon: ImageVector, description: String, canFocus: Bool
 }
 
 @Composable
-private fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onSettings: () -> Unit, onAbout: () -> Unit, onRefresh: () -> Unit, onExit: () -> Unit) {
+internal fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onSettings: () -> Unit, onAbout: () -> Unit, onRefresh: () -> Unit, onExit: () -> Unit) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { first.requestFocus() } }
     BackHandler(onBack = onDismiss)

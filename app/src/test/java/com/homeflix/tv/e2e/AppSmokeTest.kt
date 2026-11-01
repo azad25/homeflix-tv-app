@@ -159,4 +159,34 @@ class AppSmokeTest {
             check(waitForText("buymeacoffee.com/ferdousazad")) { "About screen didn't show the donation link" }
         }
     }
+
+    @Test
+    fun moviePage_hasTheTopMenu_andTabsWork() {
+        val base = server
+        assumeTrue("set -Dhomeflix.e2e.server", base != null && reachable(base))
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        pump(3_000)
+        ServerConfig.setLocal(ctx, base!!)
+        ActivityScenario.launch(MainActivity::class.java).use {
+            check(waitForText("Inception")) { "home never loaded" }
+            pump(1_000)
+            press(Key.DirectionRight)        // More Info
+            press(Key.Enter)
+            check(waitForText("More Like This")) { "movie page didn't open" }
+            dump("movie-page")
+            press(Key.DirectionUp)            // from Resume/Play into the top bar
+            println("E2E sub-page nav focus=${focused()}")
+            check(focused() == "Home") { "▲ from the movie page didn't reach the top menu (focus=${focused()})" }
+            press(Key.DirectionRight, 2)      // Shows, Movies
+            check(focused() == "Movies") { "focus=${focused()}" }
+            press(Key.Enter)
+            pump(2_500)
+            dump("after-tab")
+            // Movies' Continue Watching has only movies; Home's also has the show "Shaque".
+            check(waitForText("54m left")) { "Movies page didn't load" }
+            check(rule.onAllNodesWithText("Shaque", substring = true).fetchSemanticsNodes().isEmpty()) {
+                "still on Home instead of the Movies tab"
+            }
+        }
+    }
 }

@@ -44,6 +44,14 @@ class AppNavigator(private val nav: NavHostController, private val preview: Prev
 
     fun back() { if (canNavigate()) nav.popBackStack() }
 
+    /** From any page: return to the browse screens on [tab]. */
+    fun goTab(tab: com.homeflix.tv.presentation.shell.ShellTab) {
+        com.homeflix.tv.presentation.shell.ShellRequests.tab.value = tab
+        if (!nav.popBackStack(Screen.Home.route, inclusive = false)) {
+            nav.navigate(Screen.Home.route) { launchSingleTop = true }
+        }
+    }
+
     fun details(mediaId: Int) = go(Screen.Details.createRoute(mediaId.toString()))
     fun series(seriesId: Int) = go(Screen.TvSeriesDetails.createRoute(seriesId.toString()))
 
@@ -105,11 +113,11 @@ fun HomeFlixNavigation(
         }
 
         composable(Screen.About.route) {
-            com.homeflix.tv.presentation.screens.settings.AboutScreen()
+            com.homeflix.tv.presentation.screens.settings.AboutScreen(navigator)
         }
 
         composable(Screen.Settings.route) {
-            com.homeflix.tv.presentation.screens.settings.SettingsScreen()
+            com.homeflix.tv.presentation.screens.settings.SettingsScreen(navigator)
         }
 
         composable(Screen.TvSeriesDetails.route, arguments = Screen.TvSeriesDetails.arguments) { entry ->

@@ -62,6 +62,7 @@ import com.homeflix.tv.domain.model.Notification
 import com.homeflix.tv.presentation.navigation.AppNavigator
 import com.homeflix.tv.presentation.shell.ErrorState
 import com.homeflix.tv.presentation.shell.LoadingState
+import com.homeflix.tv.presentation.shell.SubPageTopBar
 import com.homeflix.tv.presentation.ui.MediaFormat
 import com.homeflix.tv.presentation.ui.PillButton
 import com.homeflix.tv.presentation.ui.SizedImage
@@ -85,6 +86,7 @@ fun NotificationsScreen(navigator: AppNavigator, vm: NotificationsViewModel = hi
                 if (s.notifications.isEmpty()) EmptyNotifications()
                 else NotificationsContent(s.notifications.distinctBy { it.id }, navigator)
         }
+        SubPageTopBar(navigator)
     }
 }
 
@@ -115,7 +117,7 @@ private fun NotificationsContent(items: List<Notification>, navigator: AppNaviga
 
         Row(Modifier.fillMaxSize()) {
             // ---------------------------------------------------------------- list
-            Column(Modifier.width(470.dp).fillMaxHeight().padding(start = Tv.Keyline, top = 28.dp)) {
+            Column(Modifier.width(470.dp).fillMaxHeight().padding(start = Tv.Keyline, top = Tv.NavHeight + 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Notifications", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     val unread = items.count { !it.read }

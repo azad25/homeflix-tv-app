@@ -36,6 +36,7 @@ import com.homeflix.tv.domain.model.Media
 import com.homeflix.tv.presentation.navigation.AppNavigator
 import com.homeflix.tv.presentation.shell.ErrorState
 import com.homeflix.tv.presentation.shell.LoadingState
+import com.homeflix.tv.presentation.shell.SubPageTopBar
 import com.homeflix.tv.presentation.ui.DetailHeader
 import com.homeflix.tv.presentation.ui.LocalPreviewPlayer
 import com.homeflix.tv.presentation.ui.ManualFocusScroll
@@ -100,6 +101,7 @@ private fun DetailsContent(media: Media, state: DetailsState, navigator: AppNavi
             if (media.director.isNotEmpty()) add("Director: ${media.director.take(2).joinToString(", ")}")
         }
     }
+    Box(Modifier.fillMaxSize()) {
     ManualFocusScroll {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
             item(key = "header") {
@@ -147,5 +149,7 @@ private fun DetailsContent(media: Media, state: DetailsState, navigator: AppNavi
             }
             item(key = "pad") { Spacer(Modifier.height(220.dp)) }
         }
+    }
+    SubPageTopBar(navigator, visible = section == 0)
     }
 }

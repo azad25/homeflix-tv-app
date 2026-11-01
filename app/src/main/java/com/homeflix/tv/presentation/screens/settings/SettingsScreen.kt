@@ -7,12 +7,14 @@ import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -101,7 +103,7 @@ class SettingsViewModel @Inject constructor(
 
 /** Settings → casting from the HomeFlix web app, plus app info. */
 @Composable
-fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(navigator: com.homeflix.tv.presentation.navigation.AppNavigator? = null, vm: SettingsViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val name by vm.cast.name.collectAsState()
     val enabled by vm.cast.enabled.collectAsState()
@@ -112,7 +114,12 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { first.requestFocus() } }
 
     Box(Modifier.fillMaxSize().background(Tv.Background)) {
-        Column(Modifier.padding(start = 72.dp, top = 48.dp).width(620.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // Taller than the screen: scrolls as D-pad focus moves down.
+        Column(
+            Modifier.fillMaxHeight().verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(start = 72.dp, top = Tv.NavHeight + 20.dp, bottom = 80.dp).width(620.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
             Text("Settings", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
             Text("Cast to this TV", color = Tv.TextSecondary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 16.dp))
@@ -156,6 +163,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             Text("Server: ${ServerConfig.activeApiBase}", color = Tv.TextMuted, fontSize = 15.sp)
             Text("HomeFlix TV ${BuildConfig.VERSION_NAME}", color = Tv.TextMuted, fontSize = 15.sp)
         }
+    navigator?.let { com.homeflix.tv.presentation.shell.SubPageTopBar(it) }
     }
 }
 

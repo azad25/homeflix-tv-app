@@ -52,7 +52,7 @@ object Credits {
 
 /** About HomeFlix: developer credit, contact, open-source links and version. */
 @Composable
-fun AboutScreen() {
+fun AboutScreen(navigator: com.homeflix.tv.presentation.navigation.AppNavigator? = null) {
     val back = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { focus.requestFocus() } }
@@ -103,6 +103,7 @@ fun AboutScreen() {
             PillButton("Back", { back?.onBackPressed() }, icon = Icons.AutoMirrored.Filled.ArrowBack, focusRequester = focus,
                 modifier = Modifier.padding(top = 24.dp))
         }
+    navigator?.let { com.homeflix.tv.presentation.shell.SubPageTopBar(it) }
     }
 }
 
