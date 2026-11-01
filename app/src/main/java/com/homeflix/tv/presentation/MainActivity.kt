@@ -25,6 +25,12 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var previewPlayer: PreviewPlayer
     @Inject lateinit var castController: com.homeflix.tv.cast.CastController
+    @Inject lateinit var updater: com.homeflix.tv.update.AppUpdater
+
+    override fun onStart() {
+        super.onStart()
+        updater.onForeground()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -37,7 +43,7 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(LocalDensity provides Density(density = base.density, fontScale = 1f)) {
                 HomeFlixTVTheme {
                     Box(Modifier.fillMaxSize().background(Tv.Background)) {
-                        HomeFlixNavigation(previewPlayer = previewPlayer, castController = castController)
+                        HomeFlixNavigation(previewPlayer = previewPlayer, castController = castController, updater = updater)
                     }
                 }
             }

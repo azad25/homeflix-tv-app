@@ -65,7 +65,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     val cast: CastSettings,
-    val connection: CastConnection
+    val connection: CastConnection,
+    val updater: com.homeflix.tv.update.AppUpdater
 ) : ViewModel() {
     fun setCastEnabled(on: Boolean) {
         cast.setEnabled(on)
@@ -119,11 +120,50 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                 )
             }
 
+            UpdatesSection(vm.updater)
+
             Text("About", color = Tv.TextSecondary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 18.dp))
             Text("Server: ${ServerConfig.activeApiBase}", color = Tv.TextMuted, fontSize = 15.sp)
             Text("HomeFlix TV ${BuildConfig.VERSION_NAME}", color = Tv.TextMuted, fontSize = 15.sp)
         }
+    }
+}
+
+@Composable
+private fun UpdatesSection(updater: com.homeflix.tv.update.AppUpdater) {
+    val state by updater.state.collectAsState()
+    var canInstall by remember { mutableStateOf(updater.canInstall()) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { canInstall = updater.canInstall() }
+    Text("App updates", color = Tv.TextSecondary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 18.dp))
+    val status = when (val s = state) {
+        com.homeflix.tv.update.UpdateState.Idle -> "Updates install from your HomeFlix server"
+        com.homeflix.tv.update.UpdateState.Checking -> "Checking for updates…"
+        is com.homeflix.tv.update.UpdateState.UpToDate -> "HomeFlix is up to date"
+        is com.homeflix.tv.update.UpdateState.Downloading -> "Downloading ${s.info.versionName ?: ""}… ${(s.progress * 100).toInt()}%"
+        is com.homeflix.tv.update.UpdateState.Ready -> "Version ${s.info.versionName ?: s.info.versionCode} is ready to install"
+        is com.homeflix.tv.update.UpdateState.Installing -> "Installing…"
+        is com.homeflix.tv.update.UpdateState.Failed -> s.message
+    }
+    Text(status, color = Color.White, fontSize = 17.sp)
+    val ready = state as? com.homeflix.tv.update.UpdateState.Ready
+    if (ready != null) {
+        SettingRow(
+            title = "Install update",
+            value = ready.info.versionName ?: ready.info.versionCode.toString(),
+            onClick = { if (updater.canInstall()) updater.install() else updater.openInstallPermissionSettings() }
+        )
+    } else {
+        SettingRow(title = "Check for updates", value = "", onClick = updater::checkNow)
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        SettingRow(
+            title = "Allow HomeFlix to install updates",
+            value = if (canInstall) "Allowed" else "Not allowed",
+            subtitle = "Android's \u201CInstall unknown apps\u201D switch for HomeFlix. Needed once.",
+            onClick = updater::openInstallPermissionSettings
+        )
     }
 }
 

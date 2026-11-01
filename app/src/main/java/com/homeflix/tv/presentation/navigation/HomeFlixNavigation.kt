@@ -69,6 +69,7 @@ class AppNavigator(private val nav: NavHostController, private val preview: Prev
 fun HomeFlixNavigation(
     previewPlayer: PreviewPlayer,
     castController: com.homeflix.tv.cast.CastController,
+    updater: com.homeflix.tv.update.AppUpdater? = null,
     navController: NavHostController = rememberNavController()
 ) {
     val navigator = remember(navController, previewPlayer) { AppNavigator(navController, previewPlayer) }
@@ -95,7 +96,7 @@ fun HomeFlixNavigation(
         popExitTransition = { fadeOut(tween(180)) }
     ) {
         composable(Screen.Home.route) { entry ->
-            BrowseShell(entry, navigator, previewPlayer)
+            BrowseShell(entry, navigator, previewPlayer, updater)
         }
 
         composable(Screen.Notifications.route) {
@@ -150,12 +151,18 @@ fun HomeFlixNavigation(
 
 @UnstableApi
 @Composable
-private fun BrowseShell(entry: NavBackStackEntry, navigator: AppNavigator, previewPlayer: PreviewPlayer) {
+private fun BrowseShell(
+    entry: NavBackStackEntry,
+    navigator: AppNavigator,
+    previewPlayer: PreviewPlayer,
+    updater: com.homeflix.tv.update.AppUpdater?
+) {
     AppShell(
         previewPlayer = previewPlayer,
         actions = navigator,
         onOpenNotifications = { navigator.go(Screen.Notifications.route) },
-        onOpenSettings = { navigator.go(Screen.Settings.route) }
+        onOpenSettings = { navigator.go(Screen.Settings.route) },
+        updater = updater
     ) { tab, shell ->
         when (tab) {
             ShellTab.HOME -> {

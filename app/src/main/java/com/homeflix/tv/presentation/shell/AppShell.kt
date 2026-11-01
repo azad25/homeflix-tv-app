@@ -107,6 +107,7 @@ fun AppShell(
     actions: TileActions,
     onOpenNotifications: () -> Unit,
     onOpenSettings: () -> Unit = {},
+    updater: com.homeflix.tv.update.AppUpdater? = null,
     page: @Composable (ShellTab, ShellController) -> Unit
 ) {
     var savedTab by rememberSaveable { mutableStateOf(ShellTab.HOME) }
@@ -139,6 +140,7 @@ fun AppShell(
                 menuOpen = menuOpen,
                 onToggleMenu = { menuOpen = !menuOpen }
             )
+            if (!menuOpen && updater != null) UpdatePrompt(updater)
             if (menuOpen) {
                 ProfileMenu(
                     onDismiss = { menuOpen = false; shell.focusNav() },

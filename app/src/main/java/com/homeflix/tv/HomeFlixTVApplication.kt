@@ -39,6 +39,14 @@ class HomeFlixTVApplication : Application(), ImageLoaderFactory {
 
         // Be castable from the HomeFlix web app as soon as the app process starts.
         com.homeflix.tv.cast.CastReceiverService.start(this)
+
+        // Self-updates from the HomeFlix server (also triggered by a server push).
+        val updater = dagger.hilt.android.EntryPointAccessors
+            .fromApplication(this, com.homeflix.tv.update.UpdaterEntryPoint::class.java).appUpdater()
+        updater.start()
+        dagger.hilt.android.EntryPointAccessors
+            .fromApplication(this, com.homeflix.tv.cast.CastEntryPoint::class.java)
+            .castConnection().onUpdateAvailable = updater::checkNow
     }
     
     override fun newImageLoader(): ImageLoader {

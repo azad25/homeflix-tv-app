@@ -63,6 +63,9 @@ class CastConnection @Inject constructor(
         .connectTimeout(8, TimeUnit.SECONDS)
         .build()
 
+    /** Set by the app: the server announced a new TV app build. */
+    @Volatile var onUpdateAvailable: (() -> Unit)? = null
+
     private var socket: WebSocket? = null
     private var generation = 0
     private var attempt = 0
@@ -169,6 +172,8 @@ class CastConnection @Inject constructor(
                 }
                 "ping" -> webSocket.send(gson.toJson(CastPong()))
                 "command" -> controller.onCommand(msg)
+                // Server published a new TV build: check (and download) it now.
+                "update_available" -> onUpdateAvailable?.invoke()
             }
         }
 

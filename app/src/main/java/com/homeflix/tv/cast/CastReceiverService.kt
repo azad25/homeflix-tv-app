@@ -99,7 +99,9 @@ interface CastEntryPoint {
 /** Brings the cast receiver up after the TV powers on. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "android.intent.action.QUICKBOOT_POWERON") {
+        // Also after a self-update: the new version must be castable again right away.
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
+            intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             CastReceiverService.start(context)
         }
     }
