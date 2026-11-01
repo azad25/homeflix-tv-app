@@ -152,6 +152,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                 modifier = Modifier.padding(top = 18.dp))
             Text("Developed by ${Credits.DEVELOPER} · ${Credits.ROLE}", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             Text("Contact: ${Credits.EMAIL} · ${Credits.GITHUB}", color = Tv.TextSecondary, fontSize = 14.sp)
+            Text("Support HomeFlix: ${Credits.DONATE}", color = Color(0xFFFFDD00), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             Text("Server: ${ServerConfig.activeApiBase}", color = Tv.TextMuted, fontSize = 15.sp)
             Text("HomeFlix TV ${BuildConfig.VERSION_NAME}", color = Tv.TextMuted, fontSize = 15.sp)
         }

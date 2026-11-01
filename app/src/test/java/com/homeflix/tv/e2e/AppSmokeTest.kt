@@ -156,6 +156,7 @@ class AppSmokeTest {
             dump("about")
             check(waitForText("Ferdous Azad")) { "About screen didn't show the developer credit" }
             check(waitForText("ferdousazad12@gmail.com")) { "About screen didn't show the contact" }
+            check(waitForText("buymeacoffee.com/ferdousazad")) { "About screen didn't show the donation link" }
         }
     }
 }

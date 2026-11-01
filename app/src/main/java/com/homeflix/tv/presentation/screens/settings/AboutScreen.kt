@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
@@ -45,6 +46,7 @@ object Credits {
     const val ROLE = "Developer of HomeFlix"
     const val EMAIL = "ferdousazad12@gmail.com"
     const val GITHUB = "github.com/azad25"
+    const val DONATE = "buymeacoffee.com/ferdousazad"
     val REPOS = listOf("github.com/azad25/homeflix-wifi", "github.com/azad25/homeflix-tv-app")
 }
 
@@ -81,6 +83,18 @@ fun AboutScreen() {
                 InfoLine(Icons.Filled.Email, "Contact", Credits.EMAIL)
                 InfoLine(Icons.Filled.Person, "GitHub", Credits.GITHUB)
                 InfoLine(Icons.Filled.Code, "Open source", Credits.REPOS.joinToString("   ·   "))
+            }
+            // Donation: a TV can't open a browser, so show the address big enough to type on a phone.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 18.dp).clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFFFDD00)).padding(horizontal = 18.dp, vertical = 12.dp)
+            ) {
+                Icon(Icons.Filled.Coffee, null, tint = Color.Black, modifier = Modifier.size(22.dp))
+                Column(Modifier.padding(start = 12.dp)) {
+                    Text("Enjoying HomeFlix? Buy me a coffee", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(Credits.DONATE, color = Color.Black, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
             Spacer(Modifier.height(26.dp))
             Text("HomeFlix TV ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", color = Tv.TextMuted, fontSize = 13.sp)
