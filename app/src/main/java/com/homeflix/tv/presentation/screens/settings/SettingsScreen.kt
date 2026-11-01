@@ -50,6 +50,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.homeflix.tv.BuildConfig
 import com.homeflix.tv.cast.CastConnection
@@ -68,6 +71,28 @@ class SettingsViewModel @Inject constructor(
     val connection: CastConnection,
     val updater: com.homeflix.tv.update.AppUpdater
 ) : ViewModel() {
+    /** "OK — reached http://…" / "Couldn't reach …" after saving the address. */
+    val serverCheck = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    fun saveServer(input: String) {
+        val base = ServerConfig.setLocal(context, input)
+        if (base == null) { serverCheck.value = "That doesn't look like a server address"; return }
+        serverCheck.value = "Checking ${base.removeSuffix("/api")}…"
+        viewModelScope.launch(Dispatchers.IO) { checkServer(base) }
+    }
+
+    private fun checkServer(base: String) {
+        val ok = runCatching {
+            okhttp3.OkHttpClient.Builder().connectTimeout(4, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(6, java.util.concurrent.TimeUnit.SECONDS).build()
+                .newCall(okhttp3.Request.Builder().url("$base/genres").build()).execute().use { it.code }
+        }
+        serverCheck.value = ok.fold(
+            onSuccess = { code -> if (code in 200..499) "Connected to ${base.removeSuffix("/api")}" else "Server answered HTTP $code" },
+            onFailure = { e -> "Couldn't reach ${base.removeSuffix("/api")} (${e.javaClass.simpleName})" }
+        )
+    }
+
     fun setCastEnabled(on: Boolean) {
         cast.setEnabled(on)
         if (on) CastReceiverService.start(context) else CastReceiverService.stop(context)
@@ -120,6 +145,7 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
                 )
             }
 
+            ServerSection(vm)
             UpdatesSection(vm.updater)
 
             Text("About", color = Tv.TextSecondary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
@@ -127,6 +153,45 @@ fun SettingsScreen(vm: SettingsViewModel = hiltViewModel()) {
             Text("Server: ${ServerConfig.activeApiBase}", color = Tv.TextMuted, fontSize = 15.sp)
             Text("HomeFlix TV ${BuildConfig.VERSION_NAME}", color = Tv.TextMuted, fontSize = 15.sp)
         }
+    }
+}
+
+@Composable
+private fun ServerSection(vm: SettingsViewModel) {
+    val check by vm.serverCheck.collectAsState()
+    var text by remember { mutableStateOf(ServerConfig.LOCAL.removeSuffix("/api")) }
+    var focused by remember { mutableStateOf(false) }
+    Text("Server", color = Tv.TextSecondary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 18.dp))
+    Column {
+        Text("Server address (e.g. 192.168.0.109:8252) — press OK on the remote keyboard to save",
+            color = Tv.TextMuted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
+        BasicTextField(
+            value = text,
+            onValueChange = { text = it.take(120) },
+            singleLine = true,
+            textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
+            cursorBrush = SolidColor(Color.White),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done,
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri),
+            keyboardActions = KeyboardActions(onDone = { vm.saveServer(text) }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .onFocusChanged {
+                    if (focused && !it.isFocused && text.isNotBlank()) vm.saveServer(text)
+                    focused = it.isFocused
+                }
+                .clip(RoundedCornerShape(8.dp))
+                .background(Tv.Surface)
+                .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp))
+                .padding(horizontal = 20.dp, vertical = 14.dp)
+        )
+        check?.let { Text(it, color = Color.White, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp)) }
+    }
+    if (ServerConfig.LOCAL != ServerConfig.DEFAULT_LOCAL) {
+        SettingRow(title = "Reset to default server", value = ServerConfig.DEFAULT_LOCAL.removeSuffix("/api"),
+            onClick = { text = ServerConfig.DEFAULT_LOCAL.removeSuffix("/api"); vm.saveServer(text) })
     }
 }
 

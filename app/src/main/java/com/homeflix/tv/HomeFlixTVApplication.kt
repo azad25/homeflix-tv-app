@@ -35,6 +35,7 @@ class HomeFlixTVApplication : Application(), ImageLoaderFactory {
 
         // Pick the server before the first screen loads: LAN IP when
         // reachable, public domain otherwise (2.5s probe, off main thread)
+        com.homeflix.tv.util.ServerConfig.init(this)
         Thread { com.homeflix.tv.util.ServerConfig.probe() }.start()
 
         // Be castable from the HomeFlix web app as soon as the app process starts.

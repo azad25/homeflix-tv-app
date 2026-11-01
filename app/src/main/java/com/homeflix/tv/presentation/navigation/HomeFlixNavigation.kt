@@ -168,23 +168,27 @@ private fun BrowseShell(
             ShellTab.HOME -> {
                 val vm: HomeFeedViewModel = hiltViewModel(entry)
                 val state by vm.state.collectAsState()
-                FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh)
+                FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh,
+                    onOpenSettings = { navigator.go(Screen.Settings.route) })
             }
             ShellTab.SHOWS -> {
                 val vm: ShowsFeedViewModel = hiltViewModel(entry)
                 val state by vm.state.collectAsState()
                 FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh,
+                    onOpenSettings = { navigator.go(Screen.Settings.route) },
                     heroPlayLabel = { "Episodes" })
             }
             ShellTab.MOVIES -> {
                 val vm: MoviesFeedViewModel = hiltViewModel(entry)
                 val state by vm.state.collectAsState()
-                FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh)
+                FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh,
+                    onOpenSettings = { navigator.go(Screen.Settings.route) })
             }
             ShellTab.MINE -> {
                 val vm: MyHomeFlixViewModel = hiltViewModel(entry)
                 val state by vm.state.collectAsState()
-                FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh)
+                FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh,
+                    onOpenSettings = { navigator.go(Screen.Settings.route) })
             }
             ShellTab.SEARCH -> SearchPage(shell = shell, actions = navigator)
         }

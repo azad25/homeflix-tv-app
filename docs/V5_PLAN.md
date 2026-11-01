@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: R8-optimized, about 2.7 MB, version 5.1.
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.4 (R8 code shrinking is currently off; see app/build.gradle.kts).
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 

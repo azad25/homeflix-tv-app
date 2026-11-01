@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +51,7 @@ fun FeedPage(
     actions: TileActions,
     onRetry: () -> Unit,
     onResumed: () -> Unit,
+    onOpenSettings: (() -> Unit)? = null,
     heroPlayLabel: (Tile) -> String = { "Play" }
 ) {
     val listState = rememberLazyListState()
@@ -115,7 +117,7 @@ fun FeedPage(
                 heroPlayLabel = heroPlayLabel
             )
             state.loading -> LoadingState()
-            else -> ErrorState(state.error ?: "Nothing to show", onRetry)
+            else -> ErrorState(state.error ?: "Nothing to show", onRetry, onSettings = onOpenSettings)
         }
     }
 }
@@ -128,14 +130,17 @@ fun LoadingState(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier, onSettings: (() -> Unit)? = null) {
     val retry = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { retry.requestFocus() } }
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text(message, color = Tv.TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-            PillButton("Try Again", onRetry, icon = Icons.Filled.Refresh, focusRequester = retry,
-                modifier = Modifier.padding(top = 4.dp))
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(top = 4.dp)) {
+                PillButton("Try Again", onRetry, icon = Icons.Filled.Refresh, focusRequester = retry)
+                if (onSettings != null) PillButton("Server settings", onSettings, icon = Icons.Filled.Settings)
+            }
         }
     }
 }

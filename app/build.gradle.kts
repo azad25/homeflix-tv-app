@@ -16,8 +16,8 @@ android {
         applicationId = "com.homeflix.tv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 8
-        versionName = "5.3"
+        versionCode = 9
+        versionName = "5.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -41,11 +41,12 @@ android {
         }
         release {
             signingConfig = signingConfigs.getByName("sideload")
-            // R8 optimizes Compose/Media3 library code — the single biggest
-            // win for scroll smoothness on TV. App classes are kept as-is
-            // (see proguard-rules.pro) so Gson/Retrofit reflection keeps working.
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // R8 is off until it has been verified on a real TV: shrinking can
+            // silently break Retrofit/Gson reflection, which shows up as
+            // "can't reach the server". Compose's bundled baseline profiles
+            // (profileinstaller) still give the AOT-compiled scroll paths.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

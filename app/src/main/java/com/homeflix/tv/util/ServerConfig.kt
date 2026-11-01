@@ -19,11 +19,51 @@ import java.util.concurrent.TimeUnit
  * against the other server and sticks with whichever one works.
  */
 object ServerConfig {
-    val LOCAL: String = BuildConfig.BASE_URL.removeSuffix("/")
+    /** LAN server. Built-in default, overridable in Settings → Server address. */
+    @Volatile
+    var LOCAL: String = BuildConfig.BASE_URL.removeSuffix("/")
+        private set
     val REMOTE: String = BuildConfig.FALLBACK_BASE_URL.removeSuffix("/")
+    val DEFAULT_LOCAL: String = BuildConfig.BASE_URL.removeSuffix("/")
+
+    private const val PREFS = "server_config"
+    private const val KEY_LOCAL = "local_api_base"
+
+    /** Load a user-set server address. Call first thing in Application.onCreate. */
+    fun init(context: android.content.Context) {
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .getString(KEY_LOCAL, null)?.let { LOCAL = it; activeApiBase = it }
+    }
+
+    /**
+     * Accepts "192.168.1.50", "192.168.1.50:8252", "http://host:port" or a full
+     * ".../api" URL and stores it as "http(s)://host:port/api". Returns the
+     * normalized base, or null if the input isn't a usable address.
+     */
+    fun setLocal(context: android.content.Context, input: String): String? {
+        val normalized = normalize(input) ?: return null
+        context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+            .edit().putString(KEY_LOCAL, normalized).apply()
+        LOCAL = normalized
+        activate(normalized)
+        return normalized
+    }
+
+    fun normalize(input: String): String? {
+        var s = input.trim()
+        val rest = s.removePrefix("http://").removePrefix("https://").trim('/')
+        if (rest.isEmpty() || rest.startsWith(":")) return null
+        s = s.trimEnd('/')
+        if (!s.startsWith("http://") && !s.startsWith("https://")) s = "http://$s"
+        val url = runCatching { s.toHttpUrl() }.getOrNull() ?: return null
+        val hasPort = Regex("^https?://[^/]+:\\d+").containsMatchIn(s)
+        val port = if (hasPort) url.port else if (url.scheme == "https") 443 else 8252
+        val defaultPort = (url.scheme == "http" && port == 80) || (url.scheme == "https" && port == 443)
+        return "${url.scheme}://${url.host}${if (defaultPort) "" else ":$port"}/api"
+    }
 
     @Volatile
-    var activeApiBase: String = LOCAL
+    var activeApiBase: String = BuildConfig.BASE_URL.removeSuffix("/")
         private set
 
     fun activate(base: String) {

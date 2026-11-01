@@ -75,6 +75,9 @@ abstract class FeedViewModel(private val cache: FeedCache) : ViewModel() {
 
     protected abstract suspend fun build(): Feed
 
+    /** Most recent loader failure, shown on the error screen so problems are diagnosable. */
+    protected open val lastError: Throwable? get() = null
+
     protected fun start() {
         if (started) return
         started = true
@@ -98,8 +101,7 @@ abstract class FeedViewModel(private val cache: FeedCache) : ViewModel() {
                 }
                 _state.value.feed.isEmpty -> _state.value = FeedState(
                     loading = false,
-                    error = result.exceptionOrNull()?.let { "Can't reach your HomeFlix server." }
-                        ?: "Nothing here yet."
+                    error = describeFailure(lastError ?: result.exceptionOrNull())
                 )
                 else -> _state.value = _state.value.copy(loading = false)
             }
@@ -108,10 +110,25 @@ abstract class FeedViewModel(private val cache: FeedCache) : ViewModel() {
     }
 }
 
+private fun describeFailure(e: Throwable?): String {
+    val server = com.homeflix.tv.util.ServerConfig.activeApiBase.removeSuffix("/api")
+    val why = when (e) {
+        null -> return "Nothing here yet."
+        is java.net.ConnectException, is java.net.NoRouteToHostException -> "connection refused or no route"
+        is java.net.SocketTimeoutException, is kotlinx.coroutines.TimeoutCancellationException -> "timed out"
+        is java.net.UnknownHostException -> "unknown host"
+        else -> e.message?.take(140) ?: e.javaClass.simpleName
+    }
+    return "Can't load from $server ($why)"
+}
+
 /** Shared loaders, each bounded so one slow endpoint can never stall a page. */
 internal class Loaders(private val repo: MediaRepository) {
-    suspend fun movies(limit: Int = 120): List<Media> =
-        withTimeoutOrNull(12_000) { repo.getMovies(limit = limit).first().getOrNull() }.orEmpty()
+    @Volatile var lastError: Throwable? = null
+
+    suspend fun movies(limit: Int = 120): List<Media> = runCatching {
+        kotlinx.coroutines.withTimeout(15_000) { repo.getMovies(limit = limit).first().getOrThrow() }
+    }.onFailure { lastError = it }.getOrNull().orEmpty()
 
     suspend fun trending(): List<Media> = runCatching {
         withTimeoutOrNull(6_000) { repo.getTrendingRecommendations(20).body()?.map { it.toDomain() } }
@@ -122,8 +139,8 @@ internal class Loaders(private val repo: MediaRepository) {
     }.getOrNull().orEmpty().sortedByDescending { it.lastWatchedAt.time }
 
     suspend fun series(): List<TvSeries> = runCatching {
-        withTimeoutOrNull(12_000) { repo.getTvSeries() }
-    }.getOrNull().orEmpty()
+        kotlinx.coroutines.withTimeout(15_000) { repo.getTvSeries() }
+    }.onFailure { lastError = it }.getOrNull().orEmpty()
 
     suspend fun myList(): List<Media> = runCatching {
         withTimeoutOrNull(6_000) { repo.getMyList().getOrNull() }
@@ -205,6 +222,7 @@ class HomeFeedViewModel @Inject constructor(
 ) : FeedViewModel(cache) {
     override val cacheName = "home"
     private val load = Loaders(repo)
+    override val lastError: Throwable? get() = load.lastError
 
     init { start() }
 
@@ -244,6 +262,7 @@ class ShowsFeedViewModel @Inject constructor(
 ) : FeedViewModel(cache) {
     override val cacheName = "shows"
     private val load = Loaders(repo)
+    override val lastError: Throwable? get() = load.lastError
 
     init { start() }
 
@@ -274,6 +293,7 @@ class MoviesFeedViewModel @Inject constructor(
 ) : FeedViewModel(cache) {
     override val cacheName = "movies"
     private val load = Loaders(repo)
+    override val lastError: Throwable? get() = load.lastError
 
     init { start() }
 
@@ -305,6 +325,7 @@ class MyHomeFlixViewModel @Inject constructor(
 ) : FeedViewModel(cache) {
     override val cacheName = "mine"
     private val load = Loaders(repo)
+    override val lastError: Throwable? get() = load.lastError
 
     private val _notifications = MutableStateFlow<List<Notification>>(emptyList())
     val notifications: StateFlow<List<Notification>> = _notifications.asStateFlow()
