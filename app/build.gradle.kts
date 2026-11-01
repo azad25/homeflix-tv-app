@@ -16,8 +16,8 @@ android {
         applicationId = "com.homeflix.tv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 15
-        versionName = "5.9.1"
+        versionCode = 16
+        versionName = "5.9.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

@@ -98,7 +98,7 @@ class AppUpdater @Inject constructor(
         if (loopJob != null) return
         cleanUpInstalled()
         loopJob = scope.launch {
-            delay(20_000) // let the UI and first feeds load first
+            delay(8_000) // let the UI and first feeds load first
             while (isActive) {
                 check()
                 delay(6 * 60 * 60 * 1000L)
@@ -106,9 +106,13 @@ class AppUpdater @Inject constructor(
         }
     }
 
-    /** App came to the foreground: re-check if the last check is over an hour old. */
+    /**
+     * App came to the foreground. Android TV keeps the process alive for days,
+     * so "launch" rarely means a fresh start: re-check whenever the last check
+     * is more than a few minutes old.
+     */
     fun onForeground() {
-        if (SystemClock.elapsedRealtime() - lastCheck > 60 * 60 * 1000L && lastCheck != 0L) checkNow()
+        if (lastCheck != 0L && SystemClock.elapsedRealtime() - lastCheck > 5 * 60 * 1000L) checkNow()
     }
 
     /** Server push or the Settings button. */
