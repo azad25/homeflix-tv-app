@@ -247,10 +247,17 @@ internal object Rows {
                 (if (!MediaFormat.description(m).isNullOrBlank()) 1 else 0)
         }
 
-    fun continueWatching(items: List<RecentlyWatchedItem>, filter: (RecentlyWatchedItem) -> Boolean = { true }): ContentRow? {
+    fun continueWatching(
+        items: List<RecentlyWatchedItem>,
+        series: List<TvSeries> = emptyList(),
+        filter: (RecentlyWatchedItem) -> Boolean = { true }
+    ): ContentRow? {
+        val byId = series.associateBy { it.id }
+        // Newest first; one card per show (its latest episode), one per movie.
         val tiles = items.filter(filter)
+            .sortedByDescending { it.lastWatchedAt.time }
             .distinctBy { it.media.seriesId?.takeIf { s -> s > 0 }?.let { s -> "s$s" } ?: "m${it.mediaId}" }
-            .mapNotNull { Tiles.continueWatching(it) }
+            .mapNotNull { Tiles.continueWatching(it, byId) }
             .take(15)
         return if (tiles.isEmpty()) null else ContentRow("continue", "Continue Watching", tiles, RowStyle.LANDSCAPE)
     }
@@ -284,7 +291,7 @@ class HomeFeedViewModel @Inject constructor(
         val latest = Rows.byDate(movies)
         val heroes = Rows.heroMix(latest.take(12), recsD.await().filter { it.type == MediaType.MOVIE })
         val rows = buildList {
-            Rows.continueWatching(recentD.await())?.let(::add)
+            Rows.continueWatching(recentD.await(), series)?.let(::add)
             Rows.top10(movies).takeIf { it.size >= 5 }?.let { top ->
                 add(ContentRow("top10", "Top 10 Movies on HomeFlix Today",
                     top.mapIndexed { i, m -> Tiles.movie(m, "t", rank = i + 1) }, RowStyle.TOP10))
@@ -321,7 +328,7 @@ class ShowsFeedViewModel @Inject constructor(
         if (series.isEmpty()) error("no series")
         val latest = series.sortedByDescending { it.createdAt }
         val rows = buildList {
-            Rows.continueWatching(recentD.await(), Rows::isEpisode)?.let(::add)
+            Rows.continueWatching(recentD.await(), series, Rows::isEpisode)?.let(::add)
             add(ContentRow("shows-new", "New Episodes & Shows", latest.take(20).map { Tiles.series(it, "sn") }))
             series.filter { it.rating > 0 }.sortedByDescending { it.rating }.take(20).takeIf { it.size >= 5 }?.let {
                 add(ContentRow("shows-top", "Top Rated Shows", it.map { s -> Tiles.series(s, "st") }))

@@ -79,6 +79,7 @@ data class Media(
     val seriesId: Int? = null,
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
+    val episodeTitle: String? = null,
     val seasonNumberLegacy: Int? = null, // For backward compatibility
     val episode: Int? = null, // For backward compatibility
     

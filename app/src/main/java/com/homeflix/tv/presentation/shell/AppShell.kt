@@ -141,6 +141,7 @@ fun AppShell(
                 onToggleMenu = { menuOpen = !menuOpen }
             )
             if (!menuOpen && updater != null) UpdatePrompt(updater)
+            CrashNotice()
             if (menuOpen) {
                 ProfileMenu(
                     onDismiss = { menuOpen = false; shell.focusNav() },

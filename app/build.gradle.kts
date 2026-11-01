@@ -16,8 +16,8 @@ android {
         applicationId = "com.homeflix.tv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 11
-        versionName = "5.6"
+        versionCode = 12
+        versionName = "5.7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -41,12 +41,11 @@ android {
         }
         release {
             signingConfig = signingConfigs.getByName("sideload")
-            // R8 in a conservative mode: optimizes Compose/Media3/Coil library
-            // code (noticeably smoother scrolling) but never renames anything and
-            // keeps every app class whole, so Gson/Retrofit reflection is
-            // unaffected (see proguard-rules.pro). Build with -PnoR8 to compare.
-            isMinifyEnabled = !project.hasProperty("noR8")
-            isShrinkResources = !project.hasProperty("noR8")
+            // R8 is opt-in (-PwithR8) until a minified build is verified on a TV:
+            // crashes were reported right after 5.6 enabled it, while the same
+            // code without R8 passes the end-to-end run against a real backend.
+            isMinifyEnabled = project.hasProperty("withR8")
+            isShrinkResources = project.hasProperty("withR8")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -64,7 +63,11 @@ android {
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
-        unitTests.all { it.maxHeapSize = "2g" }
+        unitTests.all {
+            it.maxHeapSize = "2g"
+            // End-to-end smoke test against a real backend: -Phomeflix.e2e.server=host:port
+            project.findProperty("homeflix.e2e.server")?.let { v -> it.systemProperty("homeflix.e2e.server", v) }
+        }
     }
     buildFeatures {
         compose = true

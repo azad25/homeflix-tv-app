@@ -218,6 +218,7 @@ fun MediaDto.toDomain(): Media {
         seriesId = seriesId,
         seasonNumber = seasonNumber,
         episodeNumber = episodeNumber,
+        episodeTitle = episodeTitle,
         seasonNumberLegacy = seasonNumberLegacy,
         episode = episode,
 

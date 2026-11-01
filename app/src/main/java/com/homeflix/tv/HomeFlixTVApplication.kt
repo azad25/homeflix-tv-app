@@ -29,6 +29,7 @@ class HomeFlixTVApplication : Application(), ImageLoaderFactory {
     
     override fun onCreate() {
         super.onCreate()
+        com.homeflix.tv.core.CrashReporter.install(this)
 
         // Initialize image cache on app startup
         com.homeflix.tv.util.ImageCache.getImageLoader(this)

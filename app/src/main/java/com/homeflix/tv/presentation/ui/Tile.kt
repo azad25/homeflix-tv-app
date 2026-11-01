@@ -104,29 +104,39 @@ object Tiles {
     )
 
     /**
-     * Continue-watching entry. For episodes the backend replaces `media` with
-     * the series' values, so the episode to resume is the top-level [RecentlyWatchedItem.mediaId].
+     * Continue-watching entry. For episodes the backend replaces `media` with the
+     * series' values (id = series id, title = "Show S01E02"); the episode to resume
+     * is the top-level [RecentlyWatchedItem.mediaId]. Episode cards show the
+     * series' artwork and name with "S1:E2 · Episode title · 30m left".
      */
-    fun continueWatching(item: RecentlyWatchedItem): Tile? {
+    fun continueWatching(item: RecentlyWatchedItem, seriesById: Map<Int, TvSeries> = emptyMap()): Tile? {
         val media = item.media
         if (item.durationSeconds <= 0) return null
         val progress = (item.progressSeconds.toFloat() / item.durationSeconds).coerceIn(0f, 1f)
         if (progress >= 0.95f) return null
+        val left = remaining(item.durationSeconds - item.progressSeconds)
         val seriesId = media.seriesId?.takeIf { it > 0 }
         val isEpisode = seriesId != null || media.type != MediaType.MOVIE
         return if (isEpisode && seriesId != null) {
+            val series = seriesById[seriesId]
+            val name = series?.title ?: media.title
+                .replace(Regex("""\s+S\d+E\d+$""", RegexOption.IGNORE_CASE), "")
+                .substringBefore(" - ")
+                .ifBlank { media.title }
+            val code = MediaFormat.episodeLabel(media.seasonNumber, media.episodeNumber, null)
+            val epTitle = media.episodeTitle?.takeIf { it.isNotBlank() }
             Tile(
                 key = "cw${item.mediaId}",
                 kind = TileKind.EPISODE,
                 id = item.mediaId,
                 seriesId = seriesId,
-                title = media.title,
-                posterUrl = "${ApiUtils.getBaseUrl()}/series/$seriesId/poster",
-                backdropUrl = ApiUtils.getEpisodeStillUrl(item.mediaId),
+                title = name,
+                posterUrl = series?.let { ApiUtils.getSeriesPosterUrl(it) } ?: "${ApiUtils.getBaseUrl()}/series/$seriesId/poster",
+                backdropUrl = series?.let { ApiUtils.getSeriesBackdropUrl(it) } ?: "${ApiUtils.getBaseUrl()}/series/$seriesId/backdrop",
                 logoUrl = ApiUtils.getSeriesLogoUrl(seriesId),
-                meta = MediaFormat.episodeLabel(media.seasonNumber, media.episodeNumber, null),
+                meta = listOfNotNull(code.ifBlank { null }, epTitle).joinToString("  •  "),
                 description = MediaFormat.description(media),
-                subtitle = MediaFormat.episodeLabel(media.seasonNumber, media.episodeNumber, null).ifBlank { null },
+                subtitle = listOfNotNull(code.ifBlank { null }, epTitle, left).joinToString("  ·  ").ifBlank { null },
                 progress = progress,
                 resumeMs = item.progressSeconds * 1000
             )
@@ -137,7 +147,7 @@ object Tiles {
                 progress = progress,
                 resumeMs = item.progressSeconds * 1000,
                 badge = null,
-                subtitle = remaining(item.durationSeconds - item.progressSeconds)
+                subtitle = left
             )
         }
     }
