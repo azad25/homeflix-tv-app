@@ -23,7 +23,7 @@ object Tv {
     val TileHeight = 196.dp
     val TileGap = 10.dp
     val TileCorner = 6.dp
-    val NavHeight = 64.dp
+    val NavHeight = 52.dp
 
     /** Netflix-like "emphasized" ease-out used for every focus motion. */
     val Ease = CubicBezierEasing(0.2f, 0f, 0f, 1f)

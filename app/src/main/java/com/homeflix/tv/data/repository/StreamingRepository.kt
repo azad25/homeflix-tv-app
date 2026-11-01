@@ -29,6 +29,10 @@ class StreamingRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to get stream URL: ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -47,6 +51,10 @@ class StreamingRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to get preview clip: ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -61,6 +69,10 @@ class StreamingRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to get subtitle tracks: ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -75,6 +87,10 @@ class StreamingRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to get audio tracks: ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -93,6 +109,10 @@ class StreamingRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to get subtitle file: ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -106,6 +126,10 @@ class StreamingRepository @Inject constructor(
                 Result.failure(Exception("Failed to track view: ${response.message()}"))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Result.failure(e)
         }
     }

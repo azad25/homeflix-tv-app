@@ -80,9 +80,9 @@ fun FeedPage(
     }
 
     // ▼ from the top nav enters this page at its billboard (or first tile).
-    LaunchedEffect(state.feed.hero != null, state.feed.rows.firstOrNull()?.id) {
+    LaunchedEffect(state.feed.heroList.isNotEmpty(), state.feed.rows.firstOrNull()?.id) {
         shell.pageEntry = when {
-            state.feed.hero != null -> heroPlay
+            state.feed.heroList.isNotEmpty() -> heroPlay
             else -> state.feed.rows.firstOrNull()?.let { r -> r.tiles.firstOrNull()?.let { registry.requesterFor("${r.id}|${it.key}") } }
         }
     }
@@ -97,7 +97,7 @@ fun FeedPage(
         shell.enterAtTop = false
         if (atTop && listState.firstVisibleItemIndex > 0) listState.scrollToItem(0)
         val restored = (!atTop && registry.tryFocus(savedFocus)) ||
-            (state.feed.hero != null && runCatching { heroPlay.requestFocus(); true }.getOrDefault(false)) ||
+            (state.feed.heroList.isNotEmpty() && runCatching { heroPlay.requestFocus(); true }.getOrDefault(false)) ||
             registry.tryFocus(state.feed.rows.firstOrNull()?.let { r -> r.tiles.firstOrNull()?.let { "${r.id}|${it.key}" } })
         if (!restored) shell.focusNav()
         shell.restoreFocusPending = false

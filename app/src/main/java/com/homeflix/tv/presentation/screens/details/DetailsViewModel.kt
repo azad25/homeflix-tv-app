@@ -44,7 +44,9 @@ class DetailsViewModel @Inject constructor(
         if (loadedId == id) { refreshProgress(); return }
         loadedId = id
         viewModelScope.launch {
-            val media = withTimeoutOrNull(10_000) { repo.getMediaById(id.toString()).first().getOrNull() }
+            val media = runCatching {
+                withTimeoutOrNull(10_000) { repo.getMediaById(id.toString()).first().getOrNull() }
+            }.getOrNull()
             if (media == null) {
                 _state.value = DetailsState(loading = false, error = "Couldn't load this title.")
                 return@launch
@@ -52,7 +54,7 @@ class DetailsViewModel @Inject constructor(
             _state.update { it.copy(loading = false, media = media) }
             refreshProgress()
             val inList = async { runCatching { repo.checkMyList(id.toString()).getOrNull() }.getOrNull() }
-            val similar = async { loadSimilar(media) }
+            val similar = async { runCatching { loadSimilar(media) }.getOrNull() }
             _state.update { it.copy(inMyList = inList.await(), similar = similar.await()) }
         }
     }

@@ -45,18 +45,33 @@ class SearchViewModel @Inject constructor(
     private var series: List<TvSeries> = emptyList()
     private var job: Job? = null
 
+    /** A failed load must degrade to "no results", never crash the app. */
+    private val guard = kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+        android.util.Log.w("SearchVM", "search load failed", e)
+        _state.update { it.copy(loading = false) }
+    }
+
+    private suspend fun <T> safe(timeoutMs: Long, block: suspend () -> T?): T? = try {
+        withTimeoutOrNull(timeoutMs) { block() }
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        android.util.Log.w("SearchVM", "load failed: ${e.message}")
+        null
+    }
+
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(guard) {
             val trending = async {
-                runCatching { withTimeoutOrNull(6_000) { repo.getTrendingRecommendations(30).body() } }.getOrNull()
-                    ?.map { it.toDomain() }.orEmpty()
+                safe(6_000) { repo.getTrendingRecommendations(30).body()?.map { it.toDomain() } }.orEmpty()
             }
-            val latest = async { withTimeoutOrNull(8_000) { repo.getMovies(limit = 40).first().getOrNull() }.orEmpty() }
-            val shows = async { runCatching { withTimeoutOrNull(10_000) { repo.getTvSeries() } }.getOrNull().orEmpty() }
-            series = shows.await()
+            val latest = async { safe(8_000) { repo.getMovies(limit = 40).first().getOrNull() }.orEmpty() }
+            val shows = async { safe(10_000) { repo.getTvSeries() }.orEmpty() }
+            series = shows.await().distinctBy { it.id }
             val movies = (trending.await() + latest.await().sortedByDescending { it.createdAt?.time ?: 0 })
                 .distinctBy { it.id }.take(24)
             recommendations = (movies.map { Tiles.movie(it, "r") } + series.take(8).map { Tiles.series(it, "rs") })
+                .distinctBy { it.key }
             if (_state.value.query.isBlank() && _state.value.genre == null) {
                 _state.update { it.copy(results = recommendations, loading = false) }
             }
@@ -74,10 +89,10 @@ class SearchViewModel @Inject constructor(
             _state.update { it.copy(title = "Your Search Recommendations", results = recommendations, loading = false) }
             return
         }
-        job = viewModelScope.launch {
+        job = viewModelScope.launch(guard) {
             delay(300) // debounce typing
             _state.update { it.copy(loading = true) }
-            val movies = withTimeoutOrNull(8_000) { repo.searchMedia(q, 40).first().getOrNull() }.orEmpty()
+            val movies = safe(8_000) { repo.searchMedia(q, 40).first().getOrNull() }.orEmpty()
             val shows = series.filter { it.title.contains(q, ignoreCase = true) }
             val tiles = shows.map { Tiles.series(it, "qs") } +
                 movies.distinctBy { it.seriesId ?: -it.id }.map { m ->
@@ -98,11 +113,13 @@ class SearchViewModel @Inject constructor(
     fun selectGenre(genre: String) {
         job?.cancel()
         _state.update { it.copy(genre = genre, query = "", loading = true, title = genre) }
-        job = viewModelScope.launch {
-            val movies = withTimeoutOrNull(8_000) { repo.getMediaByGenre(genre, 40, 0).first().getOrNull() }.orEmpty()
+        job = viewModelScope.launch(guard) {
+            val movies = safe(8_000) { repo.getMediaByGenre(genre, 40, 0).first().getOrNull() }.orEmpty()
             val shows = series.filter { s -> s.genres.any { it.contains(genre, ignoreCase = true) } }
+            // The server can list a title twice; duplicate keys crash a lazy grid.
+            val tiles = (movies.map { m -> Tiles.movie(m, "g") } + shows.map { s -> Tiles.series(s, "gs") }).distinctBy { it.key }
             _state.update {
-                it.copy(results = movies.map { m -> Tiles.movie(m, "g") } + shows.map { s -> Tiles.series(s, "gs") }, loading = false)
+                it.copy(results = tiles, title = if (tiles.isEmpty()) "Nothing in $genre yet" else genre, loading = false)
             }
         }
     }

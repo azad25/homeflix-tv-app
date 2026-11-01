@@ -199,9 +199,9 @@ private fun TopNav(shell: ShellController, menuOpen: Boolean, onToggleMenu: () -
                 .focusProperties { enter = { requesters.getValue(shell.selected) } }
                 .focusGroup()
         ) {
-            Text("HOMEFLIX", color = Tv.Red, fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+            Text("HOMEFLIX", color = Tv.Red, fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
             Spacer(Modifier.weight(1f))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                 ShellTab.entries.forEach { tab ->
                     NavItem(
                         tab = tab,
@@ -261,12 +261,12 @@ private fun NavItem(
             .clip(RoundedCornerShape(50))
             .background(bg)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 7.dp)
+            .padding(horizontal = 12.dp, vertical = 5.dp)
     ) {
         if (tab == ShellTab.SEARCH) {
-            Icon(Icons.Filled.Search, contentDescription = "Search", tint = fg, modifier = Modifier.size(22.dp))
+            Icon(Icons.Filled.Search, contentDescription = "Search", tint = fg, modifier = Modifier.size(18.dp))
         } else {
-            Text(tab.label, color = fg, fontSize = 17.sp, fontWeight = if (selected || focused) FontWeight.SemiBold else FontWeight.Medium)
+            Text(tab.label, color = fg, fontSize = 14.sp, fontWeight = if (selected || focused) FontWeight.SemiBold else FontWeight.Normal)
         }
     }
 }
@@ -277,14 +277,14 @@ private fun NavIconButton(icon: ImageVector, description: String, canFocus: Bool
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(38.dp)
+            .size(28.dp)
             .focusProperties { this.canFocus = canFocus }
             .onFocusChanged { focused = it.isFocused }
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(4.dp))
             .background(if (focused) Color.White else Color(0xFF3A6FD8))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
     ) {
-        Icon(icon, contentDescription = description, tint = if (focused) Color.Black else Color.White, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = description, tint = if (focused) Color.Black else Color.White, modifier = Modifier.size(18.dp))
     }
 }
 

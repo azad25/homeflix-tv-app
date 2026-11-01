@@ -180,7 +180,8 @@ fun SearchContent(
                 contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp, end = 4.dp, start = 4.dp),
                 modifier = Modifier.fillMaxSize().focusRestorer()
             ) {
-                items(state.results, key = { it.key }) { tile -> ResultTile(tile) { actions.open(tile) } }
+                val results = state.results.distinctBy { it.key }
+                items(results, key = { it.key }) { tile -> ResultTile(tile) { actions.open(tile) } }
             }
         }
     }

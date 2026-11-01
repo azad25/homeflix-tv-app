@@ -77,13 +77,13 @@ fun DetailHeader(
             TitleLogo(
                 logoUrl = logoUrl,
                 title = title,
-                maxWidth = 400.dp,
-                maxHeight = 140.dp,
-                textStyle = TextStyle(color = Color.White, fontSize = 46.sp, fontWeight = FontWeight.Black,
-                    lineHeight = 48.sp, shadow = Shadow(Color.Black, blurRadius = 12f))
+                maxWidth = 340.dp,
+                maxHeight = 110.dp,
+                textStyle = TextStyle(color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black,
+                    lineHeight = 38.sp, shadow = Shadow(Color.Black, blurRadius = 12f))
             )
             if (meta.isNotBlank()) {
-                Text(meta, color = Tv.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                Text(meta, color = Tv.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                     maxLines = 1, modifier = Modifier.padding(top = 14.dp))
             }
             if (progress != null && progress > 0f) {
@@ -95,7 +95,7 @@ fun DetailHeader(
                 }
             }
             description?.let {
-                Text(it, color = Tv.TextSecondary, fontSize = 16.sp, lineHeight = 22.sp, maxLines = 3,
+                Text(it, color = Tv.TextSecondary, fontSize = 14.sp, lineHeight = 19.sp, maxLines = 3,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
             }
             credits.forEach {

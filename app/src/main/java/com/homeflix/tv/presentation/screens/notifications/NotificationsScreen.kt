@@ -91,7 +91,7 @@ private fun NotificationList(items: List<Notification>, navigator: AppNavigator)
                 contentPadding = PaddingValues(top = 18.dp, bottom = 80.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                itemsIndexed(items, key = { _, n -> n.id }) { i, n ->
+                itemsIndexed(items.distinctBy { it.id }, key = { _, n -> n.id }) { i, n ->
                     NotificationRow(
                         n = n,
                         modifier = if (i == 0) Modifier.focusRequester(first) else Modifier,

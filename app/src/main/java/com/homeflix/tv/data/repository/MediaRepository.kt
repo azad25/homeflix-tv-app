@@ -31,6 +31,10 @@ class MediaRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to fetch media: ${response.code()} ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getAllMedia error", e)
             emit(Result.failure(e))
         }
@@ -48,6 +52,10 @@ class MediaRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to fetch movies: ${response.code()} ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getMovies error", e)
             emit(Result.failure(e))
         }
@@ -65,6 +73,10 @@ class MediaRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to fetch TV shows: ${response.code()} ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getTVShows error", e)
             emit(Result.failure(e))
         }
@@ -84,6 +96,10 @@ class MediaRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to fetch media: ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -102,6 +118,10 @@ class MediaRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to fetch media by genre: ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -120,6 +140,10 @@ class MediaRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to search media: ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -138,6 +162,10 @@ class MediaRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to fetch genres: ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -170,6 +198,10 @@ class MediaRepository @Inject constructor(
                 Result.failure(Exception("Failed to get playback progress: ${response.code()}"))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.w("MediaRepository", "Error fetching playback progress for $mediaId", e)
             Result.success(null) // Fallback to no progress
         }
@@ -211,6 +243,10 @@ class MediaRepository @Inject constructor(
                 emit(Result.failure(Exception("Failed to fetch recently watched: ${response.code()} ${response.message()}")))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getRecentlyWatchedWithProgress error: ${e.message}", e)
             emit(Result.failure(e))
         }
@@ -239,6 +275,10 @@ class MediaRepository @Inject constructor(
                 Result.failure(Exception("Failed to update playback progress: ${response.code()} ${response.message()}"))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "updatePlaybackProgress error", e)
             Result.failure(e)
         }
@@ -250,6 +290,10 @@ class MediaRepository @Inject constructor(
             // For now, return empty list as this is a movie-focused app
             emit(Result.success(emptyList()))
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             emit(Result.failure(e))
         }
     }
@@ -334,6 +378,10 @@ class MediaRepository @Inject constructor(
             Log.w("MediaRepository", "No TV series data available")
             emptyList()
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getTvSeries error", e)
             emptyList()
         }
@@ -372,6 +420,10 @@ class MediaRepository @Inject constructor(
                 )
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getTvSeriesById error", e)
             com.homeflix.tv.presentation.screens.tvshows.TvSeries(
                 id = seriesId,
@@ -417,6 +469,10 @@ class MediaRepository @Inject constructor(
                 }
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getTvSeriesSeasons error", e)
             emptyList()
         }
@@ -447,6 +503,10 @@ class MediaRepository @Inject constructor(
                 )
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getTvSeriesSeason error", e)
             com.homeflix.tv.presentation.screens.tvshows.Season(
                 id = seasonNumber,
@@ -492,6 +552,10 @@ class MediaRepository @Inject constructor(
                 }
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getTvSeriesEpisodes error", e)
             emptyList()
         }
@@ -508,6 +572,10 @@ class MediaRepository @Inject constructor(
                 emptyList()
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getNotifications error", e)
             emptyList()
         }
@@ -526,6 +594,10 @@ class MediaRepository @Inject constructor(
                 Result.failure(Exception("Failed to fetch my list: ${response.code()}"))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "getMyList error", e)
             Result.failure(e)
         }
@@ -542,6 +614,10 @@ class MediaRepository @Inject constructor(
                 Result.failure(Exception("Failed to check my list: ${response.code()}"))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "checkMyList error", e)
             Result.failure(e)
         }
@@ -558,6 +634,10 @@ class MediaRepository @Inject constructor(
                 Result.failure(Exception("Failed to add to my list: ${response.code()}"))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "addToMyList error", e)
             Result.failure(e)
         }
@@ -574,6 +654,10 @@ class MediaRepository @Inject constructor(
                 Result.failure(Exception("Failed to remove from my list: ${response.code()}"))
             }
         } catch (e: Exception) {
+            // Never swallow cancellation: Flow.first()/take() stop a flow by throwing
+            // AbortFlowException from emit(); catching it and emitting again crashes
+            // with "Flow exception transparency is violated".
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("MediaRepository", "removeFromMyList error", e)
             Result.failure(e)
         }

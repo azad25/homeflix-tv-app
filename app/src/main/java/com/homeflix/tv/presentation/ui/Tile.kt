@@ -48,9 +48,13 @@ data class ContentRow(
 @Immutable
 data class Feed(
     val hero: Tile? = null,
-    val rows: List<ContentRow> = emptyList()
+    val rows: List<ContentRow> = emptyList(),
+    /** Rotating billboard. Nullable so feeds cached by older versions still load. */
+    val heroes: List<Tile>? = null
 ) {
-    val isEmpty: Boolean get() = hero == null && rows.isEmpty()
+    /** Billboard titles in rotation order (falls back to the single [hero]). */
+    val heroList: List<Tile> get() = heroes?.filterNotNull()?.takeIf { it.isNotEmpty() } ?: listOfNotNull(hero)
+    val isEmpty: Boolean get() = heroList.isEmpty() && rows.isEmpty()
 }
 
 object Tiles {

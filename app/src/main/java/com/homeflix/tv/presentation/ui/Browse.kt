@@ -1,6 +1,8 @@
 package com.homeflix.tv.presentation.ui
 
 import androidx.compose.animation.AnimatedContent
+import kotlinx.coroutines.flow.first
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -100,17 +102,17 @@ fun PillButton(
     val fg = if (focused) Color.Black else Color.White
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .clip(RoundedCornerShape(50))
             .background(bg)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(horizontal = if (compact) 16.dp else 22.dp, vertical = if (compact) 8.dp else 10.dp)
+            .padding(horizontal = if (compact) 14.dp else 16.dp, vertical = if (compact) 6.dp else 7.dp)
     ) {
-        if (icon != null) Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(if (compact) 18.dp else 22.dp))
-        Text(text, color = fg, fontSize = if (compact) 14.sp else 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        if (icon != null) Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(if (compact) 16.dp else 18.dp))
+        Text(text, color = fg, fontSize = if (compact) 13.sp else 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -204,7 +206,7 @@ fun BrowseTile(
                 title = tile.title,
                 maxWidth = landscapeWidth(h) * 0.5f,
                 maxHeight = h * 0.32f,
-                textStyle = TextStyle(color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                textStyle = TextStyle(color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold,
                     shadow = Shadow(Color.Black, blurRadius = 8f)),
                 modifier = Modifier.align(Alignment.BottomStart).padding(12.dp)
             )
@@ -290,13 +292,15 @@ fun TileRow(
     val preview = LocalPreviewPlayer.current
     val previewsEnabled = preview?.tilePreviewsEnabled ?: false
 
+    // The server can list a title twice; duplicate keys crash a lazy row.
+    val tiles = remember(row.tiles) { row.tiles.distinctBy { it.key } }
     Column(modifier.fillMaxWidth().padding(top = topPadding)) {
         Text(
             row.title,
             color = if (active) Tv.TextPrimary else Tv.TextSecondary,
-            fontSize = 20.sp,
+            fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = Tv.Keyline, bottom = 10.dp)
+            modifier = Modifier.padding(start = Tv.Keyline, bottom = 8.dp)
         )
         ManualFocusScroll {
             LazyRow(
@@ -311,9 +315,9 @@ fun TileRow(
                     // previous row's (possibly expanded) tile.
                     .focusProperties {
                         enter = {
-                            val idx = focusedIndex.coerceIn(0, (row.tiles.size - 1).coerceAtLeast(0))
+                            val idx = focusedIndex.coerceIn(0, (tiles.size - 1).coerceAtLeast(0))
                             val composed = state.layoutInfo.visibleItemsInfo.any { it.index == idx }
-                            val tile = row.tiles.getOrNull(idx)
+                            val tile = tiles.getOrNull(idx)
                             if (composed && tile != null) registry.requesterFor("${row.id}|${tile.key}")
                             else FocusRequester.Default
                         }
@@ -321,7 +325,7 @@ fun TileRow(
                     .focusGroup()
                     .throttleKeyRepeat()
             ) {
-                itemsIndexed(row.tiles, key = { _, t -> t.key }, contentType = { _, _ -> row.style }) { index, tile ->
+                itemsIndexed(tiles, key = { _, t -> t.key }, contentType = { _, _ -> row.style }) { index, tile ->
                     val focusKey = "${row.id}|${tile.key}"
                     BrowseTile(
                         tile = tile,
@@ -338,14 +342,14 @@ fun TileRow(
                             val w = with(density) { landscapeWidth(h).roundToPx() }
                             val hp = with(density) { h.roundToPx() }
                             for (n in listOf(index + 1, index - 1, index + 2)) {
-                                row.tiles.getOrNull(n)?.let { t ->
+                                tiles.getOrNull(n)?.let { t ->
                                     context.imageLoader.enqueue(ImageRequest.Builder(context).data(t.backdropUrl).size(w, hp).build())
                                 }
                             }
                             if (previewsEnabled) {
                                 preview?.prefetch(listOfNotNull(
-                                    row.tiles.getOrNull(index + 1)?.previewUrl,
-                                    row.tiles.getOrNull(index - 1)?.previewUrl
+                                    tiles.getOrNull(index + 1)?.previewUrl,
+                                    tiles.getOrNull(index - 1)?.previewUrl
                                 ))
                             }
                         },
@@ -358,7 +362,7 @@ fun TileRow(
             }
         }
         Box(Modifier.fillMaxWidth().height(InfoBlockHeight).padding(start = Tv.Keyline, top = 10.dp)) {
-            val tile = if (active) row.tiles.getOrNull(focusedIndex) else null
+            val tile = if (active) tiles.getOrNull(focusedIndex) else null
             AnimatedContent(
                 targetState = tile,
                 transitionSpec = { fadeIn(tween(200, delayMillis = 60)) togetherWith fadeOut(tween(90)) },
@@ -377,11 +381,11 @@ private fun InfoBlock(tile: Tile) {
         val meta = listOfNotNull(tile.subtitle?.takeIf { tile.progress != null }, tile.meta.takeIf { it.isNotBlank() })
             .joinToString("  •  ")
         if (meta.isNotBlank()) {
-            Text(meta, color = Tv.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+            Text(meta, color = Tv.TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
                 overflow = TextOverflow.Ellipsis)
         }
         tile.description?.let {
-            Text(it, color = Tv.TextSecondary, fontSize = 14.sp, lineHeight = 19.sp, maxLines = 2,
+            Text(it, color = Tv.TextSecondary, fontSize = 13.sp, lineHeight = 18.sp, maxLines = 2,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
         }
     }
@@ -389,56 +393,102 @@ private fun InfoBlock(tile: Tile) {
 
 // ----------------------------------------------------------------------------------- hero
 
-/** Full-bleed billboard: backdrop → muted trailer, logo, meta, synopsis, Play / More Info. */
+/**
+ * Full-bleed billboard that rotates through [tiles] (newest + recommended).
+ * While the page is at the top the current title's trailer autoplays; when the
+ * clip ends (or after a short hold for titles without one) the next title
+ * crossfades in. The buttons never leave composition, so focus stays put.
+ */
 @UnstableApi
 @Composable
 fun HeroBillboard(
-    tile: Tile,
+    tiles: List<Tile>,
     active: Boolean,
     playRequester: FocusRequester,
-    onPlay: () -> Unit,
-    onMoreInfo: () -> Unit,
+    onPlay: (Tile) -> Unit,
+    onMoreInfo: (Tile) -> Unit,
     modifier: Modifier = Modifier,
-    playLabel: String = "Play"
+    playLabel: (Tile) -> String = { "Play" }
 ) {
+    if (tiles.isEmpty()) return
     val preview = LocalPreviewPlayer.current
     val epoch by (preview?.epoch ?: remember { kotlinx.coroutines.flow.MutableStateFlow(0) }).collectAsState()
+    var index by rememberSaveable { mutableIntStateOf(0) }
+    val tile = tiles[index.mod(tiles.size)]
     val heroKey = "hero:${tile.key}"
+
     LaunchedEffect(active, heroKey, epoch) {
         val p = preview ?: return@LaunchedEffect
-        if (active) p.request(heroKey, tile.previewUrl, revealDelayMs = 2_000, dwellMs = 700) else p.cancel(heroKey)
+        if (active) p.request(heroKey, tile.previewUrl, revealDelayMs = 1_800, dwellMs = 600) else p.cancel(heroKey)
     }
+    // Rotation: after the trailer finishes, or ~10 s for titles without one.
+    LaunchedEffect(active, heroKey, epoch, tiles.size) {
+        if (!active || tiles.size < 2) return@LaunchedEffect
+        val p = preview
+        val playing = if (p != null && tile.previewUrl != null) {
+            kotlinx.coroutines.withTimeoutOrNull(7_000) { p.visibleKey.first { it == heroKey } }
+        } else null
+        if (playing == null) {
+            delay(if (p != null && tile.previewUrl != null) 3_000 else 9_000)
+        } else {
+            kotlinx.coroutines.withTimeoutOrNull(60_000) { p!!.endedKey.first { it == heroKey } }
+            delay(1_200) // let the still settle back in before moving on
+        }
+        index = (index + 1).mod(tiles.size)
+    }
+
     val screenH = LocalConfiguration.current.screenHeightDp.dp
     Box(modifier.fillMaxWidth().height(screenH - 132.dp)) {
-        SizedImage(tile.backdropUrl, 960.dp, 540.dp, Modifier.fillMaxSize(), alignment = Alignment.TopCenter, crossfadeMs = 300)
+        Crossfade(targetState = tile, animationSpec = tween(600), label = "heroArt") { t ->
+            SizedImage(t.backdropUrl, 960.dp, 540.dp, Modifier.fillMaxSize(), alignment = Alignment.TopCenter, crossfadeMs = 0)
+        }
         PreviewVideo(heroKey, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().background(Tv.LeftScrim))
         Box(Modifier.fillMaxSize().background(Tv.HeroBottomScrim))
         Column(
             Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = Tv.Keyline, bottom = 20.dp)
-                .fillMaxWidth(0.5f)
+                .padding(start = Tv.Keyline, bottom = 18.dp)
+                .fillMaxWidth(0.46f)
         ) {
-            TitleLogo(
-                logoUrl = tile.logoUrl,
-                title = tile.title,
-                maxWidth = 380.dp,
-                maxHeight = 130.dp,
-                textStyle = TextStyle(color = Color.White, fontSize = 44.sp, fontWeight = FontWeight.Black,
-                    lineHeight = 46.sp, shadow = Shadow(Color.Black, blurRadius = 12f))
-            )
-            if (tile.meta.isNotBlank()) {
-                Text(tile.meta, color = Tv.TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = 1, modifier = Modifier.padding(top = 14.dp))
+            Crossfade(targetState = tile, animationSpec = tween(450), label = "heroText") { t ->
+                Column {
+                    TitleLogo(
+                        logoUrl = t.logoUrl,
+                        title = t.title,
+                        maxWidth = 340.dp,
+                        maxHeight = 110.dp,
+                        textStyle = TextStyle(color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Black,
+                            lineHeight = 38.sp, shadow = Shadow(Color.Black, blurRadius = 12f))
+                    )
+                    if (t.meta.isNotBlank()) {
+                        Text(t.meta, color = Tv.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            maxLines = 1, modifier = Modifier.padding(top = 12.dp))
+                    }
+                    Text(t.description.orEmpty(), color = Tv.TextSecondary, fontSize = 14.sp, lineHeight = 19.sp,
+                        maxLines = 3, minLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                }
             }
-            tile.description?.let {
-                Text(it, color = Tv.TextSecondary, fontSize = 15.sp, lineHeight = 21.sp, maxLines = 3,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 18.dp)) {
-                PillButton(playLabel, onPlay, icon = Icons.Filled.PlayArrow, focusRequester = playRequester)
-                PillButton("More Info", onMoreInfo, icon = Icons.Filled.Info)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 14.dp)
+            ) {
+                PillButton(playLabel(tile), { onPlay(tile) }, icon = Icons.Filled.PlayArrow, focusRequester = playRequester)
+                PillButton("More Info", { onMoreInfo(tile) }, icon = Icons.Filled.Info)
+                if (tiles.size > 1) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.padding(start = 14.dp)) {
+                        tiles.indices.forEach { i ->
+                            val on = i == index.mod(tiles.size)
+                            Box(
+                                Modifier
+                                    .size(width = if (on) 16.dp else 6.dp, height = 6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(if (on) Color.White else Color(0x66FFFFFF))
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -467,22 +517,23 @@ fun BrowseFeed(
     heroPlayLabel: (Tile) -> String = { "Play" }
 ) {
     val scope = rememberCoroutineScope()
-    val hasHero = feed.hero != null
+    val heroes = feed.heroList
+    val hasHero = heroes.isNotEmpty()
     ManualFocusScroll {
         LazyColumn(
             state = listState,
             modifier = modifier.fillMaxSize().background(Tv.Background),
             contentPadding = PaddingValues(bottom = 200.dp)
         ) {
-            feed.hero?.let { hero ->
+            if (hasHero) {
                 item(key = "hero", contentType = "hero") {
                     HeroBillboard(
-                        tile = hero,
+                        tiles = heroes,
                         active = activeSection == 0,
                         playRequester = heroPlayRequester,
-                        onPlay = { actions.play(hero) },
-                        onMoreInfo = { actions.open(hero) },
-                        playLabel = heroPlayLabel(hero),
+                        onPlay = { actions.play(it) },
+                        onMoreInfo = { actions.open(it) },
+                        playLabel = heroPlayLabel,
                         modifier = Modifier.onFocusChanged {
                             if (it.hasFocus) {
                                 onSectionFocused(0)
@@ -492,7 +543,7 @@ fun BrowseFeed(
                     )
                 }
             }
-            itemsIndexed(feed.rows, key = { _, r -> r.id }, contentType = { _, r -> r.style }) { i, row ->
+            itemsIndexed(feed.rows.distinctBy { it.id }, key = { _, r -> r.id }, contentType = { _, r -> r.style }) { i, row ->
                 val section = i + if (hasHero) 1 else 0
                 TileRow(
                     row = row,

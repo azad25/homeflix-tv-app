@@ -134,6 +134,13 @@ internal class Loaders(private val repo: MediaRepository) {
         withTimeoutOrNull(6_000) { repo.getTrendingRecommendations(20).body()?.map { it.toDomain() } }
     }.getOrNull().orEmpty()
 
+    suspend fun recommendations(): List<Media> = runCatching {
+        withTimeoutOrNull(6_000) {
+            (repo.getPersonalizedRecommendations(20).body()?.takeIf { it.isNotEmpty() } ?: repo.getMixedRecommendations(20).body())
+                ?.map { it.toDomain() }
+        }
+    }.getOrNull().orEmpty()
+
     suspend fun recentlyWatched(): List<RecentlyWatchedItem> = runCatching {
         withTimeoutOrNull(6_000) { repo.getRecentlyWatchedWithProgress().first().getOrNull() }
     }.getOrNull().orEmpty().sortedByDescending { it.lastWatchedAt.time }
@@ -193,6 +200,25 @@ internal object Rows {
         .sortedWith(compareByDescending<Media> { it.viewCount }.thenByDescending { it.rating }.thenBy { it.id })
         .take(10)
 
+    /**
+     * Billboard rotation: alternate newest additions with recommendations,
+     * titles that have a trailer clip first, no duplicates.
+     */
+    fun heroMix(latest: List<Media>, recommended: List<Media>, size: Int = 6): List<Media> {
+        fun hasClip(m: Media) = !m.previewClipPath.isNullOrBlank() || !m.previewPath.isNullOrBlank()
+        val a = latest.sortedByDescending { hasClip(it) }
+        val b = recommended.sortedByDescending { hasClip(it) }
+        val out = LinkedHashMap<Int, Media>()
+        var i = 0
+        while (out.size < size && (i < a.size || i < b.size)) {
+            a.getOrNull(i)?.let { out.putIfAbsent(it.id, it) }
+            if (out.size < size) b.getOrNull(i)?.let { out.putIfAbsent(it.id, it) }
+            i++
+        }
+        // Trailers first so the billboard starts moving right away.
+        return out.values.sortedByDescending { hasClip(it) }
+    }
+
     /** Prefer a title with a trailer, a logo and a backdrop for billboards. */
     fun heroPick(candidates: List<Media>): Media? =
         candidates.maxByOrNull { m ->
@@ -231,11 +257,12 @@ class HomeFeedViewModel @Inject constructor(
         val trendingD = async { load.trending() }
         val recentD = async { load.recentlyWatched() }
         val seriesD = async { load.series() }
+        val recsD = async { load.recommendations() }
         val movies = moviesD.await()
         val series = seriesD.await()
         if (movies.isEmpty() && series.isEmpty()) error("no content")
         val latest = Rows.byDate(movies)
-        val hero = Rows.heroPick(latest.take(10))
+        val heroes = Rows.heroMix(latest.take(12), recsD.await().filter { it.type == MediaType.MOVIE })
         val rows = buildList {
             Rows.continueWatching(recentD.await())?.let(::add)
             Rows.top10(movies).takeIf { it.size >= 5 }?.let { top ->
@@ -251,7 +278,8 @@ class HomeFeedViewModel @Inject constructor(
             }
             addAll(Rows.genreRows("h", latest))
         }
-        Feed(hero = hero?.let { Tiles.movie(it, "hero") }, rows = rows)
+        val heroTiles = heroes.map { Tiles.movie(it, "hero") }
+        Feed(hero = heroTiles.firstOrNull(), rows = rows, heroes = heroTiles)
     }
 }
 
@@ -281,8 +309,9 @@ class ShowsFeedViewModel @Inject constructor(
             addAll(Rows.seriesGenreRows(latest))
             if (latest.size > 20) add(ContentRow("shows-all", "All Shows", latest.sortedBy { it.title }.map { Tiles.series(it, "sa") }))
         }
-        val hero = latest.firstOrNull { !it.description.isNullOrBlank() } ?: latest.first()
-        Feed(hero = Tiles.series(hero, "hero"), rows = rows)
+        val heroTiles = (latest.filter { !it.description.isNullOrBlank() }.take(5).ifEmpty { latest.take(5) })
+            .map { Tiles.series(it, "hero") }
+        Feed(hero = heroTiles.firstOrNull(), rows = rows, heroes = heroTiles)
     }
 }
 
@@ -313,8 +342,8 @@ class MoviesFeedViewModel @Inject constructor(
             if (topRated.size >= 5) add(ContentRow("movies-rated", "Critically Acclaimed", topRated.take(20).map { Tiles.movie(it, "mr") }))
             addAll(Rows.genreRows("mv", latest, label = { "$it" }))
         }
-        val hero = Rows.heroPick(topRated.take(12).ifEmpty { latest.take(12) })
-        Feed(hero = hero?.let { Tiles.movie(it, "hero") }, rows = rows)
+        val heroTiles = Rows.heroMix(latest.take(10), topRated.take(10)).map { Tiles.movie(it, "hero") }
+        Feed(hero = heroTiles.firstOrNull(), rows = rows, heroes = heroTiles)
     }
 }
 

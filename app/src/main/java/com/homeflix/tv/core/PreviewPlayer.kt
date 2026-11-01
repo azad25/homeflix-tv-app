@@ -80,6 +80,10 @@ class PreviewPlayer @Inject constructor(
     private val _visibleKey = MutableStateFlow<String?>(null)
     val visibleKey: StateFlow<String?> = _visibleKey.asStateFlow()
 
+    /** Key whose clip just played to the end (the billboard uses it to rotate). */
+    private val _endedKey = MutableStateFlow<String?>(null)
+    val endedKey: StateFlow<String?> = _endedKey.asStateFlow()
+
     /** Bumped every time the app comes back to the foreground so focused UI can re-request. */
     private val _epoch = MutableStateFlow(0)
     val epoch: StateFlow<Int> = _epoch.asStateFlow()
@@ -134,6 +138,7 @@ class PreviewPlayer @Inject constructor(
                 if (state == Player.STATE_ENDED) {
                     // Trailer done: fade back to the still image (Netflix behaviour).
                     _visibleKey.value = null
+                    _endedKey.value = _activeKey.value
                 }
             }
 
@@ -165,6 +170,7 @@ class PreviewPlayer @Inject constructor(
         stopInternal()
         if (!started || url.isNullOrBlank() || url in failedUrls) return
         pendingKey = key
+        _endedKey.value = null
         requestJob = scope.launch {
             delay(dwellMs)
             val p = ensurePlayer()
