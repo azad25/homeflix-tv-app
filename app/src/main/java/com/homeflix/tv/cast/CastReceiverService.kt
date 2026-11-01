@@ -32,17 +32,22 @@ class CastReceiverService : Service() {
         super.onCreate()
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
-        runCatching { ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(), type) }
+        val promoted = runCatching { ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(), type) }
             .onFailure { Log.w(TAG, "startForeground failed", it) }
-        connection.start()
+            .isSuccess
+        connection.start() // the socket lives in the app process either way
+        // A started-as-foreground service that can't promote itself must stop,
+        // or Android kills the app ("did not then call startForeground").
+        if (!promoted) stopSelf()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    // The socket is owned by CastConnection (process-wide); turning casting off
+    // stops it explicitly in [stop]. Don't drop it just because the service ends.
     override fun onDestroy() {
-        connection.stop()
         super.onDestroy()
     }
 

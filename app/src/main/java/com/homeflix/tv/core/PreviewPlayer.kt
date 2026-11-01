@@ -80,6 +80,10 @@ class PreviewPlayer @Inject constructor(
     private val _visibleKey = MutableStateFlow<String?>(null)
     val visibleKey: StateFlow<String?> = _visibleKey.asStateFlow()
 
+    /** Display aspect ratio (w/h) of the current clip, for cover-scaling the surface. */
+    private val _videoAspect = MutableStateFlow(16f / 9f)
+    val videoAspect: StateFlow<Float> = _videoAspect.asStateFlow()
+
     /** Key whose clip just played to the end (the billboard uses it to rotate). */
     private val _endedKey = MutableStateFlow<String?>(null)
     val endedKey: StateFlow<String?> = _endedKey.asStateFlow()
@@ -127,6 +131,12 @@ class PreviewPlayer @Inject constructor(
         exo.volume = 0f
         exo.repeatMode = Player.REPEAT_MODE_OFF
         exo.addListener(object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    _videoAspect.value = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height
+                }
+            }
+
             override fun onRenderedFirstFrame() {
                 firstFrameRendered = true
                 updateVisible()

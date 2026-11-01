@@ -83,7 +83,8 @@ fun UpdatePrompt(updater: AppUpdater) {
             }
             if (needsPermission) {
                 Text(
-                    "Turn on “Allow from this source” for HomeFlix, then come back here.",
+                    "If Android asks, allow HomeFlix to install apps (Settings → Apps → Security & restrictions " +
+                        "→ Unknown sources → HomeFlix), then press Update now again.",
                     color = Color(0xFFE5B109), fontSize = 15.sp
                 )
             }
@@ -92,8 +93,8 @@ fun UpdatePrompt(updater: AppUpdater) {
                     text = if (installing) "Installing…" else "Update now",
                     onClick = {
                         if (installing) return@PillButton
-                        if (!updater.canInstall()) { needsPermission = true; updater.openInstallPermissionSettings() }
-                        else updater.install()
+                        needsPermission = !updater.canInstall()
+                        updater.install()
                     },
                     icon = Icons.Filled.SystemUpdate,
                     focusRequester = focus

@@ -226,7 +226,7 @@ private fun UpdatesSection(updater: com.homeflix.tv.update.AppUpdater) {
         SettingRow(
             title = "Allow HomeFlix to install updates",
             value = if (canInstall) "Allowed" else "Not allowed",
-            subtitle = "Android's \u201CInstall unknown apps\u201D switch for HomeFlix. Needed once.",
+            subtitle = "Needed once. If this doesn't open it: Settings → Apps → Security & restrictions → Unknown sources → HomeFlix.",
             onClick = updater::openInstallPermissionSettings
         )
     }

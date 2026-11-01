@@ -1,8 +1,13 @@
 package com.homeflix.tv.presentation.screens.notifications
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,8 +25,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,8 +51,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -49,12 +62,15 @@ import com.homeflix.tv.domain.model.Notification
 import com.homeflix.tv.presentation.navigation.AppNavigator
 import com.homeflix.tv.presentation.shell.ErrorState
 import com.homeflix.tv.presentation.shell.LoadingState
+import com.homeflix.tv.presentation.ui.MediaFormat
+import com.homeflix.tv.presentation.ui.PillButton
 import com.homeflix.tv.presentation.ui.SizedImage
+import com.homeflix.tv.presentation.ui.TitleLogo
 import com.homeflix.tv.presentation.ui.Tv
 
 /**
- * Notifications: a focusable list on the left; the focused item's artwork
- * fills the background on the right, Netflix "New & Hot" style.
+ * Notifications, Netflix "New & Hot" style: a list on the left; the focused
+ * item's artwork fills the screen behind a details panel on the right.
  */
 @Composable
 fun NotificationsScreen(navigator: AppNavigator, vm: NotificationsViewModel = hiltViewModel()) {
@@ -64,45 +80,77 @@ fun NotificationsScreen(navigator: AppNavigator, vm: NotificationsViewModel = hi
             NotificationsUiState.Loading -> LoadingState()
             is NotificationsUiState.Error -> ErrorState("Couldn't load notifications", onRetry = vm::loadNotifications)
             is NotificationsUiState.Success ->
-                if (s.notifications.isEmpty()) ErrorState("You're all caught up", onRetry = vm::loadNotifications)
-                else NotificationList(s.notifications, navigator)
+                if (s.notifications.isEmpty()) EmptyNotifications()
+                else NotificationsContent(s.notifications.distinctBy { it.id }, navigator)
         }
     }
 }
 
+private fun open(n: Notification, navigator: AppNavigator) {
+    when (n.targetType) {
+        "series" -> n.targetId?.let(navigator::series)
+        "movie" -> n.targetId?.let(navigator::details)
+    }
+}
+
 @Composable
-private fun NotificationList(items: List<Notification>, navigator: AppNavigator) {
+private fun NotificationsContent(items: List<Notification>, navigator: AppNavigator) {
     var focused by rememberSaveable { mutableIntStateOf(0) }
     val first = remember { FocusRequester() }
+    val listState = rememberLazyListState()
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { first.requestFocus() } }
-    val current = items.getOrNull(focused)
+    val current = items.getOrNull(focused.coerceIn(0, items.lastIndex))
 
     Box(Modifier.fillMaxSize()) {
-        Crossfade(targetState = current?.backdropUrl ?: current?.posterUrl, animationSpec = tween(350), label = "bg",
-            modifier = Modifier.fillMaxSize()) { url ->
-            if (url != null) SizedImage(url, 960.dp, 540.dp, Modifier.fillMaxSize(), crossfadeMs = 0)
+        // Full-bleed artwork of the focused notification.
+        Crossfade(targetState = current, animationSpec = tween(400), label = "bg", modifier = Modifier.fillMaxSize()) { n ->
+            if (n != null) FallbackImage(n.imageCandidates, 960.dp, 540.dp, Modifier.fillMaxSize())
         }
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(
-            0f to Tv.Background, 0.5f to Color(0xE6141414), 0.85f to Color(0x66141414), 1f to Color(0x33141414))))
+            0f to Tv.Background, 0.42f to Color(0xF2141414), 0.62f to Color(0x99141414), 1f to Color(0x33141414))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+            0.55f to Color.Transparent, 1f to Color(0xE6141414))))
 
-        Column(Modifier.fillMaxHeight().width(620.dp).padding(start = Tv.Keyline, top = 36.dp)) {
-            Text("Notifications", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
-            LazyColumn(
-                contentPadding = PaddingValues(top = 18.dp, bottom = 80.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                itemsIndexed(items.distinctBy { it.id }, key = { _, n -> n.id }) { i, n ->
-                    NotificationRow(
-                        n = n,
-                        modifier = if (i == 0) Modifier.focusRequester(first) else Modifier,
-                        onFocused = { focused = i },
-                        onClick = {
-                            when (n.targetType) {
-                                "series" -> n.targetId?.let(navigator::series)
-                                "movie" -> n.targetId?.let(navigator::details)
-                            }
-                        }
-                    )
+        Row(Modifier.fillMaxSize()) {
+            // ---------------------------------------------------------------- list
+            Column(Modifier.width(470.dp).fillMaxHeight().padding(start = Tv.Keyline, top = 28.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Notifications", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    val unread = items.count { !it.read }
+                    if (unread > 0) {
+                        Text(
+                            "$unread new", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(start = 10.dp).clip(RoundedCornerShape(4.dp))
+                                .background(Tv.Red).padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(top = 14.dp, bottom = 60.dp, end = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    itemsIndexed(items, key = { _, n -> n.id }) { i, n ->
+                        NotificationCard(
+                            n = n,
+                            modifier = if (i == 0) Modifier.focusRequester(first) else Modifier,
+                            onFocused = { focused = i },
+                            onClick = { open(n, navigator) }
+                        )
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------------- details
+            Box(Modifier.weight(1f).fillMaxHeight().padding(start = 32.dp, end = Tv.Keyline, bottom = 40.dp)) {
+                AnimatedContent(
+                    targetState = current,
+                    transitionSpec = { fadeIn(tween(250, delayMillis = 80)) togetherWith fadeOut(tween(120)) },
+                    contentKey = { it?.id },
+                    label = "details",
+                    modifier = Modifier.align(Alignment.BottomStart)
+                ) { n ->
+                    if (n != null) Details(n) { open(n, navigator) }
                 }
             }
         }
@@ -110,7 +158,38 @@ private fun NotificationList(items: List<Notification>, navigator: AppNavigator)
 }
 
 @Composable
-private fun NotificationRow(n: Notification, modifier: Modifier, onFocused: () -> Unit, onClick: () -> Unit) {
+private fun Details(n: Notification, onOpen: () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        n.category?.takeIf { it.isNotBlank() }?.let {
+            Text(it.replace('_', ' ').uppercase(), color = Tv.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        }
+        TitleLogo(
+            logoUrl = n.logoUrl,
+            title = n.itemTitle ?: n.title,
+            maxWidth = 320.dp,
+            maxHeight = 96.dp,
+            textStyle = TextStyle(color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Black, lineHeight = 33.sp)
+        )
+        val meta = buildList {
+            n.year?.takeIf { it > 0 }?.let { add(it.toString()) }
+            n.runtimeMinutes?.takeIf { it > 0 }?.let { add(MediaFormat.duration(it)) }
+            n.genres.take(2).forEach(::add)
+            if (n.rating > 0) add("★ %.1f".format(n.rating))
+        }.joinToString("  •  ")
+        if (meta.isNotBlank()) Text(meta, color = Tv.TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(n.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2,
+            overflow = TextOverflow.Ellipsis)
+        (n.overview?.takeIf { it.isNotBlank() } ?: n.message.takeIf { it.isNotBlank() })?.let {
+            Text(it, color = Tv.TextSecondary, fontSize = 14.sp, lineHeight = 20.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
+        }
+        if (n.targetId != null) {
+            Text("Press OK to open", color = Tv.TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+@Composable
+private fun NotificationCard(n: Notification, modifier: Modifier, onFocused: () -> Unit, onClick: () -> Unit) {
     var isFocused by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -118,28 +197,56 @@ private fun NotificationRow(n: Notification, modifier: Modifier, onFocused: () -
             .fillMaxWidth()
             .onFocusChanged { isFocused = it.isFocused; if (it.isFocused) onFocused() }
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isFocused) Color(0x33FFFFFF) else Color.Transparent)
+            .background(if (isFocused) Color(0x26FFFFFF) else Color.Transparent)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .padding(10.dp)
+            .padding(8.dp)
     ) {
-        Box(Modifier.width(178.dp).height(100.dp).clip(RoundedCornerShape(6.dp)).background(Tv.Surface)) {
-            SizedImage(n.backdropUrl ?: n.posterUrl, 178.dp, 100.dp, Modifier.fillMaxSize())
-        }
-        Column(Modifier.padding(start = 16.dp).weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!n.read) Box(Modifier.size(8.dp).clip(CircleShape).background(Tv.Red))
-                Text(
-                    timeAgo(n.timestampSeconds),
-                    color = Tv.TextMuted, fontSize = 13.sp,
-                    modifier = Modifier.padding(start = if (!n.read) 8.dp else 0.dp)
-                )
+        Box(
+            Modifier
+                .width(144.dp)
+                .height(81.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Tv.Surface)
+                .then(if (isFocused) Modifier.border(2.dp, Color.White, RoundedCornerShape(6.dp)) else Modifier)
+        ) {
+            FallbackImage(n.imageCandidates, 144.dp, 81.dp, Modifier.fillMaxSize())
+            if (!n.read) {
+                Box(Modifier.align(Alignment.TopStart).padding(6.dp).size(8.dp).clip(CircleShape).background(Tv.Red))
             }
-            Text(n.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
-            Text(n.message.ifBlank { n.overview.orEmpty() }, color = if (isFocused) Color.White else Tv.TextSecondary,
-                fontSize = 14.sp, lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp))
         }
+        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+            Text(timeAgo(n.timestampSeconds), color = Tv.TextMuted, fontSize = 11.sp)
+            Text(n.title, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp))
+            Text(n.message.ifBlank { n.itemTitle.orEmpty() }, color = if (isFocused) Tv.TextPrimary else Tv.TextSecondary,
+                fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 1.dp))
+        }
+    }
+}
+
+/** Tries each URL in turn until one loads (server banners/posters are not always there). */
+@Composable
+private fun FallbackImage(urls: List<String>, width: Dp, height: Dp, modifier: Modifier) {
+    var index by remember(urls) { mutableIntStateOf(0) }
+    val url = urls.getOrNull(index)
+    if (url == null) {
+        Box(modifier.background(Tv.SurfaceHigh), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.NotificationsNone, null, tint = Tv.TextMuted, modifier = Modifier.size(28.dp))
+        }
+        return
+    }
+    SizedImage(url, width, height, modifier, onError = { index++ })
+}
+
+@Composable
+private fun EmptyNotifications() {
+    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Icon(Icons.Filled.NotificationsNone, null, tint = Tv.TextMuted, modifier = Modifier.size(56.dp))
+        Spacer(Modifier.height(14.dp))
+        Text("You're all caught up", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text("New movies and episodes in your library will show up here.", color = Tv.TextSecondary, fontSize = 14.sp,
+            modifier = Modifier.padding(top = 6.dp))
     }
 }
 

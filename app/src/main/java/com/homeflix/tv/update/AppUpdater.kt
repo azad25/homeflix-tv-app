@@ -266,7 +266,9 @@ class AppUpdater @Inject constructor(
     /** Hand the verified APK to Android; it shows the "Update" confirmation. */
     fun install() {
         val ready = _state.value as? UpdateState.Ready ?: return
-        if (!canInstall()) { openInstallPermissionSettings(); return }
+        // Even without the "install unknown apps" grant we hand the APK to the
+        // system: its installer shows its own (OEM-tested) prompt that leads to
+        // the switch — more reliable on TVs than deep-linking to that setting.
         _state.value = UpdateState.Installing(ready.info)
         scope.launch(Dispatchers.IO) {
             runCatching {

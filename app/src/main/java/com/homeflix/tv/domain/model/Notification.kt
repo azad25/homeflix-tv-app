@@ -22,7 +22,13 @@ data class Notification(
     // Local library references (used for filtering + navigation)
     val movieIds: List<Int> = emptyList(),
     val seriesId: Int = 0,
-    val episodeIds: List<Int> = emptyList()
+    val episodeIds: List<Int> = emptyList(),
+    /** Every artwork URL worth trying, best first (the UI falls through on errors). */
+    val imageCandidates: List<String> = emptyList(),
+    val genres: List<String> = emptyList(),
+    val runtimeMinutes: Int? = null,
+    /** Title of the movie/show the notification is about (when different from the headline). */
+    val itemTitle: String? = null
 ) {
     /** True when this notification points at content in the local library. */
     val isLocal: Boolean

@@ -115,11 +115,47 @@ fun PreviewVideo(key: String, modifier: Modifier = Modifier) {
         animationSpec = tween(if (visibleKey == key) 380 else 160),
         label = "previewAlpha"
     )
+    val aspect by preview.videoAspect.collectAsState()
     Box(modifier) {
         AndroidView(
-            factory = { ctx -> TextureView(ctx).also { preview.attachSurface(it) } },
+            factory = { ctx ->
+                TextureView(ctx).also { tv ->
+                    preview.attachSurface(tv)
+                    // Re-apply when the view gets its size (billboards aren't 16:9).
+                    tv.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                        applyCover(v as TextureView, preview.videoAspect.value)
+                    }
+                }
+            },
+            update = { applyCover(it, aspect) },
             onRelease = { preview.detachSurface(it) },
             modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha }
         )
     }
+}
+
+/**
+ * Scale factors that make a video of [videoAspect] (w/h) *cover* a view of
+ * [viewW]x[viewH] without distortion — centred, cropping the overflow — plus a
+ * small [zoom] that also trims thin letterbox edges. A TextureView stretches its
+ * content to the view by default; these factors undo that stretch.
+ */
+internal fun coverScale(viewW: Float, viewH: Float, videoAspect: Float, zoom: Float = 1.02f): Pair<Float, Float> {
+    if (viewW <= 0f || viewH <= 0f || videoAspect <= 0f) return 1f to 1f
+    val viewAspect = viewW / viewH
+    return if (videoAspect > viewAspect) {
+        // Video is wider: fill the height, crop the sides.
+        (videoAspect / viewAspect) * zoom to zoom
+    } else {
+        // Video is taller (e.g. 16:9 in a wide billboard): fill the width, crop top/bottom.
+        zoom to (viewAspect / videoAspect) * zoom
+    }
+}
+
+private fun applyCover(view: TextureView, videoAspect: Float) {
+    val w = view.width.toFloat()
+    val h = view.height.toFloat()
+    if (w <= 0f || h <= 0f) return
+    val (sx, sy) = coverScale(w, h, videoAspect)
+    view.setTransform(android.graphics.Matrix().apply { setScale(sx, sy, w / 2f, h / 2f) })
 }
