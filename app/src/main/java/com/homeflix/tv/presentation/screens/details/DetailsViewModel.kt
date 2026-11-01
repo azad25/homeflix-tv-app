@@ -1,178 +1,102 @@
 package com.homeflix.tv.presentation.screens.details
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.homeflix.tv.data.repository.MediaRepository
+import com.homeflix.tv.core.PlaybackProgressStore
 import com.homeflix.tv.domain.model.Media
+import com.homeflix.tv.domain.repository.MediaRepository
+import com.homeflix.tv.presentation.ui.ContentRow
+import com.homeflix.tv.presentation.ui.MediaFormat
+import com.homeflix.tv.presentation.ui.Tiles
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
+
+data class DetailsState(
+    val loading: Boolean = true,
+    val error: String? = null,
+    val media: Media? = null,
+    val resumeMs: Long = 0,
+    val progress: Float? = null,
+    val progressLabel: String? = null,
+    val inMyList: Boolean? = null,
+    val similar: ContentRow? = null
+)
 
 @HiltViewModel
 class DetailsViewModel @Inject constructor(
-    private val mediaRepository: MediaRepository
+    private val repo: MediaRepository,
+    private val progressStore: PlaybackProgressStore
 ) : ViewModel() {
-    
-    private val _uiState = MutableStateFlow<DetailsUiState>(DetailsUiState.Loading)
-    val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
-    
-    private val _isInMyList = MutableStateFlow(false)
-    val isInMyList: StateFlow<Boolean> = _isInMyList.asStateFlow()
-    
-    private val _myListLoading = MutableStateFlow(false)
-    val myListLoading: StateFlow<Boolean> = _myListLoading.asStateFlow()
 
-    private val _similar = MutableStateFlow<List<Media>>(emptyList())
-    val similar: StateFlow<List<Media>> = _similar.asStateFlow()
-    
-    fun loadMediaDetails(mediaId: String) {
+    private val _state = MutableStateFlow(DetailsState())
+    val state: StateFlow<DetailsState> = _state.asStateFlow()
+    private var loadedId = -1
+
+    fun load(id: Int) {
+        if (loadedId == id) { refreshProgress(); return }
+        loadedId = id
         viewModelScope.launch {
-            _uiState.value = DetailsUiState.Loading
-            
-            try {
-                // Load media details and watch progress concurrently
-                mediaRepository.getMediaById(mediaId)
-                    .collect { result ->
-                        result.fold(
-                            onSuccess = { media ->
-                                // Load watch progress for this media
-                                loadWatchProgress(media)
-                                // Check if media is in My List
-                                checkMyList(mediaId)
-                                // Fetch "More like this" by first genre
-                                loadSimilar(media)
-                            },
-                            onFailure = { error ->
-                                _uiState.value = DetailsUiState.Error(
-                                    error.message ?: "Failed to load media details"
-                                )
-                            }
-                        )
-                    }
-            } catch (e: Exception) {
-                Log.e("DetailsViewModel", "Error loading media details", e)
-                _uiState.value = DetailsUiState.Error(
-                    e.message ?: "Failed to load media details"
+            val media = withTimeoutOrNull(10_000) { repo.getMediaById(id.toString()).first().getOrNull() }
+            if (media == null) {
+                _state.value = DetailsState(loading = false, error = "Couldn't load this title.")
+                return@launch
+            }
+            _state.update { it.copy(loading = false, media = media) }
+            refreshProgress()
+            val inList = async { runCatching { repo.checkMyList(id.toString()).getOrNull() }.getOrNull() }
+            val similar = async { loadSimilar(media) }
+            _state.update { it.copy(inMyList = inList.await(), similar = similar.await()) }
+        }
+    }
+
+    /** Called on (re)entry — e.g. back from the player — without a loading flash. */
+    fun refreshProgress() {
+        val media = _state.value.media ?: return
+        viewModelScope.launch {
+            val local = progressStore.get(media.id)
+            val resume = progressStore.resolveResumeMs(media.id, 0)
+            val durMs = local?.durationMs?.takeIf { it > 0 } ?: (media.duration * 1000L)
+            _state.update {
+                it.copy(
+                    resumeMs = resume,
+                    progress = if (resume > 0 && durMs > 0) (resume.toFloat() / durMs).coerceIn(0f, 1f) else null,
+                    progressLabel = if (resume > 0 && durMs > 0) {
+                        val left = ((durMs - resume) / 60_000).toInt()
+                        if (left > 0) "${MediaFormat.duration(left)} left" else null
+                    } else null
                 )
             }
         }
     }
-    
-    private suspend fun checkMyList(mediaId: String) {
-        try {
-            val result = mediaRepository.checkMyList(mediaId)
-            result.fold(
-                onSuccess = { inList ->
-                    _isInMyList.value = inList
-                    Log.d("DetailsViewModel", "Media $mediaId in my list: $inList")
-                },
-                onFailure = { error ->
-                    Log.w("DetailsViewModel", "Failed to check my list: ${error.message}")
-                    _isInMyList.value = false
-                }
-            )
-        } catch (e: Exception) {
-            Log.w("DetailsViewModel", "Error checking my list", e)
-            _isInMyList.value = false
-        }
-    }
-    
-    fun addToMyList(mediaId: String) {
+
+    fun toggleMyList() {
+        val media = _state.value.media ?: return
+        val inList = _state.value.inMyList ?: false
+        _state.update { it.copy(inMyList = !inList) }
         viewModelScope.launch {
-            _myListLoading.value = true
-            try {
-                val result = mediaRepository.addToMyList(mediaId)
-                result.fold(
-                    onSuccess = {
-                        _isInMyList.value = true
-                        Log.d("DetailsViewModel", "Added to my list: $mediaId")
-                    },
-                    onFailure = { error ->
-                        Log.e("DetailsViewModel", "Failed to add to my list: ${error.message}")
-                    }
-                )
-            } catch (e: Exception) {
-                Log.e("DetailsViewModel", "Error adding to my list", e)
-            } finally {
-                _myListLoading.value = false
-            }
-        }
-    }
-    
-    private fun loadSimilar(media: Media) {
-        val genre = media.genreNames.firstOrNull() ?: media.genres.firstOrNull()?.name
-        viewModelScope.launch {
-            try {
-                // Try the genre as-is (backend genre slugs are capitalized, e.g.
-                // "Action" / "Science Fiction" — lowercasing broke matching).
-                var results = emptyList<Media>()
-                if (!genre.isNullOrBlank()) {
-                    mediaRepository.getMediaByGenre(genre, 20, 0).collect { r ->
-                        if (r.isSuccess) results = r.getOrNull() ?: emptyList()
-                    }
-                }
-                var filtered = results.filter { it.id != media.id }.take(12)
-
-                // Fallback: if the genre lookup came back empty, show latest
-                // movies so the row is never blank.
-                if (filtered.isEmpty()) {
-                    mediaRepository.getMovies(limit = 20, offset = 0).collect { r ->
-                        if (r.isSuccess) {
-                            filtered = (r.getOrNull() ?: emptyList())
-                                .filter { it.id != media.id }
-                                .take(12)
-                        }
-                    }
-                }
-                _similar.value = filtered
-            } catch (e: Exception) {
-                Log.w("DetailsViewModel", "Failed to load similar media", e)
-                _similar.value = emptyList()
-            }
+            val r = if (inList) repo.removeFromMyList(media.id.toString()) else repo.addToMyList(media.id.toString())
+            if (r.isFailure) _state.update { it.copy(inMyList = inList) }
         }
     }
 
-    private suspend fun loadWatchProgress(media: Media) {
-        try {
-            // 1) Direct progress endpoint
-            val result = mediaRepository.getPlaybackProgress(media.id.toString())
-            val progress = result.getOrNull()
-            if (progress != null && progress.duration > 0 && progress.progress > 0) {
-                val watchProgress = (progress.progress.toFloat() / progress.duration.toFloat()).coerceIn(0f, 1f)
-                _uiState.value = DetailsUiState.Success(media, watchProgress, progress.progress)
-                return
-            }
-
-            // 2) Fallback to the SAME source as the Continue Watching row, so the
-            //    detail page and the row always agree (shows Resume when playable).
-            var applied = false
-            mediaRepository.getRecentlyWatchedWithProgress().take(1).collect { r ->
-                val item = r.getOrNull()?.firstOrNull { it.media.id == media.id || it.mediaId == media.id }
-                if (item != null && item.durationSeconds > 0 && item.progressSeconds > 0) {
-                    val wp = (item.progressSeconds.toFloat() / item.durationSeconds.toFloat()).coerceIn(0f, 1f)
-                    _uiState.value = DetailsUiState.Success(media, wp, item.progressSeconds)
-                    applied = true
-                }
-            }
-            if (!applied) {
-                _uiState.value = DetailsUiState.Success(media, null, null)
-            }
-        } catch (e: Exception) {
-            Log.w("DetailsViewModel", "Error loading watch progress", e)
-            _uiState.value = DetailsUiState.Success(media, null, null)
+    private suspend fun loadSimilar(media: Media): ContentRow? {
+        val genre = MediaFormat.genreOf(media)
+        var items: List<Media> = emptyList()
+        if (!genre.isNullOrBlank()) {
+            items = withTimeoutOrNull(6_000) { repo.getMediaByGenre(genre, 24, 0).first().getOrNull() }.orEmpty()
         }
+        if (items.size < 4) {
+            items = items + withTimeoutOrNull(6_000) { repo.getMovies(limit = 30).first().getOrNull() }.orEmpty()
+        }
+        val tiles = items.filter { it.id != media.id }.distinctBy { it.id }.take(20).map { Tiles.movie(it, "sim") }
+        return if (tiles.isEmpty()) null else ContentRow("similar", "More Like This", tiles)
     }
-}
-
-sealed class DetailsUiState {
-    object Loading : DetailsUiState()
-    data class Error(val message: String) : DetailsUiState()
-    data class Success(
-        val media: Media,
-        val watchProgress: Float? = null, // 0.0 to 1.0, null if no progress
-        val progressSeconds: Long? = null // Progress in seconds for resume
-    ) : DetailsUiState()
 }

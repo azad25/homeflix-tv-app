@@ -1,25 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme for TV -->
-    <style name="Theme.HomeFlixTV" parent="Theme.Leanback">
-        <item name="colorPrimary">@color/netflix_red</item>
+<resources>
+    <!-- Black, chrome-less base: no white flash between launcher and first frame. -->
+    <style name="Theme.HomeFlixTV" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">@color/netflix_red</item>
+        <item name="android:colorAccent">@color/netflix_red</item>
         <item name="android:colorBackground">@color/netflix_black</item>
-        <item name="colorError">@color/error_red</item>
-    </style>
-    
-    <!-- Theme without action bar -->
-    <style name="Theme.HomeFlixTV.NoActionBar">
-        <item name="windowActionBar">false</item>
-        <item name="windowNoTitle">true</item>
-        <item name="android:windowFullscreen">true</item>
-    </style>
-    
-    <!-- Fullscreen theme for video player -->
-    <style name="Theme.HomeFlixTV.Fullscreen">
-        <item name="windowActionBar">false</item>
-        <item name="windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/netflix_black</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
-        <item name="android:windowBackground">@color/netflix_black</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
+    <style name="Theme.HomeFlixTV.NoActionBar" />
+
+    <!-- Launch theme: shows the HomeFlix icon on black while Home warms up. -->
+    <style name="Theme.HomeFlixTV.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/netflix_black</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenAnimationDuration">300</item>
+        <item name="postSplashScreenTheme">@style/Theme.HomeFlixTV.NoActionBar</item>
     </style>
 </resources>

@@ -52,6 +52,21 @@ interface HomeFlixApiService {
     @GET("stream/{id}")
     suspend fun getStreamUrl(@Path("id") id: String): Response<StreamInfoDto>
     
+    /** Playback decision: direct file vs. HLS (server pre-warms the encoder at `start`). */
+    @GET("stream/{id}/info")
+    suspend fun getStreamDecision(
+        @Path("id") id: Int,
+        @Query("profile") profile: String = "tv",
+        @Query("sid") sid: String,
+        @Query("start") startSeconds: Long = 0,
+        @Query("vcodecs") videoCodecs: String? = null,
+        @Query("acodecs") audioCodecs: String? = null
+    ): Response<StreamDecisionDto>
+
+    /** Release a server-side HLS transcode session. */
+    @DELETE("stream/{id}/hls")
+    suspend fun releaseHlsSession(@Path("id") id: Int, @Query("sid") sid: String): Response<Unit>
+
     @GET("preview-clips/{id}")
     suspend fun getPreviewClip(@Path("id") id: String): Response<StreamInfoDto>
     
@@ -201,6 +216,12 @@ interface HomeFlixApiService {
         @Path("season") seasonNumber: Int
     ): Response<List<MediaDto>>
 }
+
+data class StreamDecisionDto(
+    val strategy: String? = null,
+    val url: String? = null,
+    val reason: String? = null
+)
 
 // Response wrapper classes
 data class MediaResponse(

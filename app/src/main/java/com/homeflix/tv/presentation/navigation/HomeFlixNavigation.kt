@@ -4,114 +4,117 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.media3.common.util.UnstableApi
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.media3.common.util.UnstableApi
-import com.homeflix.tv.presentation.screens.browse.BrowseScreen
+import androidx.navigation.navArgument
+import com.homeflix.tv.core.PreviewPlayer
 import com.homeflix.tv.presentation.screens.details.DetailsScreen
-import com.homeflix.tv.presentation.screens.home.NetflixHomeScreen
-import com.homeflix.tv.presentation.screens.mylist.MyListScreen
+import com.homeflix.tv.presentation.screens.feeds.HomeFeedViewModel
+import com.homeflix.tv.presentation.screens.feeds.MoviesFeedViewModel
+import com.homeflix.tv.presentation.screens.feeds.MyHomeFlixViewModel
+import com.homeflix.tv.presentation.screens.feeds.ShowsFeedViewModel
 import com.homeflix.tv.presentation.screens.notifications.NotificationsScreen
 import com.homeflix.tv.presentation.screens.player.VideoPlayerScreen
-import com.homeflix.tv.presentation.screens.search.SearchScreen
-import com.homeflix.tv.presentation.screens.tvshows.TvShowsScreen
+import com.homeflix.tv.presentation.screens.search.SearchPage
 import com.homeflix.tv.presentation.screens.tvshows.TvSeriesDetailsScreen
-import com.homeflix.tv.presentation.screens.tvshows.TvSeriesSeasonScreen
+import com.homeflix.tv.presentation.shell.AppShell
+import com.homeflix.tv.presentation.shell.FeedPage
+import com.homeflix.tv.presentation.shell.ShellTab
+import com.homeflix.tv.presentation.ui.Tile
+import com.homeflix.tv.presentation.ui.TileActions
+import com.homeflix.tv.presentation.ui.TileKind
+
+/** Navigation that ignores repeated presses while a transition is running. */
+class AppNavigator(private val nav: NavHostController, private val preview: PreviewPlayer) : TileActions {
+    private fun canNavigate(): Boolean =
+        nav.currentBackStackEntry?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) != false
+
+    fun go(route: String) { if (canNavigate()) nav.navigate(route) { launchSingleTop = true } }
+
+    fun back() { if (canNavigate()) nav.popBackStack() }
+
+    fun details(mediaId: Int) = go(Screen.Details.createRoute(mediaId.toString()))
+    fun series(seriesId: Int) = go(Screen.TvSeriesDetails.createRoute(seriesId.toString()))
+
+    fun player(mediaId: Int, startMs: Long = 0L, fromStart: Boolean = false) {
+        if (!canNavigate()) return
+        preview.hardStop() // release the preview decoder before the movie starts
+        nav.navigate(Screen.VideoPlayer.createRoute(mediaId, startMs, fromStart)) { launchSingleTop = true }
+    }
+
+    override fun open(tile: Tile) = when (tile.kind) {
+        TileKind.MOVIE -> details(tile.id)
+        TileKind.SERIES -> series(tile.id)
+        TileKind.EPISODE -> tile.seriesId?.let { series(it) } ?: details(tile.id)
+    }
+
+    override fun play(tile: Tile) = when (tile.kind) {
+        TileKind.SERIES -> series(tile.id)
+        else -> player(tile.id, tile.resumeMs)
+    }
+}
 
 @UnstableApi
 @Composable
 fun HomeFlixNavigation(
+    previewPlayer: PreviewPlayer,
     navController: NavHostController = rememberNavController()
 ) {
+    val navigator = remember(navController, previewPlayer) { AppNavigator(navController, previewPlayer) }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route,
-        // Global cross-fade for every route — gives the player (and all media)
-        // a smooth fade in on open and fade out on close.
-        enterTransition = { fadeIn(tween(250)) },
-        exitTransition = { fadeOut(tween(250)) },
-        popEnterTransition = { fadeIn(tween(250)) },
-        popExitTransition = { fadeOut(tween(250)) }
+        enterTransition = { fadeIn(tween(220)) },
+        exitTransition = { fadeOut(tween(180)) },
+        popEnterTransition = { fadeIn(tween(220)) },
+        popExitTransition = { fadeOut(tween(180)) }
     ) {
-        composable(Screen.Home.route) {
-            NetflixHomeScreen(navController = navController)
-        }
-        
-        composable(Screen.Browse.route) {
-            BrowseScreen(navController = navController)
-        }
-        
-        composable(Screen.Search.route) {
-            SearchScreen(navController = navController)
-        }
-        
-        composable(Screen.TvShows.route) {
-            TvShowsScreen(navController = navController)
-        }
-        
-        composable(Screen.MyList.route) {
-            MyListScreen(navController = navController)
+        composable(Screen.Home.route) { entry ->
+            BrowseShell(entry, navigator, previewPlayer)
         }
 
         composable(Screen.Notifications.route) {
-            NotificationsScreen(navController = navController)
+            NotificationsScreen(navigator = navigator)
+        }
+
+        composable(Screen.TvSeriesDetails.route, arguments = Screen.TvSeriesDetails.arguments) { entry ->
+            val seriesId = entry.arguments?.getString("seriesId")?.toIntOrNull() ?: 0
+            TvSeriesDetailsScreen(seriesId = seriesId, navigator = navigator, previewPlayer = previewPlayer)
+        }
+
+        composable(Screen.Details.route, arguments = Screen.Details.arguments) { entry ->
+            val mediaId = entry.arguments?.getString("mediaId")?.toIntOrNull() ?: 0
+            DetailsScreen(mediaId = mediaId, navigator = navigator, previewPlayer = previewPlayer)
         }
 
         composable(
-            route = Screen.TvSeriesDetails.route,
-            arguments = Screen.TvSeriesDetails.arguments
-        ) { backStackEntry ->
-            val seriesId = backStackEntry.arguments?.getString("seriesId") ?: ""
-            TvSeriesDetailsScreen(
-                seriesId = seriesId,
-                navController = navController
-            )
-        }
-        
-        composable(
-            route = Screen.TvSeriesSeason.route,
-            arguments = Screen.TvSeriesSeason.arguments
-        ) { backStackEntry ->
-            val seriesId = backStackEntry.arguments?.getString("seriesId") ?: ""
-            val seasonNumber = backStackEntry.arguments?.getInt("seasonNumber") ?: 1
-            TvSeriesSeasonScreen(
-                seriesId = seriesId,
-                seasonNumber = seasonNumber,
-                navController = navController
-            )
-        }
-        
-        composable(
-            route = Screen.Details.route,
-            arguments = Screen.Details.arguments
-        ) { backStackEntry ->
-            val mediaId = backStackEntry.arguments?.getString("mediaId") ?: ""
-            DetailsScreen(
-                mediaId = mediaId,
-                navController = navController
-            )
-        }
-        
-        composable(
             route = Screen.VideoPlayer.route,
-            arguments = Screen.VideoPlayer.arguments
-        ) { backStackEntry ->
-            val mediaId = backStackEntry.arguments?.getInt("mediaId") ?: 0
-            val startTime = backStackEntry.arguments?.getLong("startTime") ?: 0L
-            val forceStart = backStackEntry.arguments?.getBoolean("forceStart") ?: false
-            
+            arguments = Screen.VideoPlayer.arguments,
+            enterTransition = { fadeIn(tween(160)) },
+            exitTransition = { fadeOut(tween(160)) },
+            popExitTransition = { fadeOut(tween(160)) }
+        ) { entry ->
+            val mediaId = entry.arguments?.getInt("mediaId") ?: 0
+            val startTime = entry.arguments?.getLong("startTime") ?: 0L
+            val forceStart = entry.arguments?.getBoolean("forceStart") ?: false
             VideoPlayerScreen(
                 mediaId = mediaId,
-                startTime = startTime,
+                startTimeMs = startTime,
                 forceStartFromBeginning = forceStart,
-                onNavigateBack = {
-                    navController.popBackStack()
-                },
-                onNavigateToEpisode = { nextEpisodeId ->
-                    // Navigate to next episode, replacing current player
-                    navController.navigate(Screen.VideoPlayer.createRoute(nextEpisodeId)) {
+                onClose = { navigator.back() },
+                onPlayNext = { nextId ->
+                    navController.navigate(Screen.VideoPlayer.createRoute(nextId, 0L, false)) {
                         popUpTo(Screen.VideoPlayer.route) { inclusive = true }
                     }
                 }
@@ -120,61 +123,60 @@ fun HomeFlixNavigation(
     }
 }
 
+@UnstableApi
+@Composable
+private fun BrowseShell(entry: NavBackStackEntry, navigator: AppNavigator, previewPlayer: PreviewPlayer) {
+    AppShell(
+        previewPlayer = previewPlayer,
+        actions = navigator,
+        onOpenNotifications = { navigator.go(Screen.Notifications.route) }
+    ) { tab, shell ->
+        when (tab) {
+            ShellTab.HOME -> {
+                val vm: HomeFeedViewModel = hiltViewModel(entry)
+                val state by vm.state.collectAsState()
+                FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh)
+            }
+            ShellTab.SHOWS -> {
+                val vm: ShowsFeedViewModel = hiltViewModel(entry)
+                val state by vm.state.collectAsState()
+                FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh,
+                    heroPlayLabel = { "Episodes" })
+            }
+            ShellTab.MOVIES -> {
+                val vm: MoviesFeedViewModel = hiltViewModel(entry)
+                val state by vm.state.collectAsState()
+                FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh)
+            }
+            ShellTab.MINE -> {
+                val vm: MyHomeFlixViewModel = hiltViewModel(entry)
+                val state by vm.state.collectAsState()
+                FeedPage(state, shell, navigator, onRetry = vm::refresh, onResumed = vm::refresh)
+            }
+            ShellTab.SEARCH -> SearchPage(shell = shell, actions = navigator)
+        }
+    }
+}
+
 sealed class Screen(val route: String) {
     object Home : Screen("home")
-    object Browse : Screen("browse") {
-        fun createRoute(type: String = "") = if (type.isNotEmpty()) "browse?type=$type" else "browse"
-    }
-    object Search : Screen("search")
-    object TvShows : Screen("tv-shows")
-    object MyList : Screen("my-list")
     object Notifications : Screen("notifications")
     object TvSeriesDetails : Screen("tv-series/{seriesId}") {
         fun createRoute(seriesId: String) = "tv-series/$seriesId"
-        val arguments = listOf(
-            androidx.navigation.navArgument("seriesId") {
-                type = androidx.navigation.NavType.StringType
-            }
-        )
-    }
-    object TvSeriesSeason : Screen("tv-series/{seriesId}/season/{seasonNumber}") {
-        fun createRoute(seriesId: String, seasonNumber: Int) = "tv-series/$seriesId/season/$seasonNumber"
-        val arguments = listOf(
-            androidx.navigation.navArgument("seriesId") {
-                type = androidx.navigation.NavType.StringType
-            },
-            androidx.navigation.navArgument("seasonNumber") {
-                type = androidx.navigation.NavType.IntType
-            }
-        )
+        val arguments = listOf(navArgument("seriesId") { type = NavType.StringType })
     }
     object Details : Screen("details/{mediaId}") {
         fun createRoute(mediaId: String) = "details/$mediaId"
-        val arguments = listOf(
-            androidx.navigation.navArgument("mediaId") {
-                type = androidx.navigation.NavType.StringType
-            }
-        )
+        val arguments = listOf(navArgument("mediaId") { type = NavType.StringType })
     }
     object VideoPlayer : Screen("player/{mediaId}?startTime={startTime}&forceStart={forceStart}") {
-        fun createRoute(
-            mediaId: Int, 
-            startTime: Long = 0L, 
-            forceStartFromBeginning: Boolean = false
-        ) = "player/$mediaId?startTime=$startTime&forceStart=$forceStartFromBeginning"
-        
+        fun createRoute(mediaId: Int, startTime: Long = 0L, forceStartFromBeginning: Boolean = false) =
+            "player/$mediaId?startTime=$startTime&forceStart=$forceStartFromBeginning"
+
         val arguments = listOf(
-            androidx.navigation.navArgument("mediaId") {
-                type = androidx.navigation.NavType.IntType
-            },
-            androidx.navigation.navArgument("startTime") {
-                type = androidx.navigation.NavType.LongType
-                defaultValue = 0L
-            },
-            androidx.navigation.navArgument("forceStart") {
-                type = androidx.navigation.NavType.BoolType
-                defaultValue = false
-            }
+            navArgument("mediaId") { type = NavType.IntType },
+            navArgument("startTime") { type = NavType.LongType; defaultValue = 0L },
+            navArgument("forceStart") { type = NavType.BoolType; defaultValue = false }
         )
     }
 }

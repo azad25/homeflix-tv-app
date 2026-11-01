@@ -1,162 +1,108 @@
 package com.homeflix.tv.presentation.screens.notifications
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import com.homeflix.tv.domain.model.Notification
-import com.homeflix.tv.presentation.components.NetflixSideNavigation
-import com.homeflix.tv.presentation.navigation.Screen
-import com.homeflix.tv.presentation.theme.*
-import com.homeflix.tv.util.ApiUtils
+import com.homeflix.tv.presentation.navigation.AppNavigator
+import com.homeflix.tv.presentation.shell.ErrorState
+import com.homeflix.tv.presentation.shell.LoadingState
+import com.homeflix.tv.presentation.ui.SizedImage
+import com.homeflix.tv.presentation.ui.Tv
 
 /**
- * NOTIFICATIONS — display-only feed backed by GET /api/notifications.
- * Sidebar + Prime-styled list of cards (art, title, message, relative time,
- * type badge). No click-through / mark-read.
+ * Notifications: a focusable list on the left; the focused item's artwork
+ * fills the background on the right, Netflix "New & Hot" style.
  */
 @Composable
-fun NotificationsScreen(
-    navController: NavController,
-    viewModel: NotificationsViewModel = hiltViewModel()
-) {
-    val uiState by viewModel.uiState.collectAsState()
-    val firstCardFocus = remember { FocusRequester() }
-
-    // Move focus onto the first notification once loaded so it's selectable.
-    LaunchedEffect(uiState) {
-        val s = uiState
-        if (s is NotificationsUiState.Success && s.notifications.isNotEmpty()) {
-            delay(300)
-            try { firstCardFocus.requestFocus() } catch (_: Exception) {}
+fun NotificationsScreen(navigator: AppNavigator, vm: NotificationsViewModel = hiltViewModel()) {
+    val state by vm.uiState.collectAsState()
+    Box(Modifier.fillMaxSize().background(Tv.Background)) {
+        when (val s = state) {
+            NotificationsUiState.Loading -> LoadingState()
+            is NotificationsUiState.Error -> ErrorState("Couldn't load notifications", onRetry = vm::loadNotifications)
+            is NotificationsUiState.Success ->
+                if (s.notifications.isEmpty()) ErrorState("You're all caught up", onRetry = vm::loadNotifications)
+                else NotificationList(s.notifications, navigator)
         }
     }
+}
 
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PrimeBg)
-    ) {
-        NetflixSideNavigation(
-            selectedRoute = "notifications",
-            onNavigate = { route ->
-                when (route) {
-                    "notifications" -> { /* already here */ }
-                    "home" -> navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Home.route) { inclusive = false }
-                        launchSingleTop = true
-                    }
-                    else -> navController.navigate(route) {
-                        popUpTo(Screen.Home.route) { inclusive = false }
-                        launchSingleTop = true
-                    }
-                }
-            },
-            onNavigateToContent = {
-                try { firstCardFocus.requestFocus() } catch (_: Exception) {}
-            }
-        )
+@Composable
+private fun NotificationList(items: List<Notification>, navigator: AppNavigator) {
+    var focused by rememberSaveable { mutableIntStateOf(0) }
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) { withFrameNanos { }; runCatching { first.requestFocus() } }
+    val current = items.getOrNull(focused)
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            when (val state = uiState) {
-                is NotificationsUiState.Loading -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = PrimeBlue)
-                    }
-                }
+    Box(Modifier.fillMaxSize()) {
+        Crossfade(targetState = current?.backdropUrl ?: current?.posterUrl, animationSpec = tween(350), label = "bg",
+            modifier = Modifier.fillMaxSize()) { url ->
+            if (url != null) SizedImage(url, 960.dp, 540.dp, Modifier.fillMaxSize(), crossfadeMs = 0)
+        }
+        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(
+            0f to Tv.Background, 0.5f to Color(0xE6141414), 0.85f to Color(0x66141414), 1f to Color(0x33141414))))
 
-                is NotificationsUiState.Error -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text("Couldn't load notifications", color = TextPrimary, style = MaterialTheme.typography.titleLarge)
-                            Text(state.message, color = PrimeTextDim)
-                            Button(
-                                onClick = { viewModel.loadNotifications() },
-                                colors = ButtonDefaults.buttonColors(containerColor = PrimeBlue)
-                            ) { Text("Retry") }
-                        }
-                    }
-                }
-
-                is NotificationsUiState.Success -> {
-                    if (state.notifications.isEmpty()) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    Icons.Default.Notifications,
-                                    contentDescription = null,
-                                    tint = PrimeTextDim,
-                                    modifier = Modifier.size(56.dp)
-                                )
-                                Spacer(Modifier.height(12.dp))
-                                Text("No notifications yet", color = PrimeTextDim, style = MaterialTheme.typography.titleMedium)
+        Column(Modifier.fillMaxHeight().width(620.dp).padding(start = Tv.Keyline, top = 36.dp)) {
+            Text("Notifications", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+            LazyColumn(
+                contentPadding = PaddingValues(top = 18.dp, bottom = 80.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                itemsIndexed(items, key = { _, n -> n.id }) { i, n ->
+                    NotificationRow(
+                        n = n,
+                        modifier = if (i == 0) Modifier.focusRequester(first) else Modifier,
+                        onFocused = { focused = i },
+                        onClick = {
+                            when (n.targetType) {
+                                "series" -> n.targetId?.let(navigator::series)
+                                "movie" -> n.targetId?.let(navigator::details)
                             }
                         }
-                    } else {
-                        val listState = rememberLazyListState()
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 40.dp, end = 56.dp, top = 32.dp, bottom = 40.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            item {
-                                Text(
-                                    text = "Notifications",
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
-                                    ),
-                                    modifier = Modifier.padding(bottom = 12.dp)
-                                )
-                            }
-                            itemsIndexed(state.notifications, key = { _, n -> n.id }) { index, notification ->
-                                NotificationCard(
-                                    notification = notification,
-                                    onClick = {
-                                        val id = notification.targetId ?: return@NotificationCard
-                                        when (notification.targetType) {
-                                            "series" -> navController.navigate(Screen.TvSeriesDetails.createRoute(id.toString()))
-                                            "movie" -> navController.navigate(Screen.Details.createRoute(id.toString()))
-                                        }
-                                    },
-                                    modifier = if (index == 0) Modifier.focusRequester(firstCardFocus) else Modifier
-                                )
-                            }
-                        }
-                    }
+                    )
                 }
             }
         }
@@ -164,153 +110,46 @@ fun NotificationsScreen(
 }
 
 @Composable
-private fun NotificationCard(
-    notification: Notification,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    // These are local notifications, so always derive a guaranteed image from
-    // the referenced media id (the backend backdrop/poster URLs are often empty).
-    // Movies use the real BANNER art (/backdrops/{id} auto-downloads from TMDB),
-    // not the video-frame thumbnail.
-    val base = ApiUtils.getBaseUrl()
-    val primaryArt = resolveAssetUrl(notification.backdropUrl ?: notification.posterUrl)
-        ?: notification.targetId?.let { id ->
-            if (notification.targetType == "series") "$base/series/$id/backdrop"
-            else "$base/backdrops/$id"
-        }
-    val fallbackArt = notification.targetId?.let { id ->
-        if (notification.targetType == "series") "$base/series/$id/poster"
-        else "$base/thumbnails/$id"
-    }
-    var focused by remember { mutableStateOf(false) }
-    val scale by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (focused) 1.015f else 1f,
-        animationSpec = androidx.compose.animation.core.tween(150),
-        label = "notif_scale"
-    )
-
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = if (focused) PrimeSurfaceHigh else PrimeSurface,
+private fun NotificationRow(n: Notification, modifier: Modifier, onFocused: () -> Unit, onClick: () -> Unit) {
+    var isFocused by remember { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .graphicsLayer(scaleX = scale, scaleY = scale)
-            .onFocusChanged { focused = it.isFocused }
-            .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown &&
-                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
-                ) {
-                    onClick(); true
-                } else false
-            }
-            .focusable()
-            .clickable { onClick() }
-            .then(
-                if (focused) Modifier.border(2.dp, Color.White, RoundedCornerShape(10.dp))
-                else Modifier
-            )
+            .onFocusChanged { isFocused = it.isFocused; if (it.isFocused) onFocused() }
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isFocused) Color(0x33FFFFFF) else Color.Transparent)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(10.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Art (16:9) — banner-sized, with single-swap fallback
-            Box(
-                modifier = Modifier
-                    .width(210.dp)
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(PrimeBgDeep)
-            ) {
-                var artFailed by remember(notification.id) { mutableStateOf(false) }
-                val model = if (artFailed) fallbackArt else (primaryArt ?: fallbackArt)
-                if (model != null) {
-                    AsyncImage(
-                        model = coil.request.ImageRequest.Builder(LocalContext.current)
-                            .data(model)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = notification.title,
-                        contentScale = ContentScale.Crop,
-                        onError = { if (!artFailed && fallbackArt != null) artFailed = true },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+        Box(Modifier.width(178.dp).height(100.dp).clip(RoundedCornerShape(6.dp)).background(Tv.Surface)) {
+            SizedImage(n.backdropUrl ?: n.posterUrl, 178.dp, 100.dp, Modifier.fillMaxSize())
+        }
+        Column(Modifier.padding(start = 16.dp).weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!n.read) Box(Modifier.size(8.dp).clip(CircleShape).background(Tv.Red))
+                Text(
+                    timeAgo(n.timestampSeconds),
+                    color = Tv.TextMuted, fontSize = 13.sp,
+                    modifier = Modifier.padding(start = if (!n.read) 8.dp else 0.dp)
+                )
             }
-
-            // Text
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (!notification.read) {
-                        Box(
-                            Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(PrimeBlue)
-                        )
-                    }
-                    Text(
-                        text = notification.title,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                }
-                if (notification.message.isNotBlank()) {
-                    Text(
-                        text = notification.message,
-                        style = MaterialTheme.typography.bodyMedium.copy(color = TextPrimary.copy(alpha = 0.8f)),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val label = notification.category?.takeIf { it.isNotBlank() }
-                        ?: notification.type.replace('_', ' ').replaceFirstChar { it.uppercase() }
-                    Box(
-                        Modifier
-                            .border(1.dp, BadgeOutline, RoundedCornerShape(3.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(label, color = PrimeTextDim, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                    }
-                    Text(
-                        text = relativeTime(notification.timestampSeconds),
-                        color = PrimeTextDim,
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-            }
+            Text(n.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+            Text(n.message.ifBlank { n.overview.orEmpty() }, color = if (isFocused) Color.White else Tv.TextSecondary,
+                fontSize = 14.sp, lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp))
         }
     }
 }
 
-/** Resolve a notification asset URL: absolute stays, `/api/...` gets the host. */
-private fun resolveAssetUrl(path: String?): String? {
-    if (path.isNullOrBlank()) return null
-    if (path.startsWith("http")) return path
-    val root = ApiUtils.getRootUrl() // host without /api
-    return if (path.startsWith("/")) "$root$path" else "$root/$path"
-}
-
-private fun relativeTime(timestampSeconds: Long): String {
-    if (timestampSeconds <= 0) return ""
-    val nowSec = System.currentTimeMillis() / 1000
-    val diff = (nowSec - timestampSeconds).coerceAtLeast(0)
+private fun timeAgo(seconds: Long): String {
+    if (seconds <= 0) return "Recently"
+    val diff = System.currentTimeMillis() / 1000 - seconds
     return when {
-        diff < 60 -> "Just now"
-        diff < 3600 -> "${diff / 60}m ago"
-        diff < 86400 -> "${diff / 3600}h ago"
-        diff < 604800 -> "${diff / 86400}d ago"
-        else -> "${diff / 604800}w ago"
+        diff < 3600 -> "Just now"
+        diff < 86_400 -> "${diff / 3600}h ago"
+        diff < 7 * 86_400 -> "${diff / 86_400}d ago"
+        else -> java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault()).format(java.util.Date(seconds * 1000))
     }
 }
