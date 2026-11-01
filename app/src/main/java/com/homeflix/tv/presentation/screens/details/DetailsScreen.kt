@@ -61,7 +61,7 @@ fun DetailsScreen(
 ) {
     val state by vm.state.collectAsState()
     LaunchedEffect(mediaId) { vm.load(mediaId) }
-    var resumed by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var resumed by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (resumed) vm.refreshProgress()
         resumed = true

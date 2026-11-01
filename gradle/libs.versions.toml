@@ -30,6 +30,7 @@ kotlinxSerialization = "1.7.0"
 materialIconsExtended = "1.2.1"
 
 [libraries]
+leakcanary = { group = "com.squareup.leakcanary", name = "leakcanary-android", version = "2.14" }
 robolectric = { group = "org.robolectric", name = "robolectric", version = "4.14.1" }
 androidx-test-core = { group = "androidx.test", name = "core-ktx", version = "1.6.1" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version = "1.4.1" }

@@ -39,8 +39,8 @@ object ImageCache {
             }
             .okHttpClient {
                 OkHttpClient.Builder()
-                    .connectTimeout(30, TimeUnit.SECONDS)
-                    .readTimeout(30, TimeUnit.SECONDS)
+                    .connectTimeout(8, TimeUnit.SECONDS)
+                    .readTimeout(15, TimeUnit.SECONDS)
                     .writeTimeout(30, TimeUnit.SECONDS)
                     .build()
             }
@@ -49,6 +49,8 @@ object ImageCache {
             .networkCachePolicy(CachePolicy.ENABLED)
             // Perf on low-RAM TVs: RGB_565 halves bitmap memory (less GC → less
             // D-pad jank) and no global crossfade avoids an extra draw pass.
+            // Artwork endpoints (backdrops, logos) send no cache headers; cache anyway.
+            .respectCacheHeaders(false)
             .allowRgb565(true)
             .crossfade(false)
             .build()

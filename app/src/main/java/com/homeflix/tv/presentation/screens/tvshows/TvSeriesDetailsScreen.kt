@@ -78,7 +78,7 @@ fun TvSeriesDetailsScreen(
 ) {
     val state by vm.state.collectAsState()
     LaunchedEffect(seriesId) { vm.load(seriesId) }
-    var resumed by remember { mutableStateOf(false) }
+    var resumed by rememberSaveable { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (resumed) vm.refreshProgress()
         resumed = true

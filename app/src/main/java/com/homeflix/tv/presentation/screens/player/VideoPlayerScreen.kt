@@ -198,8 +198,15 @@ fun VideoPlayerScreen(
             pauseScreen = true
         }
     }
-    // Show controls whenever the user pauses (or we come back paused).
-    LaunchedEffect(ui.playWhenReady) { if (!ui.playWhenReady && ui.phase is PlayerPhase.Ready) showControls() }
+    // Show controls whenever the user pauses or we come back paused, and briefly
+    // when playback first starts (so the title is visible, like Netflix).
+    val ready = ui.phase is PlayerPhase.Ready
+    var shownOnStart by remember { mutableStateOf(false) }
+    LaunchedEffect(ui.playWhenReady, ready) {
+        if (!ready) return@LaunchedEffect
+        if (!ui.playWhenReady) showControls()
+        else if (!shownOnStart) { shownOnStart = true; showControls() }
+    }
     LaunchedEffect(focusTarget) {
         if (focusTarget == 0) return@LaunchedEffect
         withFrameNanos { }

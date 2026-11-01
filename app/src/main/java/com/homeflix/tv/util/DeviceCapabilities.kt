@@ -28,6 +28,24 @@ object DeviceCapabilities {
         return result
     }
 
+    @Volatile private var cachedVeryLowRam: Boolean? = null
+
+    /**
+     * Truly constrained boxes (< 1.2 GB RAM): no tile trailers. The OS low-RAM
+     * flag is deliberately ignored — some 2 GB TVs set it but play previews fine.
+     */
+    fun isVeryLowRam(context: Context): Boolean {
+        cachedVeryLowRam?.let { return it }
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val result = runCatching {
+            val mem = ActivityManager.MemoryInfo()
+            am?.getMemoryInfo(mem)
+            mem.totalMem in 1 until 1_200L * 1024 * 1024
+        }.getOrDefault(false)
+        cachedVeryLowRam = result
+        return result
+    }
+
     /** Whether ambient background preview videos should auto-play. */
     fun allowBackgroundVideo(context: Context): Boolean = !isLowRam(context)
 }

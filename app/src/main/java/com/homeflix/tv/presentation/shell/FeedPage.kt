@@ -57,7 +57,7 @@ fun FeedPage(
     val heroPlay = remember { FocusRequester() }
     var activeSection by rememberSaveable { mutableIntStateOf(0) }
     var savedFocus by rememberSaveable { mutableStateOf<String?>(null) }
-    var resumedOnce by remember { mutableStateOf(false) }
+    var resumedOnce by rememberSaveable { mutableStateOf(false) }
 
     // Coming back from the player/details: refresh progress rows quietly.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {

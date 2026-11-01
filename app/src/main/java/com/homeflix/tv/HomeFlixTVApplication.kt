@@ -7,6 +7,25 @@ import coil.ImageLoaderFactory
 
 @HiltAndroidApp
 class HomeFlixTVApplication : Application(), ImageLoaderFactory {
+
+    @javax.inject.Inject lateinit var previewPlayer: com.homeflix.tv.core.PreviewPlayer
+
+    /**
+     * Memory pressure: Coil trims its own bitmap cache via component callbacks;
+     * here we additionally free the preview decoder + buffers, and drop all
+     * cached bitmaps once the UI is hidden and the system is running low.
+     */
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (::previewPlayer.isInitialized && level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            previewPlayer.onTrimMemory()
+        }
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            com.homeflix.tv.util.ImageCache.getImageLoader(this).memoryCache?.clear()
+        }
+    }
     
     override fun onCreate() {
         super.onCreate()

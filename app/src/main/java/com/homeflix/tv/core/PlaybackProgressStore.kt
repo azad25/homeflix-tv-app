@@ -42,6 +42,7 @@ class PlaybackProgressStore @Inject constructor(
         if (mediaId <= 0 || durationMs <= 0 || positionMs < 0) return
         val pos = positionMs.coerceAtMost(durationMs)
         prefs.edit().putString(key(mediaId), "$pos|$durationMs|${System.currentTimeMillis()}").apply()
+        pruneIfLarge()
         if (!sync) return
         // Backend rejects position=0 (binding:"required"); nothing worth syncing anyway.
         val posSec = pos / 1000
@@ -71,6 +72,16 @@ class PlaybackProgressStore @Inject constructor(
             }.getOrNull()?.let { p -> if (p.completed) 0L else p.progress * 1000 } ?: 0L
         }
         return if (candidate < 10_000) 0L else candidate
+    }
+
+    /** Keep the store bounded: forget the oldest entries beyond 600 titles. */
+    private fun pruneIfLarge() {
+        val all = prefs.all
+        if (all.size <= 600) return
+        val oldest = all.entries
+            .sortedBy { (it.value as? String)?.substringAfterLast('|')?.toLongOrNull() ?: 0L }
+            .take(all.size - 500)
+        prefs.edit().apply { oldest.forEach { remove(it.key) } }.apply()
     }
 
     private fun key(mediaId: Int) = "m$mediaId"

@@ -152,7 +152,11 @@ class VideoPlayerViewModel @Inject constructor(
     private var tickerJob: Job? = null
 
     private fun buildPlayer(): ExoPlayer {
+        // Buffer budget follows Android TV memory guidance: ~40-60 MB on 1-2 GB
+        // devices, more only where the heap class allows it.
         val lowRam = DeviceCapabilities.isLowRam(context)
+        val veryLow = DeviceCapabilities.isVeryLowRam(context)
+        val targetBytes = when { veryLow -> 40; lowRam -> 64; else -> 128 } * 1024 * 1024
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 15_000,
@@ -160,7 +164,7 @@ class VideoPlayerViewModel @Inject constructor(
                 /* bufferForPlaybackMs = */ 1_000,
                 /* bufferForPlaybackAfterRebufferMs = */ 2_500
             )
-            .setTargetBufferBytes(if (lowRam) 60 * 1024 * 1024 else 160 * 1024 * 1024)
+            .setTargetBufferBytes(targetBytes)
             .setPrioritizeTimeOverSizeThresholds(false)
             .build()
         val renderers = DefaultRenderersFactory(context).setEnableDecoderFallback(true)

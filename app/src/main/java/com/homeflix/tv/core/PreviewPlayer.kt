@@ -65,7 +65,12 @@ class PreviewPlayer @Inject constructor(
     private var firstFrameRendered = false
     private var started = false
     private var attachedView: TextureView? = null
-    private val failedUrls = HashSet<String>()
+    /** Bounded memory of clips that 404'd so we never retry them (LRU, 256 entries). */
+    private val failedUrls: MutableSet<String> = java.util.Collections.newSetFromMap(
+        object : LinkedHashMap<String, Boolean>(64, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?) = size > 256
+        }
+    )
 
     /** Key whose clip is loaded (UI should host the video surface for it). */
     private val _activeKey = MutableStateFlow<String?>(null)
@@ -79,7 +84,7 @@ class PreviewPlayer @Inject constructor(
     private val _epoch = MutableStateFlow(0)
     val epoch: StateFlow<Int> = _epoch.asStateFlow()
 
-    val tilePreviewsEnabled: Boolean by lazy { !DeviceCapabilities.isLowRam(context) }
+    val tilePreviewsEnabled: Boolean by lazy { !DeviceCapabilities.isVeryLowRam(context) }
 
     private val cache: SimpleCache by lazy { sharedCache(context) }
 
@@ -252,6 +257,11 @@ class PreviewPlayer @Inject constructor(
             started = false
             hardStop()
         }
+    }
+
+    /** System is short on memory: drop the decoder and buffers now; they come back on demand. */
+    fun onTrimMemory() {
+        hardStop()
     }
 
     /** The full-screen player is opening: give it the hardware decoder right now. */

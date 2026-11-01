@@ -16,8 +16,8 @@ android {
         applicationId = "com.homeflix.tv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 5
+        versionName = "5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -114,6 +114,8 @@ dependencies {
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    // Debug builds only: reports any leaked Activity/ViewModel/View on the TV itself.
+    debugImplementation(libs.leakcanary)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
