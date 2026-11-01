@@ -517,7 +517,7 @@ fun BrowseFeed(
     heroPlayLabel: (Tile) -> String = { "Play" }
 ) {
     val scope = rememberCoroutineScope()
-    val heroes = feed.heroList
+    val heroes = remember(feed) { feed.heroList }
     val hasHero = heroes.isNotEmpty()
     ManualFocusScroll {
         LazyColumn(

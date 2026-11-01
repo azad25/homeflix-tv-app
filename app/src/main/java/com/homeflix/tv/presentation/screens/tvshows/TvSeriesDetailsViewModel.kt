@@ -51,7 +51,7 @@ class TvSeriesDetailsViewModel @Inject constructor(
     fun load(seriesId: Int) {
         if (loadedId == seriesId) { refreshProgress(); return }
         loadedId = seriesId
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             val seriesD = async { runCatching { withTimeoutOrNull(10_000) { repo.getTvSeriesById(seriesId) } }.getOrNull() }
             val seasonsD = async { runCatching { withTimeoutOrNull(10_000) { repo.getTvSeriesSeasons(seriesId) } }.getOrNull().orEmpty() }
             val resumeD = async { findResume(seriesId) }
@@ -80,7 +80,7 @@ class TvSeriesDetailsViewModel @Inject constructor(
         if (seriesId <= 0) return
         _state.update { it.copy(selectedSeason = season, episodesLoading = true) }
         seasonJob?.cancel()
-        seasonJob = viewModelScope.launch {
+        seasonJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
             val eps = episodes(seriesId, season)
             if (_state.value.selectedSeason != season) return@launch
             _state.update { it.copy(episodes = row(seriesId, season, eps), episodesLoading = false) }

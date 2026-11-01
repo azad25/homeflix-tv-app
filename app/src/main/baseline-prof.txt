@@ -1,0 +1,11 @@
+# HomeFlix app code compiled ahead of time at install (profileinstaller), so
+# browsing, focus movement, the billboard and the player never run in the
+# interpreter/JIT on first use. Library code (Compose, Media3, Coil) brings
+# its own baseline profiles.
+HSPLcom/homeflix/tv/presentation/**;->**(**)**
+HSPLcom/homeflix/tv/core/**;->**(**)**
+HSPLcom/homeflix/tv/data/**;->**(**)**
+HSPLcom/homeflix/tv/domain/**;->**(**)**
+HSPLcom/homeflix/tv/cast/**;->**(**)**
+HSPLcom/homeflix/tv/util/**;->**(**)**
+Lcom/homeflix/tv/**;

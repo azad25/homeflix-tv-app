@@ -42,3 +42,15 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# Safe mode: optimize and shrink, but never rename (stack traces stay readable,
+# reflection by name keeps working).
+-dontobfuscate
+
+# Strip debug/verbose/info logging from release builds (several repository
+# paths log once per title, which costs main-thread time on big libraries).
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}

@@ -52,7 +52,7 @@ class SearchViewModel @Inject constructor(
     }
 
     private suspend fun <T> safe(timeoutMs: Long, block: suspend () -> T?): T? = try {
-        withTimeoutOrNull(timeoutMs) { block() }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { withTimeoutOrNull(timeoutMs) { block() } }
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e
     } catch (e: Exception) {

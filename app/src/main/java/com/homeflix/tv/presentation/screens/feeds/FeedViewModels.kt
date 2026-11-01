@@ -89,14 +89,34 @@ abstract class FeedViewModel(private val cache: FeedCache) : ViewModel() {
         }
     }
 
+    private var lastRefreshAt = 0L
+
+    /**
+     * Back from Details/Player: refresh quietly. Waits until the return
+     * transition and focus restore are done, and skips if the feed is fresh.
+     */
+    fun refreshAfterReturn() {
+        if (android.os.SystemClock.elapsedRealtime() - lastRefreshAt < 20_000) return
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(1_200)
+            refresh()
+        }
+    }
+
     fun refresh() {
         if (refreshJob?.isActive == true) return
         refreshJob = viewModelScope.launch {
-            val result = runCatching { build() }
+            lastRefreshAt = android.os.SystemClock.elapsedRealtime()
+            // All parsing/mapping/sorting off the main thread: the UI thread only
+            // receives the finished feed, so D-pad input never waits on it.
+            val result = runCatching { kotlinx.coroutines.withContext(Dispatchers.Default) { build() } }
             val feed = result.getOrNull()
             when {
                 feed != null && !feed.isEmpty -> {
-                    _state.value = FeedState(feed, loading = false)
+                    // Identical data → no emission → nothing on screen recomposes.
+                    if (feed != _state.value.feed || _state.value.loading || _state.value.error != null) {
+                        _state.value = FeedState(feed, loading = false)
+                    }
                     cache.write(cacheName, feed)
                 }
                 _state.value.feed.isEmpty -> _state.value = FeedState(

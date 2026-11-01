@@ -16,8 +16,8 @@ android {
         applicationId = "com.homeflix.tv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 10
-        versionName = "5.5"
+        versionCode = 11
+        versionName = "5.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -41,12 +41,12 @@ android {
         }
         release {
             signingConfig = signingConfigs.getByName("sideload")
-            // R8 is off until it has been verified on a real TV: shrinking can
-            // silently break Retrofit/Gson reflection, which shows up as
-            // "can't reach the server". Compose's bundled baseline profiles
-            // (profileinstaller) still give the AOT-compiled scroll paths.
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // R8 in a conservative mode: optimizes Compose/Media3/Coil library
+            // code (noticeably smoother scrolling) but never renames anything and
+            // keeps every app class whole, so Gson/Retrofit reflection is
+            // unaffected (see proguard-rules.pro). Build with -PnoR8 to compare.
+            isMinifyEnabled = !project.hasProperty("noR8")
+            isShrinkResources = !project.hasProperty("noR8")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -69,6 +69,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+// `./gradlew assembleRelease -PcomposeReports` writes Compose stability reports.
+composeCompiler {
+    if (project.hasProperty("composeReports")) {
+        reportsDestination = layout.buildDirectory.dir("compose_reports")
+        metricsDestination = layout.buildDirectory.dir("compose_reports")
     }
 }
 
