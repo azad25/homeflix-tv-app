@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.13.0 (R8 code shrinking is currently off; see app/build.gradle.kts).
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.13.1 (R8 code shrinking is currently off; see app/build.gradle.kts).
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 
@@ -68,6 +68,9 @@ This implements `docs/LIVE_TV.md` from homeflix-wifi `release/v5.5`. The code is
   - HLS with a 1.5 s / 3 s start/rebuffer buffer and a 12 s live offset.
   - `BehindLiveWindow` seeks to the live edge.
   - A TextureView moves between full screen and the guide's preview window.
+- **YouTube channels (5.13.1):** an IFrame-API embed in a non-focusable WebView.
+  - It reports playing and errors, so the logo stays up until there's a picture.
+  - If embedding fails or nothing plays within 12 s, OK hands the video to the YouTube app (`ACTION_VIEW`, TV edition first). Info ▶ does too.
 - **`LiveTvRepository`:** loads the lineup (sorted by number) and `/play`. It prefetches the neighbours' `/play` (trusted for 45 s, used once).
 - **`LiveTvStore`:** keeps favorites, last and previous channel, and the last 10 channels in DataStore.
 - **Entry points:** a "Live TV" item on the top menu (opens on OK), and a "Live TV" row on Home: an entry tile, then favorites, then recents.

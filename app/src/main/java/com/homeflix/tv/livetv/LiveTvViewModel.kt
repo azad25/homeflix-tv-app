@@ -53,7 +53,19 @@ class LiveTvViewModel @Inject constructor(
         .build()
         .apply { playWhenReady = true }
 
-    val controller = LiveTvController(viewModelScope, repo, store, this)
+    val controller = LiveTvController(viewModelScope, repo, store, this, openYouTubeApp = ::openYouTubeApp)
+
+    /** ACTION_VIEW to the YouTube app (the TV edition first); its Back returns to HomeFlix. */
+    private fun openYouTubeApp(videoId: String): Boolean {
+        val uri = android.net.Uri.parse("https://www.youtube.com/watch?v=$videoId")
+        for (pkg in listOf("com.google.android.youtube.tv", "com.google.android.youtube", null)) {
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                .apply { if (pkg != null) setPackage(pkg) }
+            if (runCatching { context.startActivity(intent) }.isSuccess) return true
+        }
+        return false
+    }
     val state get() = controller.state
 
     private val _loadFailed = MutableStateFlow(false)

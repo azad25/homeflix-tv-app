@@ -54,7 +54,10 @@ class LiveTvControllerTest {
         val source = FakeSource()
         val memory = FakeMemory(last)
         val player = FakePlayer()
-        val c = LiveTvController(scope, source, memory, player, now = { scope.testScheduler.currentTime })
+        val handedOff = mutableListOf<String>()
+        var youtubeInstalled = true
+        val c = LiveTvController(scope, source, memory, player, now = { scope.testScheduler.currentTime },
+            openYouTubeApp = { id -> if (youtubeInstalled) { handedOff += id; true } else false })
     }
 
     private fun TestScope.rig(last: String? = null, start: String? = null): Rig {
@@ -226,5 +229,41 @@ class LiveTvControllerTest {
         r.c.left()
         assertEquals("★  Favorites", r.c.state.value.groups.first().title)
         assertNull(r.c.state.value.message)
+    }
+
+    @Test
+    fun youtube_embedPlays_orFailsAndOkHandsOffToTheYouTubeApp() = runTest {
+        val r = rig(last = "ch3")
+        r.source.answer = { LivePlay(urls = emptyList(), youtubeId = "abcdefghijk") }
+        r.c.down(); advanceTimeBy(450)
+        assertEquals(LivePhase.YOUTUBE, r.c.state.value.phase)
+        assertFalse(r.c.state.value.youtubePlaying)
+        r.c.onYouTubePlaying()
+        assertTrue(r.c.state.value.youtubePlaying)
+        advanceTimeBy(20_000)
+        assertFalse("a playing embed never counts as failed", r.c.state.value.youtubeFailed)
+        // OK still opens the mini guide while the embed plays.
+        r.c.ok(); assertEquals(LiveOverlay.MINI_GUIDE, r.c.state.value.overlay); r.c.back()
+        // ▶ info on a YouTube channel, then ▶ again: the YouTube app.
+        r.c.right(); r.c.right()
+        assertEquals(listOf("abcdefghijk"), r.handedOff)
+
+        // Embedding blocked: the screen offers the app, OK hands off; never leaves by itself.
+        r.c.down(); advanceTimeBy(450)
+        r.c.onYouTubeError()
+        assertTrue(r.c.state.value.youtubeFailed)
+        assertEquals(1, r.handedOff.size)
+        r.c.ok()
+        assertEquals(2, r.handedOff.size)
+        assertEquals(LiveOverlay.NONE, r.c.state.value.overlay)
+
+        // Nothing on screen for 12 s counts as failed too.
+        r.c.down(); advanceTimeBy(450)
+        advanceTimeBy(12_100)
+        assertTrue(r.c.state.value.youtubeFailed)
+        // No YouTube app: say so instead of failing silently.
+        r.youtubeInstalled = false
+        r.c.ok()
+        assertEquals("The YouTube app isn't installed", r.c.state.value.message)
     }
 }

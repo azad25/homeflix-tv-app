@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.13.0)
+# HomeFlix TV v5 (5.13.1)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.13.0, versionCode 24, 16.7 MB)
-SHA-256: `638da3ede5bf5a7ffbfd3801146e54287d838bac4269a9ee6a32b44a095f1b2b`
+**Download:** `homeflix-tv-v5.apk` (5.13.1, versionCode 25, 16.7 MB)
+SHA-256: `ed4a9f26dba635be6d2cabe80da71f9686b0e720bfd0b4ab2b26aa4646712865`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -96,8 +96,9 @@ SHA-256: `638da3ede5bf5a7ffbfd3801146e54287d838bac4269a9ee6a32b44a095f1b2b`
   - **Back** closes a guide, or returns to your last channel. **Back twice** leaves Live TV.
 - **When a channel won't play:**
   - The app tries the server's next stream.
-  - Then it tries the broadcaster's official YouTube live stream.
+  - Then it plays the broadcaster's official YouTube live stream inside HomeFlix, and ▲▼ still zap.
   - Then it shows "isn't available right now". It never jumps to another channel by itself.
+- **YouTube channels:** if the broadcaster blocks embedding (or the TV can't play it), the screen offers **Press OK to watch it in the YouTube app**. On any YouTube channel, ▶ (info) then ▶ also opens it in the YouTube app.
 - **Under the hood:**
   - One player for the whole session.
   - A small start buffer, with live playback about 12 s behind the live edge.

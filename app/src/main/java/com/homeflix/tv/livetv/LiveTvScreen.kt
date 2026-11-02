@@ -142,7 +142,13 @@ fun LiveTvContent(
             when (state.phase) {
                 LivePhase.TUNING, LivePhase.IDLE -> TuningScreen(state.shown ?: state.current, state.loading)
                 LivePhase.UNAVAILABLE -> NoSignal(state.shown ?: state.current)
-                LivePhase.YOUTUBE -> state.youtubeId?.let { YouTubeLive(it) }
+                LivePhase.YOUTUBE -> state.youtubeId?.let { id ->
+                    if (!state.youtubeFailed) YouTubeLive(id, onPlaying = controller::onYouTubePlaying, onError = controller::onYouTubeError)
+                    when {
+                        state.youtubeFailed -> YouTubeHandoff(state.shown ?: state.current)
+                        !state.youtubePlaying -> TuningScreen(state.shown ?: state.current, false)
+                    }
+                }
                 LivePhase.PLAYING -> Unit
             }
         }
@@ -154,7 +160,9 @@ fun LiveTvContent(
             exit = fadeOut(tween(250)),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            (state.shown ?: state.current)?.let { InfoBanner(it, state.overlay == LiveOverlay.INFO, state.isFavorite) }
+            (state.shown ?: state.current)?.let {
+                InfoBanner(it, state.overlay == LiveOverlay.INFO, state.isFavorite, youtube = state.phase == LivePhase.YOUTUBE)
+            }
         }
 
         if (state.digits.isNotEmpty()) NumberEntry(state.digits, Modifier.align(Alignment.TopEnd))
@@ -200,10 +208,22 @@ private fun LiveVideo(vm: LiveTvViewModel, modifier: Modifier) {
     DisposableEffect(Unit) { onDispose { view?.let(vm::detach) } }
 }
 
-/** Broadcasters' official YouTube live streams; the remote keeps zapping (the WebView never takes focus). */
-@SuppressLint("SetJavaScriptEnabled")
+/**
+ * Broadcasters' official YouTube live streams, embedded (docs/LIVE_TV.md).
+ * The IFrame API reports playing / errors (e.g. embedding blocked), so the
+ * logo stays up until there's a picture and a failure offers the YouTube app.
+ * The WebView never takes focus: ▲▼ keep zapping.
+ */
+@SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
-private fun YouTubeLive(videoId: String) {
+private fun YouTubeLive(videoId: String, onPlaying: () -> Unit, onError: () -> Unit) {
+    val main = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
+    val bridge = remember(videoId) {
+        object {
+            @android.webkit.JavascriptInterface fun playing() { main.post(onPlaying) }
+            @android.webkit.JavascriptInterface fun failed() { main.post(onError) }
+        }
+    }
     AndroidView(
         factory = { ctx ->
             WebView(ctx).apply {
@@ -217,10 +237,50 @@ private fun YouTubeLive(videoId: String) {
                 setBackgroundColor(android.graphics.Color.BLACK)
             }
         },
-        update = { it.loadUrl("https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&controls=0&rel=0&modestbranding=1&playsinline=1") },
+        update = { web ->
+            if (web.tag != videoId) {
+                web.tag = videoId
+                web.removeJavascriptInterface("HomeFlix")
+                web.addJavascriptInterface(bridge, "HomeFlix")
+                web.loadDataWithBaseURL("https://www.youtube-nocookie.com/", youTubeHtml(videoId), "text/html", "utf-8", null)
+            }
+        },
         onRelease = { it.destroy() },
         modifier = Modifier.fillMaxSize()
     )
+}
+
+private fun youTubeHtml(id: String): String = """
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#p{position:absolute;inset:0;width:100%;height:100%}</style>
+</head><body><div id="p"></div>
+<script>
+var tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';
+tag.onerror=function(){HomeFlix.failed()};document.head.appendChild(tag);
+function onYouTubeIframeAPIReady(){
+  new YT.Player('p',{host:'https://www.youtube-nocookie.com',videoId:'$id',
+    playerVars:{autoplay:1,controls:0,rel:0,modestbranding:1,playsinline:1,iv_load_policy:3,disablekb:1},
+    events:{
+      onReady:function(e){e.target.playVideo()},
+      onStateChange:function(e){if(e.data===1)HomeFlix.playing()},
+      onError:function(){HomeFlix.failed()}
+    }});
+}
+</script></body></html>
+""".trimIndent()
+
+@Composable
+private fun YouTubeHandoff(channel: LiveChannel?) {
+    Box(Modifier.fillMaxSize().background(Color.Black).testTag("live_youtube_handoff"), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (channel != null) LogoTile(channel, 140.dp, 78.dp)
+            Text("${channel?.name ?: "This channel"} streams live on YouTube", color = Color.White, fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+            Text("Press OK to watch it in the YouTube app", color = Color.White, fontSize = 16.sp,
+                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x33FFFFFF)).padding(horizontal = 18.dp, vertical = 8.dp))
+            Text("or ▲ ▼ for another channel", color = Tv.TextSecondary, fontSize = 14.sp)
+        }
+    }
 }
 
 // ------------------------------------------------------------------ screens
@@ -262,7 +322,7 @@ private fun LiveUnavailableLineup(onExit: () -> Unit) {
 }
 
 @Composable
-private fun InfoBanner(ch: LiveChannel, infoMode: Boolean, favorite: Boolean) {
+private fun InfoBanner(ch: LiveChannel, infoMode: Boolean, favorite: Boolean, youtube: Boolean = false) {
     val clock = rememberClock()
     Box(
         Modifier.fillMaxWidth()
@@ -290,6 +350,10 @@ private fun InfoBanner(ch: LiveChannel, infoMode: Boolean, favorite: Boolean) {
                         Text(if (favorite) "★  In Favorites" else "☆  Add to Favorites", color = Color.Black, fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).padding(horizontal = 16.dp, vertical = 7.dp))
+                        if (youtube) {
+                            Text("▶  Open in YouTube", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x33FFFFFF)).padding(horizontal = 16.dp, vertical = 7.dp))
+                        }
                         Text("OK to ${if (favorite) "remove" else "add"}  ·  ◀ guide  ·  Back to close", color = Tv.TextSecondary, fontSize = 13.sp)
                     }
                 }
