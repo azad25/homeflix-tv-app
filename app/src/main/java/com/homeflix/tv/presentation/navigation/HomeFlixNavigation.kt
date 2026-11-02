@@ -96,6 +96,24 @@ fun HomeFlixNavigation(
         castController.consumePlayRequest(req)
     }
 
+    // A card on the TV home screen: open that title, or resume it.
+    val homeLink by com.homeflix.tv.launcher.DeepLinks.pending.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(homeLink) {
+        val link = homeLink ?: return@LaunchedEffect
+        com.homeflix.tv.launcher.DeepLinks.consume(link)
+        // Start from the browse screens so Back from the title lands on Home.
+        navController.popBackStack(Screen.Home.route, inclusive = false)
+        when (link) {
+            is com.homeflix.tv.launcher.HomeLink.Play -> {
+                previewPlayer.hardStop()
+                navController.navigate(Screen.VideoPlayer.createRoute(link.mediaId, link.positionMs, false)) { launchSingleTop = true }
+            }
+            is com.homeflix.tv.launcher.HomeLink.Movie -> navController.navigate(Screen.Details.createRoute(link.mediaId.toString())) { launchSingleTop = true }
+            is com.homeflix.tv.launcher.HomeLink.Series -> navController.navigate(Screen.TvSeriesDetails.createRoute(link.seriesId.toString())) { launchSingleTop = true }
+            com.homeflix.tv.launcher.HomeLink.Home -> Unit
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route,

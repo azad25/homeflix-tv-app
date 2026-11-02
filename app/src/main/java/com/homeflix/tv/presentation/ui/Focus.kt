@@ -43,6 +43,80 @@ fun ManualFocusScroll(content: @Composable () -> Unit) {
 }
 
 /**
+ * For plain lists, grids and chip rows (Search, Notifications, Settings,
+ * seasons): keep the focused item in view with a margin so the next one peeks
+ * in, and move there with a critically-damped spring. A spring keeps its
+ * velocity when the target changes, so holding the D-pad is one continuous
+ * glide instead of a stop-start per item.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+object SmoothBringIntoView : BringIntoViewSpec {
+    @Suppress("OVERRIDE_DEPRECATION")
+    override val scrollAnimationSpec: androidx.compose.animation.core.AnimationSpec<Float> =
+        androidx.compose.animation.core.spring(dampingRatio = 1f, stiffness = 420f)
+
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+        val margin = containerSize * 0.12f
+        val trailing = offset + size - (containerSize - margin)
+        return when {
+            size + 2 * margin > containerSize -> offset - margin   // too big: align its start
+            offset < margin -> offset - margin                     // above / left of the margin
+            trailing > 0 -> trailing                               // below / right of the margin
+            else -> 0f
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun SmoothFocusScroll(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalBringIntoViewSpec provides SmoothBringIntoView, content = content)
+}
+
+/** Ongoing smooth scroll per list: new D-pad presses retarget it instead of restarting it. */
+private class Follower {
+    var remaining = 0f
+    var running = false
+}
+
+private val followers = java.util.WeakHashMap<LazyListState, Follower>()
+
+/** Time constant of the follow motion: ~95% of the way in 3 × this. */
+private const val FollowTauMs = 68f
+
+/**
+ * Scrolls by [delta] px with an ease-out follow. If this list is already
+ * moving, the running motion is simply retargeted (no stop, no restart from
+ * zero speed), which is what makes rapid or held presses glide.
+ */
+suspend fun LazyListState.followBy(delta: Float) {
+    val f = followers.getOrPut(this) { Follower() }
+    f.remaining = delta
+    if (f.running) return
+    if (kotlin.math.abs(delta) <= 0.5f) return
+    f.running = true
+    try {
+        scroll {
+            var last = androidx.compose.runtime.withFrameNanos { it }
+            while (kotlin.math.abs(f.remaining) > 0.5f) {
+                val now = androidx.compose.runtime.withFrameNanos { it }
+                val dt = ((now - last) / 1_000_000f).coerceIn(1f, 48f)
+                last = now
+                var step = f.remaining * (1f - kotlin.math.exp(-dt / FollowTauMs))
+                // A minimum speed so the very end doesn't crawl.
+                if (kotlin.math.abs(step) < 1.5f) step = kotlin.math.sign(f.remaining) * minOf(1.5f, kotlin.math.abs(f.remaining))
+                val used = scrollBy(step)
+                f.remaining -= step
+                if (kotlin.math.abs(used - step) > 0.5f) break // hit the end of the list
+            }
+        }
+    } finally {
+        f.remaining = 0f
+        f.running = false
+    }
+}
+
+/**
  * Smoothly bring item [index] to the list's start keyline (its content padding
  * start, minus [offsetPx]). Uses the laid-out position when visible so the
  * motion is a single eased glide; falls back to an index jump otherwise.
@@ -50,8 +124,7 @@ fun ManualFocusScroll(content: @Composable () -> Unit) {
 suspend fun LazyListState.glideTo(index: Int, offsetPx: Int = 0, durationMs: Int = Tv.ScrollMotionMs) {
     val info = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
     if (info != null) {
-        val delta = (info.offset - offsetPx).toFloat()
-        if (kotlin.math.abs(delta) > 0.5f) animateScrollBy(delta, tween(durationMs, easing = Tv.Ease))
+        followBy((info.offset - offsetPx).toFloat())
     } else {
         animateScrollToItem(index, offsetPx)
     }
@@ -68,8 +141,7 @@ suspend fun LazyListState.slideTo(index: Int, from: Int, basePx: Int, durationMs
     val items = layoutInfo.visibleItemsInfo
     val target = items.firstOrNull { it.index == index } ?: run { animateScrollToItem(index); return }
     val shrink = if (from < index) items.firstOrNull { it.index == from }?.let { (it.size - basePx).coerceAtLeast(0) } ?: 0 else 0
-    val delta = (target.offset - shrink).toFloat()
-    if (kotlin.math.abs(delta) > 0.5f) animateScrollBy(delta, tween(durationMs, easing = Tv.Ease))
+    followBy((target.offset - shrink).toFloat())
 }
 
 /** Scroll just enough to show item [index] whole (no-op when it already fits). */
@@ -77,7 +149,7 @@ suspend fun LazyListState.revealItem(index: Int, durationMs: Int = Tv.FocusMotio
     val info = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } ?: return
     val end = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding / 4
     val overflow = info.offset + info.size - end
-    if (overflow > 1) animateScrollBy(overflow.toFloat(), tween(durationMs, easing = Tv.Ease))
+    if (overflow > 1) followBy(overflow.toFloat())
 }
 
 /** Remembers FocusRequesters by key so a screen can restore focus to the exact tile it left. */

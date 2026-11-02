@@ -46,6 +46,9 @@ class HomeFlixTVApplication : Application(), ImageLoaderFactory {
         val updater = dagger.hilt.android.EntryPointAccessors
             .fromApplication(this, com.homeflix.tv.update.UpdaterEntryPoint::class.java).appUpdater()
         updater.start()
+
+        // HomeFlix's row on the TV home screen stays fresh in the background.
+        com.homeflix.tv.launcher.HomeScreenSync.schedule(this)
         dagger.hilt.android.EntryPointAccessors
             .fromApplication(this, com.homeflix.tv.cast.CastEntryPoint::class.java)
             .castConnection().onUpdateAvailable = updater::checkNow

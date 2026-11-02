@@ -108,6 +108,8 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
             intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             CastReceiverService.start(context)
+            com.homeflix.tv.launcher.HomeScreenSync.schedule(context)
+            com.homeflix.tv.launcher.HomeScreenSync.refreshSoon(context, delaySeconds = 30)
         }
     }
 }

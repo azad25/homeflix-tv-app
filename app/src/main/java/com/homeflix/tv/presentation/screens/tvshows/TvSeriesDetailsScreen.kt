@@ -207,6 +207,8 @@ private fun SeasonPicker(seasons: List<Season>, selected: Int, onSelect: (Int) -
         if (s != selected) onSelect(s)
     }
     Column(modifier.fillMaxWidth().padding(top = 8.dp)) {
+        // The page scrolls itself (ManualFocusScroll); the chips must still follow focus.
+        com.homeflix.tv.presentation.ui.SmoothFocusScroll {
         LazyRow(
             contentPadding = PaddingValues(horizontal = Tv.Keyline),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -233,6 +235,7 @@ private fun SeasonPicker(seasons: List<Season>, selected: Int, onSelect: (Int) -
                         .padding(horizontal = 18.dp, vertical = 8.dp)
                 )
             }
+        }
         }
     }
 }

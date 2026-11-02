@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import com.homeflix.tv.presentation.ui.throttleKeyRepeat
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -131,6 +132,7 @@ private fun NotificationsContent(items: List<Notification>, navigator: AppNaviga
                 }
                 LazyColumn(
                     state = listState,
+                    modifier = Modifier.throttleKeyRepeat(),
                     contentPadding = PaddingValues(top = 14.dp, bottom = 60.dp, end = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {

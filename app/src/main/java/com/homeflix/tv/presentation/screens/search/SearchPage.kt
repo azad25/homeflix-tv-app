@@ -48,6 +48,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import com.homeflix.tv.presentation.ui.throttleKeyRepeat
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -178,7 +179,7 @@ fun SearchContent(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp, end = 4.dp, start = 4.dp),
-                modifier = Modifier.fillMaxSize().focusRestorer()
+                modifier = Modifier.fillMaxSize().focusRestorer().throttleKeyRepeat()
             ) {
                 val results = state.results.distinctBy { it.key }
                 items(results, key = { it.key }) { tile -> ResultTile(tile) { actions.open(tile) } }

@@ -250,4 +250,23 @@ class AppSmokeTest {
             check(focused().contains("Server address")) { "Cancel should return to the row (focus=${focused()})" }
         }
     }
+
+    @Test
+    fun homeScreenCard_opensTheTitle() {
+        val base = server
+        assumeTrue("set -Dhomeflix.e2e.server", base != null && reachable(base))
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        pump(3_000)
+        ServerConfig.setLocal(ctx, base!!)
+        // What the launcher sends when a "HomeFlix" row card is pressed.
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, com.homeflix.tv.launcher.HomeLink.Movie(2).toUri())
+            .setClass(ctx, MainActivity::class.java)
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            check(waitForText("More Like This")) { "card didn't open the movie page" }
+            check(waitForText("Heat")) { "opened the wrong title" }
+            // Back goes to Home, not out of the app.
+            scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+            check(waitForText("Inception")) { "Back from a home-screen card should land on Home" }
+        }
+    }
 }

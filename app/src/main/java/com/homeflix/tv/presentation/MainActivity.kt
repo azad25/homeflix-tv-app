@@ -32,9 +32,22 @@ class MainActivity : ComponentActivity() {
         updater.onForeground()
     }
 
+    override fun onStop() {
+        super.onStop()
+        // You may have just watched something: refresh HomeFlix's home-screen row.
+        com.homeflix.tv.launcher.HomeScreenSync.refreshSoon(this)
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        com.homeflix.tv.launcher.DeepLinks.offer(intent) // a card on the TV home screen
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) com.homeflix.tv.launcher.DeepLinks.offer(intent)
 
         setContent {
             // Pin font scale to 1.0 so the TV's accessibility font size can't
@@ -42,8 +55,12 @@ class MainActivity : ComponentActivity() {
             val base = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density = base.density, fontScale = 1f)) {
                 HomeFlixTVTheme {
-                    Box(Modifier.fillMaxSize().background(Tv.Background)) {
-                        HomeFlixNavigation(previewPlayer = previewPlayer, castController = castController, updater = updater)
+                    // Lists that follow focus on their own glide smoothly; browse rows
+                    // and pages opt into their own keyline scrolling (ManualFocusScroll).
+                    com.homeflix.tv.presentation.ui.SmoothFocusScroll {
+                        Box(Modifier.fillMaxSize().background(Tv.Background)) {
+                            HomeFlixNavigation(previewPlayer = previewPlayer, castController = castController, updater = updater)
+                        }
                     }
                 }
             }

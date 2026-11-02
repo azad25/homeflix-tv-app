@@ -75,6 +75,9 @@ abstract class FeedViewModel(private val cache: FeedCache) : ViewModel() {
 
     protected abstract suspend fun build(): Feed
 
+    /** Called with every successfully built feed. */
+    protected open fun onBuilt(feed: Feed) {}
+
     /** Most recent loader failure, shown on the error screen so problems are diagnosable. */
     protected open val lastError: Throwable? get() = null
 
@@ -118,6 +121,7 @@ abstract class FeedViewModel(private val cache: FeedCache) : ViewModel() {
                         _state.value = FeedState(feed, loading = false)
                     }
                     cache.write(cacheName, feed)
+                    onBuilt(feed)
                 }
                 _state.value.feed.isEmpty -> _state.value = FeedState(
                     loading = false,
@@ -302,19 +306,32 @@ internal object Rows {
 @HiltViewModel
 class HomeFeedViewModel @Inject constructor(
     repo: MediaRepository,
-    cache: FeedCache
+    cache: FeedCache,
+    private val homeScreen: com.homeflix.tv.launcher.HomeScreenPublisher
 ) : FeedViewModel(cache) {
     override val cacheName = "home"
-    private val load = Loaders(repo)
-    override val lastError: Throwable? get() = load.lastError
+    private val builder = HomeFeedBuilder(repo)
+    override val lastError: Throwable? get() = builder.lastError
 
     init { start() }
 
-    override suspend fun build(): Feed = coroutineScope {
+    override suspend fun build(): Feed = builder.build()
+
+    // Every fresh Home feed also refreshes HomeFlix's row on the TV home screen.
+    override fun onBuilt(feed: Feed) = homeScreen.publishLater(feed)
+}
+
+/** Home's rows. Shared with the background job that keeps the TV home screen row fresh. */
+class HomeFeedBuilder(repo: MediaRepository) {
+    private val load = Loaders(repo)
+    val lastError: Throwable? get() = load.lastError
+
+    suspend fun build(): Feed = coroutineScope {
         val moviesD = async { load.movies() }
         val trendingD = async { load.trending() }
         val recentD = async { load.recentlyWatched() }
         val seriesD = async { load.series() }
+        val recommendedD = async { load.recommendations() }
         val movies = moviesD.await()
         val series = seriesD.await()
         if (movies.isEmpty() && series.isEmpty()) error("no content")
@@ -331,6 +348,9 @@ class HomeFeedViewModel @Inject constructor(
                 if (t.isNotEmpty()) add(ContentRow("trending", "Trending Now", t.take(20).map { Tiles.movie(it, "tr") }))
             }
             if (latest.isNotEmpty()) add(ContentRow("new", "New on HomeFlix", latest.take(20).map { Tiles.movie(it, "n") }))
+            recommendedD.await().distinctBy { it.id }.take(20).takeIf { it.size >= 4 }?.let { rec ->
+                add(ContentRow("recommended", "Recommended for You", rec.map { Tiles.movie(it, "rc") }))
+            }
             if (series.isNotEmpty()) {
                 add(ContentRow("shows", "TV Shows", series.sortedByDescending { it.createdAt }.take(20).map { Tiles.series(it) }))
             }

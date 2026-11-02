@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.9.6 (R8 code shrinking is currently off; see app/build.gradle.kts).
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.10.0 (R8 code shrinking is currently off; see app/build.gradle.kts).
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 
@@ -54,6 +54,19 @@ Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release bu
 - **Memory pressure:** the app frees the preview decoder and the bitmap cache when the system is low on memory.
 - **Player buffers:** sized to the device (40, 64 or 128 MB). Small caches are bounded, and LeakCanary is included in debug builds.
 - **Build:** R8 for library code, bundled Compose baseline profiles via profileinstaller, Kotlin 2.0.21 (strong skipping), a black splash with no white flash, and no verbose HTTP logging in release.
+
+### HomeFlix on the TV home screen (5.10)
+- **HomeFlix row:** a "HomeFlix" row on the TV's home screen, like Netflix and Prime Video (on Google TV it is in the Apps tab).
+  - What you're watching comes first, with a "Continue Watching" label and a red progress bar. A mix of new arrivals (marked NEW) and recommendations follows.
+  - Pressing a card resumes playback, or opens the movie or show page. Back from there goes to HomeFlix Home.
+- **Continue watching:** in-progress titles are also published to the system "Continue watching" row (Watch Next). Titles you remove there stay removed until you watch more.
+- **Card art:** the app draws each card: the backdrop with the title logo, the label and the progress bar. Launchers get the art from the app (`content://com.homeflix.tv.homeart/…`), so cards show even if the launcher can't reach the server.
+- **Freshness:** the row is refreshed every time Home loads, about 20 s after you leave the app, after boot or an update, when the launcher asks, and every 3 h in the background (WorkManager).
+- **Code:** `app/src/main/java/com/homeflix/tv/launcher/`. Tests are in `HomeScreenTest` and `AppSmokeTest.homeScreenCard_opensTheTitle`.
+
+### Smoother scrolling (5.10)
+- **Rows and pages:** they follow focus with one continuous ease-out motion. A new press retargets the running motion instead of restarting it, so quick or held presses glide.
+- **Other lists:** Search results, Notifications, Settings and season chips keep the focused item in view with a margin, using a critically damped spring. Held keys are throttled to a steady pace.
 
 ### Cast from the web app (5.1)
 This implements `docs/TV_CAST_PROTOCOL.md` from the homeflix-wifi `release/v5.5` branch.
