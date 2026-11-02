@@ -156,7 +156,15 @@ interface HomeFlixApiService {
 
     /** Personalised rows learned from watches, ratings and My List. */
     @GET("recommendations/for-you")
-    suspend fun getForYou(@Query("limit") limit: Int = 20): Response<TasteResultDto>
+    suspend fun getForYou(
+        @Query("limit") limit: Int = 20,
+        @Query("kind") kind: String? = null,   // movie | series
+        @Query("unique") unique: Int? = 1      // no title in two rows
+    ): Response<TasteResultDto>
+
+    /** Top 10 from real plays (episodes roll up to shows). kind = movie | series | all. */
+    @GET("charts/top10")
+    suspend fun getTop10(@Query("kind") kind: String = "all", @Query("limit") limit: Int = 10): Response<ChartDto>
     
     // Recommendation endpoints - matching web frontend ScrollXHero.tsx
     @GET("recommendations")

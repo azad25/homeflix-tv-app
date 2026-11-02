@@ -32,5 +32,23 @@ data class TasteRowDto(
 
 data class TasteResultDto(
     val personalized: Boolean = false,
-    val rows: List<TasteRowDto>? = null
+    val rows: List<TasteRowDto>? = null,
+    /** Strongest taste features, e.g. "gen:Action", "cast:Michael Caine". */
+    @SerializedName("top_features") val topFeatures: List<String>? = null
+)
+
+data class ChartItemDto(
+    val id: Int = 0,
+    val type: String? = null,
+    val title: String? = null,
+    val rank: Int = 0,
+    val plays: Int = 0
+)
+
+data class ChartDto(
+    val kind: String? = null,
+    @SerializedName("window_days") val windowDays: Int = 0,
+    /** plays | mixed | catalog */
+    val source: String? = null,
+    val items: List<ChartItemDto>? = null
 )

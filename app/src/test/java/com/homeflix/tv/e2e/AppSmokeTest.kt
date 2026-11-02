@@ -321,4 +321,45 @@ class AppSmokeTest {
             http("DELETE", "$api/mylist/2")
         }
     }
+
+    /** Home, Movies and Shows never show a title in two rows (Continue Watching, Top 10 and My List aside). */
+    @Test
+    fun pages_haveNoDuplicateTitles_andARealTop10() {
+        val base = server
+        assumeTrue("set -Dhomeflix.e2e.server", base != null && reachable(base))
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        pump(3_000)
+        ServerConfig.setLocal(ctx, base!!)
+        listOf("home", "movies", "shows").forEach { java.io.File(ctx.filesDir, "feed_v5_$it.json").delete() }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            check(waitForText("Inception")) { "home never loaded" }
+            pump(2_000)
+            press(Key.DirectionUp)            // nav: Home
+            press(Key.DirectionRight); pump(3_000)   // Shows
+            press(Key.DirectionRight); pump(3_000)   // Movies
+        }
+        val gson = com.google.gson.Gson()
+        val exempt = Regex("continue|top10|mylist")
+        for (page in listOf("home", "movies", "shows")) {
+            val f = java.io.File(ctx.filesDir, "feed_v5_$page.json")
+            check(f.exists()) { "$page feed was never built" }
+            val feed = gson.fromJson(f.readText(), com.homeflix.tv.presentation.ui.Feed::class.java)
+            println("E2E[$page rows] " + feed.rows.joinToString { "${it.title} (${it.tiles.size})" })
+            val owner = HashMap<String, String>()
+            for (row in feed.rows.filter { !exempt.containsMatchIn(it.id) }) {
+                for (t in row.tiles) {
+                    val k = com.homeflix.tv.presentation.screens.feeds.PagePlanner.identity(t)
+                    val prev = owner.put(k, row.title)
+                    check(prev == null) { "$page: ${t.title} is in both \"$prev\" and \"${row.title}\"" }
+                }
+            }
+            val ranked = feed.rows.filter { it.id.contains("top10") }.flatMap { it.tiles }
+            for (row in feed.rows.filter { !exempt.containsMatchIn(it.id) }) {
+                check(row.tiles.none { t -> ranked.any { r -> com.homeflix.tv.presentation.screens.feeds.PagePlanner.identity(r) == com.homeflix.tv.presentation.screens.feeds.PagePlanner.identity(t) } }) {
+                    "$page: \"${row.title}\" repeats a Top 10 title"
+                }
+            }
+            ranked.forEachIndexed { i, t -> check(t.rank == i + 1) { "$page: Top 10 ranks out of order" } }
+        }
+    }
 }

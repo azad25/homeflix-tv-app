@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.11.0)
+# HomeFlix TV v5 (5.12.0)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.11.0, versionCode 22, 16.3 MB)
-SHA-256: `8a7f1e15a053aade485b31019a994a9cdbbfd33af08dc4606e91e01f9a6fe331`
+**Download:** `homeflix-tv-v5.apk` (5.12.0, versionCode 23, 16.3 MB)
+SHA-256: `6d4814ffc011e4d4cec7173e01ce0edffab830edca847e0a63f96935bb2c9e0e`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -19,6 +19,9 @@ SHA-256: `8a7f1e15a053aade485b31019a994a9cdbbfd33af08dc4606e91e01f9a6fe331`
 - **New player:** Netflix-style controls and pause screen, reliable resume, and a Next Episode card.
 - **HomeFlix on your TV's home screen:** Continue Watching, new arrivals and picks for you, right on the launcher.
 - **Rate and My List:** Not for me / I like this / Love this! on every movie and show. Your ratings, your list and your watch history shape your recommendations.
+- **Smarter pages, no repeats:** Home, Movies and Shows never show the same title in two rows.
+  - **Top 10** is ranked by what's actually being watched this week.
+  - Rows like Top Picks for You, Because You Liked…, New for You and Hidden Gems for You are personalised for you.
 - **Cast from the web app:** play any title on the TV from the HomeFlix website.
 - **Automatic updates:** the app updates itself from your HomeFlix server. This is the last APK you need to install by hand.
 
@@ -28,7 +31,15 @@ SHA-256: `8a7f1e15a053aade485b31019a994a9cdbbfd33af08dc4606e91e01f9a6fe331`
 - A new top menu that hides while you browse rows, plus a notification bell and a profile menu (Notifications, Settings, About, Refresh, Exit).
 - Movie, show, notification, settings and about pages also show the top menu.
 - Each tab remembers where you were. Back goes from the page to the menu, then to Home, then exits.
-- Home shows Continue Watching, **Top Picks for You**, Top 10, Trending, New on HomeFlix, **Because You Liked / Watched …**, TV Shows and genre rows.
+- **Home:** Continue Watching, My List, **Top Picks for You**, **Top 10 on HomeFlix This Week**, New on HomeFlix (movies and shows), **Because You Watched / Liked …**, **New for You**, **More with <actor>**, **Hidden Gems for You**, Trending, TV Shows, Critically Acclaimed and genre rows.
+- **Movies and Shows pages:** each gets its own Top Picks, its own Top 10, recently added titles, Because You Watched rows, and genre rows. "More Movies" / "More Shows" at the end holds everything not shown above.
+- **No title in two rows:** Continue Watching, My List and Top 10 keep their full lists. Every other row only shows titles not already on the page.
+- **Top 10 from real plays:**
+  - It counts how far each viewer got, how recently, and how many episodes they binged. Episodes count towards their show.
+  - This week's plays rank first, then this month's.
+  - Quiet servers fill the remaining places with the best rated and newest titles.
+- **Genre rows:** your favourite genres come first.
+- **Small libraries:** they still get several short rows instead of an empty page.
 - Continue Watching shows on Home, Movies and Shows. Show cards say where you are, e.g. "S1:E2 · Pilot · 20m left".
 - Pages open instantly from the last saved copy, then refresh quietly in the background.
 

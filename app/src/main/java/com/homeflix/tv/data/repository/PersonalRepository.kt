@@ -66,9 +66,17 @@ class PersonalRepository @Inject constructor(private val api: HomeFlixApiService
         r.body().orEmpty().filter { it.mediaType == "series" && it.mediaId > 0 }.map { it.mediaId }
     }
 
-    suspend fun forYou(limit: Int = 20): Result<TasteResultDto> = call {
-        val r = api.getForYou(limit)
+    /** Personalised rows; [kind] = "movie" / "series" for the Movies / Shows pages. No title repeats across rows. */
+    suspend fun forYou(limit: Int = 20, kind: String? = null): Result<TasteResultDto> = call {
+        val r = api.getForYou(limit, kind, 1)
         if (!r.isSuccessful) error("HTTP ${r.code()}")
         r.body() ?: TasteResultDto()
+    }
+
+    /** Top 10 by what's actually being watched. */
+    suspend fun top10(kind: String = "all"): Result<com.homeflix.tv.data.remote.dto.ChartDto> = call {
+        val r = api.getTop10(kind, 10)
+        if (!r.isSuccessful) error("HTTP ${r.code()}")
+        r.body() ?: com.homeflix.tv.data.remote.dto.ChartDto()
     }
 }

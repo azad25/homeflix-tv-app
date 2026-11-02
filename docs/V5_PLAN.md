@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.11.0 (R8 code shrinking is currently off; see app/build.gradle.kts).
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.12.0 (R8 code shrinking is currently off; see app/build.gradle.kts).
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 
@@ -54,6 +54,18 @@ Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release bu
 - **Memory pressure:** the app frees the preview decoder and the bitmap cache when the system is low on memory.
 - **Player buffers:** sized to the device (40, 64 or 128 MB). Small caches are bounded, and LeakCanary is included in debug builds.
 - **Build:** R8 for library code, bundled Compose baseline profiles via profileinstaller, Kotlin 2.0.21 (strong skipping), a black splash with no white flash, and no verbose HTTP logging in release.
+
+### Smarter pages (5.12)
+- **PagePlanner:** this is the planner behind Home, Movies and Shows (`feeds/PagePlanner.kt`).
+  - Rows claim titles in priority order and show in display order. No title appears in two rows.
+  - Continue Watching, My List and Top 10 keep their full lists.
+  - Row minimums scale with library size.
+  - Leftovers end up in "More Movies" / "More Shows".
+- **Top 10:** comes from the server's `/charts/top10`, ranked by real plays.
+- **Personalised rows:** come from `/recommendations/for-you?unique=1`, with `&kind=movie|series` on the Movies and Shows pages.
+  - Rows: Top Picks, Because You…, Continue <collection>, New for You, More with <actor>, From Director, and Hidden Gems.
+- **Genre rows:** ordered by the viewer's top genres.
+- **Tests:** `PagePlannerTest`, and the e2e `pages_haveNoDuplicateTitles_andARealTop10`.
 
 ### Ratings and My List (5.11)
 - **Rate:** movie and show pages have a **Rate** button. It opens Not for me, I like this or Love this!; picking your current rating again clears it.
