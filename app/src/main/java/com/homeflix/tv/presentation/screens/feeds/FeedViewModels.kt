@@ -297,6 +297,32 @@ internal object Rows {
         return if (tiles.isEmpty()) null else ContentRow("continue", "Continue Watching", tiles, RowStyle.LANDSCAPE)
     }
 
+    /**
+     * Rows from /recommendations/for-you: "Top Picks for You" first (row id
+     * "recommended", which the TV home screen also uses), then up to two
+     * "Because You Liked / Watched …" rows. Titles are matched against the
+     * loaded library so tiles get full artwork and trailers.
+     */
+    fun forYou(result: com.homeflix.tv.data.remote.dto.TasteResultDto?, movies: List<Media>, series: List<TvSeries>): List<ContentRow> {
+        val rows = result?.rows.orEmpty()
+        if (rows.isEmpty()) return emptyList()
+        val movieById = movies.associateBy { it.id }
+        val seriesById = series.associateBy { it.id }
+        fun tiles(row: com.homeflix.tv.data.remote.dto.TasteRowDto, prefix: String) = row.items.orEmpty().mapNotNull { item ->
+            if (item.type == "series") seriesById[item.id]?.let { Tiles.series(it, "${prefix}s") }
+            else movieById[item.id]?.let { Tiles.movie(it, prefix) }
+        }.distinctBy { it.key }
+        val out = mutableListOf<ContentRow>()
+        rows.firstOrNull { it.kind == "top-picks" }?.let { r ->
+            tiles(r, "fy").takeIf { it.size >= 3 }?.let { out += ContentRow("recommended", r.title ?: "Top Picks for You", it) }
+        }
+        if (out.isEmpty()) return emptyList()
+        rows.filter { it.kind == "because" }.take(2).forEachIndexed { i, r ->
+            tiles(r, "by$i").takeIf { it.size >= 3 }?.let { out += ContentRow("because$i", r.title ?: "Because You Watched", it) }
+        }
+        return out
+    }
+
     fun isEpisode(item: RecentlyWatchedItem) =
         (item.media.seriesId ?: 0) > 0 || item.media.type != MediaType.MOVIE
 }
@@ -306,11 +332,12 @@ internal object Rows {
 @HiltViewModel
 class HomeFeedViewModel @Inject constructor(
     repo: MediaRepository,
+    personal: com.homeflix.tv.data.repository.PersonalRepository,
     cache: FeedCache,
     private val homeScreen: com.homeflix.tv.launcher.HomeScreenPublisher
 ) : FeedViewModel(cache) {
     override val cacheName = "home"
-    private val builder = HomeFeedBuilder(repo)
+    private val builder = HomeFeedBuilder(repo, personal)
     override val lastError: Throwable? get() = builder.lastError
 
     init { start() }
@@ -322,7 +349,7 @@ class HomeFeedViewModel @Inject constructor(
 }
 
 /** Home's rows. Shared with the background job that keeps the TV home screen row fresh. */
-class HomeFeedBuilder(repo: MediaRepository) {
+class HomeFeedBuilder(repo: MediaRepository, private val personal: com.homeflix.tv.data.repository.PersonalRepository) {
     private val load = Loaders(repo)
     val lastError: Throwable? get() = load.lastError
 
@@ -332,14 +359,19 @@ class HomeFeedBuilder(repo: MediaRepository) {
         val recentD = async { load.recentlyWatched() }
         val seriesD = async { load.series() }
         val recommendedD = async { load.recommendations() }
+        // Learned from what you watch, rate and add to My List.
+        val forYouD = async { personal.forYou(20).getOrNull() }
         val movies = moviesD.await()
         val series = seriesD.await()
         if (movies.isEmpty() && series.isEmpty()) error("no content")
         val latest = Rows.byDate(movies)
         // Billboard: the newest additions released this year (movies and shows).
         val heroTiles = Rows.heroThisYear(movies, series)
+        val forYou = forYouD.await()?.takeIf { it.personalized }
+        val personalRows = Rows.forYou(forYou, movies, series)
         val rows = buildList {
             Rows.continueWatching(recentD.await(), series)?.let(::add)
+            personalRows.firstOrNull()?.let(::add) // Top Picks for You
             Rows.top10(movies).takeIf { it.size >= 5 }?.let { top ->
                 add(ContentRow("top10", "Top 10 Movies on HomeFlix Today",
                     top.mapIndexed { i, m -> Tiles.movie(m, "t", rank = i + 1) }, RowStyle.TOP10))
@@ -348,8 +380,12 @@ class HomeFeedBuilder(repo: MediaRepository) {
                 if (t.isNotEmpty()) add(ContentRow("trending", "Trending Now", t.take(20).map { Tiles.movie(it, "tr") }))
             }
             if (latest.isNotEmpty()) add(ContentRow("new", "New on HomeFlix", latest.take(20).map { Tiles.movie(it, "n") }))
-            recommendedD.await().distinctBy { it.id }.take(20).takeIf { it.size >= 4 }?.let { rec ->
-                add(ContentRow("recommended", "Recommended for You", rec.map { Tiles.movie(it, "rc") }))
+            if (personalRows.isNotEmpty()) {
+                addAll(personalRows.drop(1)) // Because You Liked / Watched …
+            } else {
+                recommendedD.await().distinctBy { it.id }.take(20).takeIf { it.size >= 4 }?.let { rec ->
+                    add(ContentRow("recommended", "Recommended for You", rec.map { Tiles.movie(it, "rc") }))
+                }
             }
             if (series.isNotEmpty()) {
                 add(ContentRow("shows", "TV Shows", series.sortedByDescending { it.createdAt }.take(20).map { Tiles.series(it) }))
@@ -427,6 +463,7 @@ class MoviesFeedViewModel @Inject constructor(
 @HiltViewModel
 class MyHomeFlixViewModel @Inject constructor(
     repo: MediaRepository,
+    private val personal: com.homeflix.tv.data.repository.PersonalRepository,
     cache: FeedCache
 ) : FeedViewModel(cache) {
     override val cacheName = "mine"
@@ -444,11 +481,16 @@ class MyHomeFlixViewModel @Inject constructor(
     override suspend fun build(): Feed = coroutineScope {
         val recentD = async { load.recentlyWatched() }
         val listD = async { load.myList() }
+        val listedShowsD = async { personal.myListSeriesIds().getOrNull().orEmpty() }
+        val seriesD = async { if (listedShowsD.await().isEmpty()) emptyList() else load.series() }
         val recent = recentD.await()
         val myList = listD.await()
+        val seriesById = seriesD.await().associateBy { it.id }
+        val listedShows = listedShowsD.await().mapNotNull { seriesById[it] }.map { Tiles.series(it, "mls") }
         val rows = buildList {
             Rows.continueWatching(recent)?.let(::add)
-            if (myList.isNotEmpty()) add(ContentRow("mylist", "My List", myList.map { Tiles.movie(it, "ml") }))
+            val listTiles = listedShows + myList.map { Tiles.movie(it, "ml") }
+            if (listTiles.isNotEmpty()) add(ContentRow("mylist", "My List", listTiles))
             val watched = recent.filter { !Rows.isEpisode(it) && it.durationSeconds > 0 &&
                 it.progressSeconds >= it.durationSeconds * 0.9 }
             if (watched.isNotEmpty()) add(ContentRow("watched", "Watch It Again", watched.map { Tiles.movie(it.media, "wa") }))

@@ -73,7 +73,7 @@ fun DetailsScreen(
         Box(Modifier.fillMaxSize().background(Tv.Background)) {
             val media = state.media
             when {
-                media != null -> DetailsContent(media, state, navigator, onMyList = vm::toggleMyList)
+                media != null -> DetailsContent(media, state, navigator, onMyList = vm::toggleMyList, onRate = vm::rate)
                 state.loading -> LoadingState()
                 else -> ErrorState(state.error ?: "Couldn't load this title.", onRetry = { vm.load(mediaId) })
             }
@@ -83,7 +83,7 @@ fun DetailsScreen(
 
 @UnstableApi
 @Composable
-private fun DetailsContent(media: Media, state: DetailsState, navigator: AppNavigator, onMyList: () -> Unit) {
+private fun DetailsContent(media: Media, state: DetailsState, navigator: AppNavigator, onMyList: () -> Unit, onRate: (Int) -> Unit) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val registry = rememberFocusRegistry()
@@ -131,6 +131,7 @@ private fun DetailsContent(media: Media, state: DetailsState, navigator: AppNavi
                         PillButton(if (inList) "In My List" else "My List", onMyList,
                             icon = if (inList) Icons.Filled.Check else Icons.Filled.Add)
                     }
+                    com.homeflix.tv.presentation.ui.RateButton(state.rating, onRate)
                 }
             }
             state.similar?.let { row ->

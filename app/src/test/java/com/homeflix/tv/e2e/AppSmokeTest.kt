@@ -269,4 +269,56 @@ class AppSmokeTest {
             check(waitForText("Inception")) { "Back from a home-screen card should land on Home" }
         }
     }
+
+    private fun http(method: String, url: String, body: String? = null): String =
+        (URL(url).openConnection() as HttpURLConnection).run {
+            requestMethod = method
+            if (body != null) { doOutput = true; setRequestProperty("Content-Type", "application/json"); outputStream.use { it.write(body.toByteArray()) } }
+            (if (responseCode < 400) inputStream else errorStream).bufferedReader().readText()
+        }
+
+    @Test
+    fun moviePage_myList_andRate_reachTheServer() {
+        val base = server
+        assumeTrue("set -Dhomeflix.e2e.server", base != null && reachable(base))
+        val api = "http://$base/api"
+        http("PUT", "$api/ratings/movie/2", """{"rating":0}""")
+        http("DELETE", "$api/mylist/2")
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        pump(3_000)
+        ServerConfig.setLocal(ctx, base!!)
+        fun key(k: Key, times: Int = 1) = repeat(times) {
+            rule.onAllNodes(androidx.compose.ui.test.isFocused()).onLast().performKeyInput { pressKey(k) }
+            pump(400)
+            println("E2E key=$k -> focus=${focused()}")
+        }
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, com.homeflix.tv.launcher.HomeLink.Movie(2).toUri())
+            .setClass(ctx, MainActivity::class.java)
+        try {
+            ActivityScenario.launch<MainActivity>(intent).use {
+                check(waitForText("More Like This")) { "movie page didn't open" }
+                check(waitForText("Rate")) { "no Rate button" }
+                pump(800)
+                key(Key.DirectionRight)                      // My List
+                check(focused() == "My List") { "focus=${focused()}" }
+                key(Key.Enter)
+                check(waitForText("In My List")) { "My List didn't toggle" }
+                key(Key.DirectionRight)                      // Rate
+                check(focused() == "Rate") { "focus=${focused()}" }
+                key(Key.Enter)                               // dialog: focus on "I like this"
+                pump(600)
+                key(Key.DirectionRight)                      // Love this!
+                key(Key.Enter)
+                check(waitForText("Loved")) { "rating didn't apply" }
+                pump(1_500)
+                val rating = http("GET", "$api/ratings/movie/2")
+                check(rating.contains("\"rating\":2")) { "server rating: $rating" }
+                val listed = http("GET", "$api/mylist/check/2")
+                check(listed.contains("true")) { "server My List: $listed" }
+            }
+        } finally {
+            http("PUT", "$api/ratings/movie/2", """{"rating":0}""")
+            http("DELETE", "$api/mylist/2")
+        }
+    }
 }

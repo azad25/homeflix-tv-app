@@ -1,6 +1,6 @@
 # 🎬 HomeFlix TV — Android TV Streaming Client
 
-**Version 5.9.5** — A Netflix/Prime‑grade Android TV client for the HomeFlix media server. Full‑bleed cinematic UI with auto‑playing background previews, a red‑and‑black HomeFlix theme, D‑pad‑first navigation, and an ExoPlayer video pipeline that buffers ahead for smooth playback. Built with Jetpack Compose and deliberately tuned to stay light on low‑RAM TVs (e.g. a 2 GB Sony Android TV).
+**Version 5.11.0** — A Netflix/Prime‑grade Android TV client for the HomeFlix media server. Full‑bleed cinematic UI with auto‑playing background previews, a red‑and‑black HomeFlix theme, D‑pad‑first navigation, and an ExoPlayer video pipeline that buffers ahead for smooth playback. Built with Jetpack Compose and deliberately tuned to stay light on low‑RAM TVs (e.g. a 2 GB Sony Android TV).
 
 ![Android TV](https://img.shields.io/badge/Android-TV-3DDC84?style=flat&logo=android) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=flat&logo=kotlin) ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=jetpack-compose) ![Media3 ExoPlayer](https://img.shields.io/badge/Media3-ExoPlayer-FF0000?style=flat) ![Hilt](https://img.shields.io/badge/Hilt-DI-2196F3?style=flat)
 
@@ -185,6 +185,50 @@ Tests, including an optional end-to-end run against a real server:
 ```
 
 See `docs/V5_PLAN.md` for what changed in v5.
+
+## 12. The server: homeflix-wifi
+
+HomeFlix TV is a client only. All movies, shows, artwork, progress, My List, ratings and recommendations come from the **HomeFlix server**, which lives in its own repo: **[azad25/homeflix-wifi](https://github.com/azad25/homeflix-wifi)**. The TV v5 app needs the server's **`release/v5.5`** branch, which has casting, TV app updates, thumbs ratings and the "for you" recommendations.
+
+| Part | What it does | Default address |
+|---|---|---|
+| `backend/` (Go) | Media library scanner, REST API, streaming (direct play + HLS transcode), previews, posters/logos, progress, recommendations | `http://<server-ip>:8252/api/` |
+| `frontend/` (Next.js) | The HomeFlix web app (also casts to this TV app) | `http://<server-ip>:3008` |
+
+### Run the server
+
+```bash
+git clone -b release/v5.5 https://github.com/azad25/homeflix-wifi.git
+cd homeflix-wifi
+./quick-start.sh      # first time: checks dependencies, sets up folders, starts everything
+./start.sh            # later runs
+```
+
+To keep it running in the background, the server README describes a systemd service (`homeflix.service`). The server needs Go, Node.js, FFmpeg and, optionally, Redis.
+
+### Point the TV at it
+
+1. Put the TV and the server on the same network.
+2. On the TV, open HomeFlix, then **Profile → Settings → Server address**, and enter `<server-ip>:8252`. The app checks the address and saves it.
+3. Optionally, set a public domain as `FALLBACK_BASE_URL` (§10). The app switches to it when the LAN address isn't reachable.
+
+### Server features the TV app uses
+
+| Feature | Endpoints | Docs (server repo) |
+|---|---|---|
+| Library, details, search, genres | `/api/media/*`, `/api/tv-series/*` | — |
+| Streaming | `/api/stream/{id}`, `/api/stream/{id}/info`, HLS | — |
+| Progress and Continue Watching | `/api/playback/*` | — |
+| My List (movies and whole shows) | `/api/mylist[/{id}][?type=series]` | — |
+| Thumbs ratings | `/api/ratings/{movie\|series}/{id}` | `docs/PERSONALISATION.md` |
+| Personalised rows ("Top Picks", "Because You Liked …") | `/api/recommendations/for-you` | `docs/PERSONALISATION.md` |
+| Cast from the web app | `ws://…/api/cast/tv/ws` | `docs/TV_CAST_PROTOCOL.md` |
+| TV app self-updates | `/api/app/tv/latest`, `backend/app-updates/tv/` | `docs/TV_APP_UPDATES.md` |
+| Pull the newest TV build from this repo | web **Settings → Dashboard → HomeFlix TV App**, `/api/admin/app/tv/fetch` | `docs/TV_APP_UPDATES.md` |
+
+**Publishing a TV build:** the server can download `apk/homeflix-tv-v5.apk` from this repo with one click. If the repo's default branch isn't `v5`, set `HOMEFLIX_TV_APP_BRANCH=v5` on the server. Copying the APK into `backend/app-updates/tv/` by hand also works.
+
+The recommendations learn from what you watch (and how much), your thumbs ratings and your My List. "Not for me" titles are never recommended. The same rows feed HomeFlix's row on the TV home screen.
 
 ## © Copyright
 © 2025 Homeflix Studios. All Rights Reserved.

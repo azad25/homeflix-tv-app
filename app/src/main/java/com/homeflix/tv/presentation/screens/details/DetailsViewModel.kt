@@ -27,13 +27,16 @@ data class DetailsState(
     val progress: Float? = null,
     val progressLabel: String? = null,
     val inMyList: Boolean? = null,
+    /** Thumbs rating (see Thumbs); null while loading or if the server can't rate. */
+    val rating: Int? = null,
     val similar: ContentRow? = null
 )
 
 @HiltViewModel
 class DetailsViewModel @Inject constructor(
     private val repo: MediaRepository,
-    private val progressStore: PlaybackProgressStore
+    private val progressStore: PlaybackProgressStore,
+    private val personal: com.homeflix.tv.data.repository.PersonalRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(DetailsState())
@@ -55,9 +58,11 @@ class DetailsViewModel @Inject constructor(
             }
             _state.update { it.copy(loading = false, media = media) }
             refreshProgress()
-            val inList = async { runCatching { repo.checkMyList(id.toString()).getOrNull() }.getOrNull() }
+            val inList = async { personal.inMyList(id, series = false).getOrNull() }
+            val rating = async { personal.rating(id, series = false).getOrNull() }
             val similar = async(kotlinx.coroutines.Dispatchers.Default) { runCatching { loadSimilar(media) }.getOrNull() }
-            _state.update { it.copy(inMyList = inList.await(), similar = similar.await()) }
+            _state.update { it.copy(inMyList = inList.await() ?: false, rating = rating.await()) }
+            _state.update { it.copy(similar = similar.await()) }
         }
     }
 
@@ -86,8 +91,17 @@ class DetailsViewModel @Inject constructor(
         val inList = _state.value.inMyList ?: false
         _state.update { it.copy(inMyList = !inList) }
         viewModelScope.launch {
-            val r = if (inList) repo.removeFromMyList(media.id.toString()) else repo.addToMyList(media.id.toString())
+            val r = personal.setInMyList(media.id, series = false, add = !inList)
             if (r.isFailure) _state.update { it.copy(inMyList = inList) }
+        }
+    }
+
+    fun rate(value: Int) {
+        val media = _state.value.media ?: return
+        val before = _state.value.rating
+        _state.update { it.copy(rating = value) }
+        viewModelScope.launch {
+            if (personal.rate(media.id, series = false, value = value).isFailure) _state.update { it.copy(rating = before) }
         }
     }
 

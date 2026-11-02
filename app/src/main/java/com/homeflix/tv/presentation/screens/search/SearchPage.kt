@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,6 +49,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusProperties
 import com.homeflix.tv.presentation.ui.throttleKeyRepeat
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -66,7 +68,8 @@ import com.homeflix.tv.presentation.ui.Tile
 import com.homeflix.tv.presentation.ui.TileActions
 import com.homeflix.tv.presentation.ui.Tv
 
-private val KEYS = ("abcdefghijklmnopqrstuvwxyz1234567890").map { it.toString() }
+/** Compact QWERTY layout: numbers, three letter rows (offset like a real keyboard). */
+private val QWERTY = listOf("1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm")
 
 /** Netflix-style search: on-screen keyboard + genres on the left, results grid on the right. */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -124,38 +127,22 @@ fun SearchContent(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp)
+                    .height(38.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .background(Tv.Surface)
                     .padding(horizontal = 12.dp)
             ) {
-                Icon(Icons.Filled.Search, null, tint = Tv.TextMuted, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.Search, null, tint = Tv.TextMuted, modifier = Modifier.size(18.dp))
                 Text(
                     state.query.ifEmpty { "Search movies & shows" },
                     color = if (state.query.isEmpty()) Tv.TextMuted else Color.White,
-                    fontSize = 17.sp,
+                    fontSize = 15.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 10.dp)
                 )
             }
-            Column(Modifier.padding(top = 12.dp).focusRestorer(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Key(icon = Icons.Filled.SpaceBar, label = "space", modifier = Modifier.weight(1f)) { onType(" ") }
-                    Key(icon = Icons.AutoMirrored.Filled.Backspace, label = "delete", modifier = Modifier.weight(1f),
-                        onLongClear = onClear) { onBackspace() }
-                }
-                KEYS.chunked(6).forEachIndexed { r, rowKeys ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        rowKeys.forEachIndexed { c, k ->
-                            Key(
-                                text = k,
-                                modifier = Modifier.weight(1f).then(if (r == 0 && c == 0) Modifier.focusRequester(firstKey) else Modifier)
-                            ) { onType(k) }
-                        }
-                    }
-                }
-            }
+            QwertyKeyboard(firstKey, onType, onBackspace, onClear)
             LazyColumn(Modifier.padding(top = 16.dp).fillMaxWidth(), contentPadding = PaddingValues(bottom = 40.dp)) {
                 items(state.genres, key = { it }) { g ->
                     GenreItem(g, selected = state.genre == g) { onGenre(g) }
@@ -188,27 +175,77 @@ fun SearchContent(
     }
 }
 
+/**
+ * Small QWERTY keyboard with keycap-style keys. Each letter row is ten key
+ * widths wide; shorter rows are centred with half-key insets, as on a real
+ * keyboard, so ▲/▼ land on the key above/below.
+ */
+@Composable
+private fun QwertyKeyboard(firstKey: FocusRequester, onType: (String) -> Unit, onBackspace: () -> Unit, onClear: () -> Unit) {
+    // ▲/▼ go to the key at the same position in the next row (w ▼ s, l ▲ o),
+    // not to whichever key's centre happens to be nearest.
+    val grid = remember { QWERTY.mapIndexed { r, keys -> List(keys.length) { c -> if (r == 1 && c == 0) firstKey else FocusRequester() } } }
+    Column(Modifier.padding(top = 10.dp).focusRestorer(), verticalArrangement = Arrangement.spacedBy(KeyGap)) {
+        QWERTY.forEachIndexed { r, keys ->
+            Row(horizontalArrangement = Arrangement.spacedBy(KeyGap)) {
+                val inset = (10 - keys.length) / 2f
+                if (inset > 0f) Spacer(Modifier.weight(inset))
+                keys.forEachIndexed { c, ch ->
+                    val k = ch.toString()
+                    Key(
+                        text = k,
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(grid[r][c])
+                            .focusProperties {
+                                grid.getOrNull(r + 1)?.let { below -> down = below[minOf(c, below.size - 1)] }
+                                grid.getOrNull(r - 1)?.let { above -> up = above[minOf(c, above.size - 1)] }
+                            }
+                    ) { onType(k) }
+                }
+                if (inset > 0f) Spacer(Modifier.weight(inset))
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(KeyGap)) {
+            Key(icon = Icons.Filled.SpaceBar, label = "space", modifier = Modifier.weight(5f)) { onType(" ") }
+            Key(icon = Icons.AutoMirrored.Filled.Backspace, label = "delete", modifier = Modifier.weight(2.5f),
+                onLongClear = onClear) { onBackspace() }
+            Key(text = "clear", small = true, modifier = Modifier.weight(2.5f)) { onClear() }
+        }
+    }
+}
+
+private val KeyGap = 3.dp
+
 @Composable
 private fun Key(
     modifier: Modifier = Modifier,
     text: String? = null,
     icon: ImageVector? = null,
     label: String? = null,
+    small: Boolean = false,
     onLongClear: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(5.dp)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .height(42.dp)
+            .height(30.dp)
             .onFocusChanged { focused = it.isFocused }
-            .clip(RoundedCornerShape(4.dp))
-            .background(if (focused) Color.White else Color(0x14FFFFFF))
+            .clip(shape)
+            // Keycap: a lighter face over a darker lip at the bottom.
+            .background(if (focused) Color(0xFFBDBDBD) else Color(0xFF151515))
+            .padding(bottom = 2.dp)
+            .clip(shape)
+            .background(if (focused) Color.White else Color(0xFF2C2C2C))
+            .border(1.dp, if (focused) Color.White else Color(0x1AFFFFFF), shape)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
     ) {
-        if (icon != null) Icon(icon, contentDescription = label, tint = if (focused) Color.Black else Color.White, modifier = Modifier.size(22.dp))
-        else Text(text.orEmpty(), color = if (focused) Color.Black else Color.White, fontSize = 19.sp, fontWeight = FontWeight.Medium)
+        val fg = if (focused) Color.Black else Color(0xFFE6E6E6)
+        if (icon != null) Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(17.dp))
+        else Text(text.orEmpty(), color = fg, fontSize = if (small) 11.sp else 14.sp, fontWeight = FontWeight.Medium)
     }
 }
 

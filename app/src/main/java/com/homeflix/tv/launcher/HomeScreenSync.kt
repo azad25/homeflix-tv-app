@@ -62,6 +62,7 @@ object HomeScreenSync {
 @InstallIn(SingletonComponent::class)
 interface HomeScreenEntryPoint {
     fun mediaRepository(): MediaRepository
+    fun personalRepository(): com.homeflix.tv.data.repository.PersonalRepository
     fun feedCache(): FeedCache
     fun homeScreenPublisher(): HomeScreenPublisher
 }
@@ -70,7 +71,7 @@ class HomeScreenWorker(context: Context, params: WorkerParameters) : CoroutineWo
     override suspend fun doWork(): Result {
         val entry = EntryPointAccessors.fromApplication(applicationContext, HomeScreenEntryPoint::class.java)
         val feed = runCatching {
-            withTimeout(60_000) { HomeFeedBuilder(entry.mediaRepository()).build() }
+            withTimeout(60_000) { HomeFeedBuilder(entry.mediaRepository(), entry.personalRepository()).build() }
         }.getOrNull() ?: entry.feedCache().read("home") ?: return Result.retry()
         entry.feedCache().write("home", feed) // the app also opens with it
         entry.homeScreenPublisher().publish(feed)

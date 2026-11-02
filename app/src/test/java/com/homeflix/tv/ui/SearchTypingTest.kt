@@ -47,9 +47,11 @@ class SearchTypingTest {
             override fun play(tile: Tile) {}
         }
         rule.setContent {
+            // One controller for the page's lifetime, as in the app shell.
+            val shell = androidx.compose.runtime.remember { ShellController(ShellTab.SEARCH) }
             SearchContent(
                 state = SearchState(query = query),
-                shell = ShellController(ShellTab.SEARCH),
+                shell = shell,
                 actions = noActions,
                 onType = { query += it },
                 onBackspace = { query = query.dropLast(1) },
@@ -57,7 +59,7 @@ class SearchTypingTest {
                 onGenre = {}
             )
         }
-        rule.waitForIdle() // focus starts on the on-screen "a" key
+        rule.waitForIdle() // focus starts on the on-screen "q" key (QWERTY)
 
         // Physical keyboard while an on-screen key has focus.
         press(listOf(Key.I, Key.N, Key.C, Key.E, Key.P, Key.T, Key.I, Key.O, Key.N))
@@ -75,8 +77,13 @@ class SearchTypingTest {
         rule.onRoot().performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.Backspace) } }
         assertEquals("", query)
 
-        // The on-screen keyboard still works with the D-pad: → then OK types "b".
+        // The on-screen QWERTY keyboard works with the D-pad: → then OK types "w",
+        // ▼ lands on the key below ("s"), ▲▲ reaches the number row ("2").
         press(listOf(Key.DirectionRight, Key.DirectionCenter))
-        assertEquals("b", query)
+        assertEquals("w", query)
+        press(listOf(Key.DirectionDown, Key.DirectionCenter))
+        assertEquals("ws", query)
+        press(listOf(Key.DirectionUp, Key.DirectionUp, Key.DirectionCenter))
+        assertEquals("ws2", query)
     }
 }

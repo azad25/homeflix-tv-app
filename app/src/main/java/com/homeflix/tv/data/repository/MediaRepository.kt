@@ -589,7 +589,10 @@ class MediaRepository @Inject constructor(
         return try {
             val response = apiService.getMyList()
             if (response.isSuccessful) {
-                val items = response.body()?.map { it.toDomain() } ?: emptyList()
+                // Shows in My List carry an empty media object; PersonalRepository lists those.
+                val items = response.body().orEmpty()
+                    .filter { it.mediaType != "series" && it.media.id > 0 }
+                    .mapNotNull { runCatching { it.toDomain() }.getOrNull() }
                 Log.d("MediaRepository", "getMyList success: ${items.size} items")
                 Result.success(items)
             } else {
@@ -610,7 +613,7 @@ class MediaRepository @Inject constructor(
         return try {
             val response = apiService.checkMyList(mediaId)
             if (response.isSuccessful) {
-                Result.success(response.body() ?: false)
+                Result.success(response.body()?.inList ?: false)
             } else if (response.code() == 404) {
                 Result.success(false)
             } else {

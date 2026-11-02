@@ -33,13 +33,17 @@ data class SeriesState(
     val episodes: ContentRow? = null,
     val episodesLoading: Boolean = false,
     val resume: SeriesResume? = null,
-    val firstEpisodeId: Int? = null
+    val firstEpisodeId: Int? = null,
+    val inMyList: Boolean? = null,
+    /** Thumbs rating of the whole show (see Thumbs); null while loading. */
+    val rating: Int? = null
 )
 
 @HiltViewModel
 class TvSeriesDetailsViewModel @Inject constructor(
     private val repo: MediaRepository,
-    private val progressStore: PlaybackProgressStore
+    private val progressStore: PlaybackProgressStore,
+    private val personal: com.homeflix.tv.data.repository.PersonalRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SeriesState())
@@ -67,11 +71,34 @@ class TvSeriesDetailsViewModel @Inject constructor(
                 it.copy(loading = false, series = series, seasons = seasons, resume = resume, selectedSeason = initialSeason)
             }
             selectSeason(initialSeason)
+            launch {
+                val inList = async { personal.inMyList(seriesId, series = true).getOrNull() }
+                val rating = async { personal.rating(seriesId, series = true).getOrNull() }
+                _state.update { it.copy(inMyList = inList.await() ?: false, rating = rating.await()) }
+            }
             // First episode of the first season for "Play S1:E1".
             seasons.firstOrNull()?.seasonNumber?.let { first ->
                 val eps = episodes(seriesId, first)
                 _state.update { it.copy(firstEpisodeId = eps.firstOrNull()?.id) }
             }
+        }
+    }
+
+    fun toggleMyList() {
+        val id = loadedId.takeIf { it > 0 } ?: return
+        val inList = _state.value.inMyList ?: false
+        _state.update { it.copy(inMyList = !inList) }
+        viewModelScope.launch {
+            if (personal.setInMyList(id, series = true, add = !inList).isFailure) _state.update { it.copy(inMyList = inList) }
+        }
+    }
+
+    fun rate(value: Int) {
+        val id = loadedId.takeIf { it > 0 } ?: return
+        val before = _state.value.rating
+        _state.update { it.copy(rating = value) }
+        viewModelScope.launch {
+            if (personal.rate(id, series = true, value = value).isFailure) _state.update { it.copy(rating = before) }
         }
     }
 

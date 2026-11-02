@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.10.0 (R8 code shrinking is currently off; see app/build.gradle.kts).
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.11.0 (R8 code shrinking is currently off; see app/build.gradle.kts).
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 
@@ -54,6 +54,14 @@ Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release bu
 - **Memory pressure:** the app frees the preview decoder and the bitmap cache when the system is low on memory.
 - **Player buffers:** sized to the device (40, 64 or 128 MB). Small caches are bounded, and LeakCanary is included in debug builds.
 - **Build:** R8 for library code, bundled Compose baseline profiles via profileinstaller, Kotlin 2.0.21 (strong skipping), a black splash with no white flash, and no verbose HTTP logging in release.
+
+### Ratings and My List (5.11)
+- **Rate:** movie and show pages have a **Rate** button. It opens Not for me, I like this or Love this!; picking your current rating again clears it.
+- **My List on show pages:** whole shows can now go in My List, and they appear in My HomeFlix → My List.
+- **Fixed:** the movie page's My List button never showed, because the server's `{"in_list": …}` answer wasn't parsed.
+- **Personalised Home:** Home's **Top Picks for You** and up to two **Because You Liked / Watched …** rows come from the server's `/recommendations/for-you`. These learn from what you watch, rate and add to My List. "Not for me" titles are never recommended. Top Picks also feed the TV home-screen row.
+- **Search keyboard:** a compact QWERTY keyboard with keycap-style keys and a number row. ▲/▼ go to the key at the same position in the next row. The bottom row has space, delete and clear.
+- **Server:** needs homeflix-wifi `release/v5.5`, which has the ratings API (`docs/PERSONALISATION.md` there).
 
 ### HomeFlix on the TV home screen (5.10)
 - **HomeFlix row:** a "HomeFlix" row on the TV's home screen, like Netflix and Prime Video (on Google TV it is in the Apps tab).

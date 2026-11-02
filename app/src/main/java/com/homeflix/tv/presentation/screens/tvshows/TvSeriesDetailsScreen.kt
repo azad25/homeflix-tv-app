@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -90,7 +92,7 @@ fun TvSeriesDetailsScreen(
         Box(Modifier.fillMaxSize().background(Tv.Background)) {
             val series = state.series
             when {
-                series != null -> SeriesContent(series, state, navigator, onSeason = vm::selectSeason)
+                series != null -> SeriesContent(series, state, navigator, onSeason = vm::selectSeason, onMyList = vm::toggleMyList, onRate = vm::rate)
                 state.loading -> LoadingState()
                 else -> ErrorState(state.error ?: "Couldn't load this show.", onRetry = { vm.load(seriesId) })
             }
@@ -101,7 +103,7 @@ fun TvSeriesDetailsScreen(
 @OptIn(ExperimentalComposeUiApi::class)
 @UnstableApi
 @Composable
-private fun SeriesContent(series: TvSeries, state: SeriesState, navigator: AppNavigator, onSeason: (Int) -> Unit) {
+private fun SeriesContent(series: TvSeries, state: SeriesState, navigator: AppNavigator, onSeason: (Int) -> Unit, onMyList: () -> Unit, onRate: (Int) -> Unit) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val registry = rememberFocusRegistry()
@@ -159,6 +161,11 @@ private fun SeriesContent(series: TvSeries, state: SeriesState, navigator: AppNa
                         PillButton("Play", { state.firstEpisodeId?.let { navigator.player(it, 0) } },
                             icon = Icons.Filled.PlayArrow, focusRequester = play)
                     }
+                    state.inMyList?.let { inList ->
+                        PillButton(if (inList) "In My List" else "My List", onMyList,
+                            icon = if (inList) Icons.Filled.Check else Icons.Filled.Add)
+                    }
+                    com.homeflix.tv.presentation.ui.RateButton(state.rating, onRate)
                 }
             }
             if (state.seasons.size > 1) {

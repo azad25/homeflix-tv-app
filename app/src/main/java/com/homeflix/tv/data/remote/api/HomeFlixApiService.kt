@@ -129,17 +129,34 @@ interface HomeFlixApiService {
     suspend fun getWatchHistory(): Response<List<ViewHistoryDto>>
     
     // My List endpoints
+    // type = "series" for a whole show (id is then the series id).
     @POST("mylist/{id}")
-    suspend fun addToMyList(@Path("id") id: String): Response<Unit>
+    suspend fun addToMyList(@Path("id") id: String, @Query("type") type: String? = null): Response<Unit>
     
     @DELETE("mylist/{id}")
-    suspend fun removeFromMyList(@Path("id") id: String): Response<Unit>
+    suspend fun removeFromMyList(@Path("id") id: String, @Query("type") type: String? = null): Response<Unit>
     
     @GET("mylist")
     suspend fun getMyList(): Response<List<WatchlistItemDto>>
+
+    /** Same list, read only for which entries are shows (their series ids). */
+    @GET("mylist")
+    suspend fun getMyListEntries(): Response<List<MyListEntryDto>>
     
+    // The server answers {"in_list": true}.
     @GET("mylist/check/{id}")
-    suspend fun checkMyList(@Path("id") id: String): Response<Boolean>
+    suspend fun checkMyList(@Path("id") id: String, @Query("type") type: String? = null): Response<MyListCheckDto>
+
+    // Thumbs ratings (kind = movie | series): steer /recommendations/for-you.
+    @GET("ratings/{kind}/{id}")
+    suspend fun getRating(@Path("kind") kind: String, @Path("id") id: Int): Response<RatingDto>
+
+    @PUT("ratings/{kind}/{id}")
+    suspend fun putRating(@Path("kind") kind: String, @Path("id") id: Int, @Body body: RatingBody): Response<RatingDto>
+
+    /** Personalised rows learned from watches, ratings and My List. */
+    @GET("recommendations/for-you")
+    suspend fun getForYou(@Query("limit") limit: Int = 20): Response<TasteResultDto>
     
     // Recommendation endpoints - matching web frontend ScrollXHero.tsx
     @GET("recommendations")
