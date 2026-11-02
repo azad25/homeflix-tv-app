@@ -162,6 +162,18 @@ interface HomeFlixApiService {
         @Query("unique") unique: Int? = 1      // no title in two rows
     ): Response<TasteResultDto>
 
+    // ---------------------------------------------------------------- Live TV
+    @GET("livetv/channels")
+    suspend fun liveChannels(
+        @Query("country") country: String? = null,
+        @Query("category") category: String? = null,
+        @Query("q") q: String? = null
+    ): Response<com.homeflix.tv.livetv.LiveLineup>
+
+    /** Fresh, signed stream URLs for a channel (ask on every tune). */
+    @GET("livetv/channels/{id}/play")
+    suspend fun livePlay(@Path("id") id: String): Response<com.homeflix.tv.livetv.LivePlay>
+
     /** Top 10 from real plays (episodes roll up to shows). kind = movie | series | all. */
     @GET("charts/top10")
     suspend fun getTop10(@Query("kind") kind: String = "all", @Query("limit") limit: Int = 10): Response<ChartDto>

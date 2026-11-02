@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.12.0 (R8 code shrinking is currently off; see app/build.gradle.kts).
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.13.0 (R8 code shrinking is currently off; see app/build.gradle.kts).
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 
@@ -54,6 +54,24 @@ Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release bu
 - **Memory pressure:** the app frees the preview decoder and the bitmap cache when the system is low on memory.
 - **Player buffers:** sized to the device (40, 64 or 128 MB). Small caches are bounded, and LeakCanary is included in debug builds.
 - **Build:** R8 for library code, bundled Compose baseline profiles via profileinstaller, Kotlin 2.0.21 (strong skipping), a black splash with no white flash, and no verbose HTTP logging in release.
+
+### Live TV (5.13)
+This implements `docs/LIVE_TV.md` from homeflix-wifi `release/v5.5`. The code is in `app/src/main/java/com/homeflix/tv/livetv/`.
+- **`LiveTvController`:** all the behaviour, in pure Kotlin.
+  - Instant banner, 400 ms zap debounce, and URL fallback, then YouTube, then "not available".
+  - 10 s with no video shows "not available".
+  - Number entry: 1.2 s commit, or OK.
+  - Mini guide and full guide. Groups are Favorites, All, countries and categories. Preview starts after 600 ms, muted, using the same player.
+  - Info/favorite panel.
+  - Back returns to the last channel; Back twice leaves.
+- **`LiveTvViewModel`:** owns one ExoPlayer for the session.
+  - HLS with a 1.5 s / 3 s start/rebuffer buffer and a 12 s live offset.
+  - `BehindLiveWindow` seeks to the live edge.
+  - A TextureView moves between full screen and the guide's preview window.
+- **`LiveTvRepository`:** loads the lineup (sorted by number) and `/play`. It prefetches the neighbours' `/play` (trusted for 45 s, used once).
+- **`LiveTvStore`:** keeps favorites, last and previous channel, and the last 10 channels in DataStore.
+- **Entry points:** a "Live TV" item on the top menu (opens on OK), and a "Live TV" row on Home: an entry tile, then favorites, then recents.
+- **Tests:** `LiveTvControllerTest` (virtual time) and `LiveTvScreenTest` (remote keys). The e2e `liveTv_menuRow_banner_zap_back` runs against a real server lineup.
 
 ### Smarter pages (5.12)
 - **PagePlanner:** this is the planner behind Home, Movies and Shows (`feeds/PagePlanner.kt`).

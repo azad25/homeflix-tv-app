@@ -112,6 +112,8 @@ fun AppShell(
     onOpenAbout: () -> Unit = {},
     unreadNotifications: Int = 0,
     updater: com.homeflix.tv.update.AppUpdater? = null,
+    /** Opens full-screen Live TV; null hides the menu item (server has Live TV off). */
+    onOpenLiveTv: (() -> Unit)? = null,
     page: @Composable (ShellTab, ShellController) -> Unit
 ) {
     var savedTab by rememberSaveable { mutableStateOf(ShellTab.HOME) }
@@ -154,7 +156,8 @@ fun AppShell(
                 menuOpen = menuOpen,
                 unread = unreadNotifications,
                 onNotifications = onOpenNotifications,
-                onToggleMenu = { menuOpen = !menuOpen }
+                onToggleMenu = { menuOpen = !menuOpen },
+                onLiveTv = onOpenLiveTv
             )
             if (!menuOpen && updater != null) UpdatePrompt(updater)
             CrashNotice()
@@ -179,7 +182,8 @@ private fun TopNav(
     menuOpen: Boolean,
     unread: Int,
     onNotifications: () -> Unit,
-    onToggleMenu: () -> Unit
+    onToggleMenu: () -> Unit,
+    onLiveTv: (() -> Unit)? = null
 ) {
     val visible = shell.navVisible || menuOpen
     val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(200), label = "navAlpha")
@@ -246,6 +250,8 @@ private fun TopNav(
                         }
                     )
                 }
+                // Live TV opens full screen on OK (it isn't a browse page, so resting on it does nothing).
+                if (onLiveTv != null) NavLiveTv(canFocus = visible, down = shell.pageEntry, onClick = onLiveTv)
             }
             Spacer(Modifier.weight(1f))
             // Notifications stay on the nav: bell with a red dot while anything is unread.
@@ -299,6 +305,28 @@ internal fun NavItem(
         } else {
             Text(tab.label, color = fg, fontSize = 14.sp, fontWeight = if (selected || focused) FontWeight.SemiBold else FontWeight.Normal)
         }
+    }
+}
+
+@Composable
+internal fun NavLiveTv(canFocus: Boolean, down: FocusRequester?, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .focusProperties {
+                this.canFocus = canFocus
+                if (down != null) this.down = down
+            }
+            .onFocusChanged { focused = it.isFocused }
+            .clip(RoundedCornerShape(50))
+            .background(if (focused) Color.White else Color.Transparent)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 5.dp)
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(Tv.Red))
+        Text("  Live TV", color = if (focused) Color.Black else Color(0xCCFFFFFF), fontSize = 14.sp,
+            fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
 

@@ -71,6 +71,7 @@ class PagePlanner(private val librarySize: Int = Int.MAX_VALUE) {
             TileKind.MOVIE -> "m:${t.id}"
             TileKind.SERIES -> "s:${t.id}"
             TileKind.EPISODE -> t.seriesId?.takeIf { it > 0 }?.let { "s:$it" } ?: "m:${t.id}"
+            TileKind.CHANNEL -> "c:${t.channelId}"
         }
     }
 }

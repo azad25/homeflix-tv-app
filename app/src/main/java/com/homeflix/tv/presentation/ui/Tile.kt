@@ -7,7 +7,8 @@ import com.homeflix.tv.domain.model.RecentlyWatchedItem
 import com.homeflix.tv.presentation.screens.tvshows.TvSeries
 import com.homeflix.tv.util.ApiUtils
 
-enum class TileKind { MOVIE, SERIES, EPISODE }
+/** CHANNEL = a Live TV channel ([Tile.channelId]); id 0 = "Live TV" (last channel). */
+enum class TileKind { MOVIE, SERIES, EPISODE, CHANNEL }
 
 /**
  * Everything a browse tile, the hero billboard and the info block under a row
@@ -32,10 +33,12 @@ data class Tile(
     val progress: Float? = null,
     val resumeMs: Long = 0,
     val badge: String? = null,
+    /** Live TV channel id for [TileKind.CHANNEL]. */
+    val channelId: String? = null,
     val rank: Int? = null
 )
 
-enum class RowStyle { POSTER, LANDSCAPE, TOP10 }
+enum class RowStyle { POSTER, LANDSCAPE, TOP10, CHANNEL }
 
 @Immutable
 data class ContentRow(

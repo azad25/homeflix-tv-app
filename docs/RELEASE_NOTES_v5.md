@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.12.0)
+# HomeFlix TV v5 (5.13.0)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.12.0, versionCode 23, 16.3 MB)
-SHA-256: `6d4814ffc011e4d4cec7173e01ce0edffab830edca847e0a63f96935bb2c9e0e`
+**Download:** `homeflix-tv-v5.apk` (5.13.0, versionCode 24, 16.7 MB)
+SHA-256: `638da3ede5bf5a7ffbfd3801146e54287d838bac4269a9ee6a32b44a095f1b2b`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -22,6 +22,10 @@ SHA-256: `6d4814ffc011e4d4cec7173e01ce0edffab830edca847e0a63f96935bb2c9e0e`
 - **Smarter pages, no repeats:** Home, Movies and Shows never show the same title in two rows.
   - **Top 10** is ranked by what's actually being watched this week.
   - Rows like Top Picks for You, Because You Liked…, New for You and Hidden Gems for You are personalised for you.
+- **Live TV, like a cable box:** free-to-air channels from your HomeFlix server.
+  - Channel numbers, ▲▼ zapping in about a second, and an info banner on every change.
+  - OK opens a mini guide; ◀ opens a full guide with live previews.
+  - Favorites, and Back to your last channel.
 - **Cast from the web app:** play any title on the TV from the HomeFlix website.
 - **Automatic updates:** the app updates itself from your HomeFlix server. This is the last APK you need to install by hand.
 
@@ -75,6 +79,30 @@ SHA-256: `6d4814ffc011e4d4cec7173e01ce0edffab830edca847e0a63f96935bb2c9e0e`
 - A compact QWERTY keyboard with a number row, plus space, delete and clear keys.
 - You can also type with a Bluetooth or USB keyboard, or the remote's number keys.
 - A genre list and a results grid.
+
+### Live TV
+- **Opening it:** use **Live TV** on the top menu, or the **Live TV** row on Home (favorites, then channels you watched recently). It opens full screen on your last channel, or channel 1.
+- **While watching:** only the video is on screen.
+  - Every channel change shows a banner for about 3 s: channel number, logo, name, ● LIVE, category · quality · country, and the clock.
+  - While a channel loads you see its logo, never the previous channel's picture.
+- **Remote:**
+  - **▲ / CH+** previous channel; **▼ / CH-** next channel. Holding a key zaps quickly; the channel tunes once you stop.
+  - **0-9** enters a channel number (`1 2 _`). It tunes after a short pause, or on OK.
+  - **OK** opens the mini guide: a channel list over the video, with ● NOW on the channel you're watching.
+  - **◀ / GUIDE** opens the full guide:
+    - Groups: Favorites, All, each country with its flag, each category.
+    - The focused channel plays muted in a preview window.
+  - **▶ / INFO / MENU** shows channel info with **Add to Favorites**.
+  - **Back** closes a guide, or returns to your last channel. **Back twice** leaves Live TV.
+- **When a channel won't play:**
+  - The app tries the server's next stream.
+  - Then it tries the broadcaster's official YouTube live stream.
+  - Then it shows "isn't available right now". It never jumps to another channel by itself.
+- **Under the hood:**
+  - One player for the whole session.
+  - A small start buffer, with live playback about 12 s behind the live edge.
+  - Neighbouring channels' streams are looked up in advance.
+- **Requires** Live TV to be turned on on the server (web app: Settings → Live TV). Without it, Live TV is hidden.
 
 ### Cast from the web app
 - Pick the TV in the HomeFlix website's cast menu to play, pause, seek, change volume or subtitles.

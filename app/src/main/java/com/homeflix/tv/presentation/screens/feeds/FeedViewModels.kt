@@ -308,10 +308,11 @@ class HomeFeedViewModel @Inject constructor(
     repo: MediaRepository,
     personal: com.homeflix.tv.data.repository.PersonalRepository,
     cache: FeedCache,
-    private val homeScreen: com.homeflix.tv.launcher.HomeScreenPublisher
+    private val homeScreen: com.homeflix.tv.launcher.HomeScreenPublisher,
+    liveTv: com.homeflix.tv.livetv.LiveTvHome
 ) : FeedViewModel(cache) {
     override val cacheName = "home"
-    private val builder = HomeFeedBuilder(repo, personal)
+    private val builder = HomeFeedBuilder(repo, personal, liveTv)
     override val lastError: Throwable? get() = builder.lastError
 
     init { start() }
@@ -323,7 +324,11 @@ class HomeFeedViewModel @Inject constructor(
 }
 
 /** Home's rows. Shared with the background job that keeps the TV home screen row fresh. */
-class HomeFeedBuilder(repo: MediaRepository, private val personal: com.homeflix.tv.data.repository.PersonalRepository) {
+class HomeFeedBuilder(
+    repo: MediaRepository,
+    private val personal: com.homeflix.tv.data.repository.PersonalRepository,
+    private val liveTv: com.homeflix.tv.livetv.LiveTvHome? = null
+) {
     private val load = Loaders(repo)
     val lastError: Throwable? get() = load.lastError
 
@@ -338,6 +343,7 @@ class HomeFeedBuilder(repo: MediaRepository, private val personal: com.homeflix.
         // Learned from what you watch, rate and add to My List; Top 10 from real plays.
         val forYouD = async { personal.forYou(20).getOrNull() }
         val chartD = async { personal.top10("all").getOrNull() }
+        val liveD = async { runCatching { liveTv?.tiles() }.getOrNull() }
         val movies = moviesD.await()
         val series = seriesD.await()
         if (movies.isEmpty() && series.isEmpty()) error("no content")
@@ -360,6 +366,7 @@ class HomeFeedBuilder(repo: MediaRepository, private val personal: com.homeflix.
         val myList = listedShowsD.await().mapNotNull { seriesById[it] }.map { Tiles.series(it, "mls") } +
             myListD.await().map { Tiles.movie(it, "ml") }
         p.add(1, "mylist", "My List", myList, min = 1, exclusive = false)
+        liveD.await()?.let { p.add(1, "livetv", "Live TV", it, RowStyle.CHANNEL, min = 1, max = com.homeflix.tv.livetv.LiveTvHome.MAX, exclusive = false) }
         themed["top-picks"]?.firstOrNull()?.let { r ->
             p.add(2, "recommended", r.title ?: "Top Picks for You", lib.tiles(r, "fy"), max = 15)
         } ?: p.add(2, "recommended", "Recommended for You",

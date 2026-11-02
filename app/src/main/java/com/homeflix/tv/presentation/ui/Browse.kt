@@ -122,6 +122,7 @@ fun PillButton(
 
 private fun tileHeightFor(style: RowStyle): Dp = when (style) {
     RowStyle.LANDSCAPE -> 150.dp
+    RowStyle.CHANNEL -> 112.dp
     else -> Tv.TileHeight
 }
 
@@ -130,6 +131,57 @@ private const val ExpandDwellMs = 650L
 
 private fun posterWidth(h: Dp): Dp = h * (2f / 3f)
 private fun landscapeWidth(h: Dp): Dp = h * (16f / 9f)
+
+/**
+ * A Live TV channel: the logo on a dark card, the channel number and a red
+ * LIVE dot (the first tile, id 0, is "Live TV": the last channel). No trailer.
+ */
+@Composable
+fun ChannelTile(tile: Tile, focusKey: String, registry: FocusRegistry, onFocused: () -> Unit, onClick: () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val h = tileHeightFor(RowStyle.CHANNEL)
+    val scale by animateFloatAsState(if (focused) 1.06f else 1f, tween(Tv.FocusMotionMs, easing = Tv.Ease), label = "chScale")
+    Box(
+        modifier = Modifier
+            .width(landscapeWidth(h))
+            .height(h)
+            .registerFocus(registry, focusKey)
+            .testTag("tile:$focusKey")
+            .onFocusChanged {
+                if (it.isFocused != focused) {
+                    focused = it.isFocused
+                    if (it.isFocused) onFocused()
+                }
+            }
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .clip(TileShape)
+            .background(if (tile.channelId == null) Color(0xFF3A0A0D) else Color(0xFF1C1C1E))
+            .then(if (focused) Modifier.border(3.dp, Tv.FocusRing, TileShape) else Modifier)
+    ) {
+        if (tile.channelId == null) {
+            Column(Modifier.align(Alignment.CenterStart).padding(start = 16.dp)) {
+                Text("Live TV", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(tile.subtitle ?: "Watch now", color = Color(0xCCFFFFFF), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        } else {
+            Box(Modifier.align(Alignment.Center).padding(horizontal = 30.dp, vertical = 22.dp).fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (tile.posterUrl.isNotBlank()) {
+                    coil.compose.AsyncImage(model = tile.posterUrl, contentDescription = tile.title,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                } else {
+                    Text(tile.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            Text(tile.id.toString(), color = Color(0xCCFFFFFF), fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp))
+        }
+        Row(Modifier.align(Alignment.BottomStart).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Tv.Red))
+            Text(" LIVE", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
 
 /**
  * A browse tile. Portrait poster at rest; once focus *settles* on it (so a held
@@ -335,6 +387,22 @@ fun TileRow(
             ) {
                 itemsIndexed(tiles, key = { _, t -> t.key }, contentType = { _, _ -> row.style }) { index, tile ->
                     val focusKey = "${row.id}|${tile.key}"
+                    if (row.style == RowStyle.CHANNEL) {
+                        ChannelTile(
+                            tile = tile,
+                            focusKey = focusKey,
+                            registry = registry,
+                            onFocused = {
+                                val from = focusedIndex
+                                focusedIndex = index
+                                onTileFocused(focusKey)
+                                val basePx = with(density) { landscapeWidth(tileHeightFor(row.style)).roundToPx() }
+                                scope.launch { state.slideTo(index, from, basePx) }
+                            },
+                            onClick = { actions.open(tile) }
+                        )
+                        return@itemsIndexed
+                    }
                     BrowseTile(
                         tile = tile,
                         style = row.style,
@@ -347,7 +415,7 @@ fun TileRow(
                             onTileFocused(focusKey)
                             val basePx = with(density) {
                                 val h = tileHeightFor(row.style)
-                                (if (row.style == RowStyle.LANDSCAPE) landscapeWidth(h) else posterWidth(h)).roundToPx()
+                                (if (row.style == RowStyle.LANDSCAPE || row.style == RowStyle.CHANNEL) landscapeWidth(h) else posterWidth(h)).roundToPx()
                             }
                             scope.launch { state.slideTo(index, from, basePx) }
                             // Warm the next tiles' stills + trailers so moving on is instant.

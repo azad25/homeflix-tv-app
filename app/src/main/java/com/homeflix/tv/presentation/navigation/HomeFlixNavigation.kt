@@ -52,6 +52,13 @@ class AppNavigator(private val nav: NavHostController, private val preview: Prev
         }
     }
 
+    /** Full-screen Live TV on [channelId], or the last channel. */
+    fun liveTv(channelId: String? = null) {
+        if (!canNavigate()) return
+        preview.hardStop()
+        nav.navigate(Screen.LiveTv.createRoute(channelId)) { launchSingleTop = true }
+    }
+
     fun details(mediaId: Int) = go(Screen.Details.createRoute(mediaId.toString()))
     fun series(seriesId: Int) = go(Screen.TvSeriesDetails.createRoute(seriesId.toString()))
 
@@ -65,10 +72,12 @@ class AppNavigator(private val nav: NavHostController, private val preview: Prev
         TileKind.MOVIE -> details(tile.id)
         TileKind.SERIES -> series(tile.id)
         TileKind.EPISODE -> tile.seriesId?.let { series(it) } ?: details(tile.id)
+        TileKind.CHANNEL -> liveTv(tile.channelId)
     }
 
     override fun play(tile: Tile) = when (tile.kind) {
         TileKind.SERIES -> series(tile.id)
+        TileKind.CHANNEL -> liveTv(tile.channelId)
         else -> player(tile.id, tile.resumeMs)
     }
 }
@@ -134,6 +143,13 @@ fun HomeFlixNavigation(
             com.homeflix.tv.presentation.screens.settings.AboutScreen(navigator)
         }
 
+        composable(Screen.LiveTv.route, arguments = Screen.LiveTv.arguments) { entry ->
+            com.homeflix.tv.livetv.LiveTvScreen(
+                channelId = entry.arguments?.getString("channel"),
+                onExit = { navigator.back() }
+            )
+        }
+
         composable(Screen.Settings.route) {
             com.homeflix.tv.presentation.screens.settings.SettingsScreen(navigator)
         }
@@ -193,6 +209,9 @@ private fun BrowseShell(
     val notificationsState by notificationsVm.uiState.collectAsState()
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { notificationsVm.loadNotifications() }
     val unread = notificationsState.unreadCount
+    // "Live TV" on the top menu while the server has Live TV turned on.
+    val liveVm: com.homeflix.tv.livetv.LiveTvEntryViewModel = hiltViewModel(entry)
+    val liveEnabled by liveVm.enabled.collectAsState()
     AppShell(
         previewPlayer = previewPlayer,
         actions = navigator,
@@ -200,7 +219,8 @@ private fun BrowseShell(
         onOpenSettings = { navigator.go(Screen.Settings.route) },
         onOpenAbout = { navigator.go(Screen.About.route) },
         unreadNotifications = unread,
-        updater = updater
+        updater = updater,
+        onOpenLiveTv = if (liveEnabled) ({ navigator.liveTv() }) else null
     ) { tab, shell ->
         when (tab) {
             ShellTab.HOME -> {
@@ -245,6 +265,11 @@ sealed class Screen(val route: String) {
         val arguments = listOf(navArgument("mediaId") { type = NavType.StringType })
     }
     object Settings : Screen("settings")
+    object LiveTv : Screen("livetv?channel={channel}") {
+        fun createRoute(channelId: String?) =
+            if (channelId.isNullOrBlank()) "livetv" else "livetv?channel=" + android.net.Uri.encode(channelId)
+        val arguments = listOf(navArgument("channel") { type = NavType.StringType; nullable = true; defaultValue = null })
+    }
     object About : Screen("about")
     object VideoPlayer : Screen("player/{mediaId}?startTime={startTime}&forceStart={forceStart}&exact={exact}") {
         fun createRoute(mediaId: Int, startTime: Long = 0L, forceStartFromBeginning: Boolean = false, exact: Boolean = false) =

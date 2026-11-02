@@ -148,13 +148,16 @@ class AppSmokeTest {
 
             // Bell on the nav → Notifications; profile menu → About (developer credit).
             back()                                   // focus the nav (Search tab)
-            press(Key.DirectionRight, 5)             // Home, Shows, Movies, My HomeFlix, bell
+            // Home, Shows, Movies, My HomeFlix, (Live TV), bell: find the bell by name.
+            var steps = 0
+            while (focused() != "Notifications" && steps++ < 8) press(Key.DirectionRight)
             println("E2E on bell: ${focused()}")
             press(Key.Enter); pump(2_500)
             dump("notifications")
             back(); pump(1_000)
             back()                                   // nav again
-            press(Key.DirectionRight, 2)             // bell, then profile
+            steps = 0
+            while (focused() != "Profile" && steps++ < 9) press(Key.DirectionRight)
             press(Key.Enter); pump(800)              // menu: Notifications, Settings, About…
             press(Key.DirectionDown, 2)
             press(Key.Enter); pump(1_500)
@@ -360,6 +363,55 @@ class AppSmokeTest {
                 }
             }
             ranked.forEachIndexed { i, t -> check(t.rank == i + 1) { "$page: Top 10 ranks out of order" } }
+        }
+    }
+
+    /** Live TV against the real server: menu entry, Home row, banner, zapping, Back. */
+    @Test
+    fun liveTv_menuRow_banner_zap_back() {
+        val base = server
+        assumeTrue("set -Dhomeflix.e2e.server", base != null && reachable(base))
+        val lineup = runCatching { URL("http://$base/api/livetv/channels").readText() }.getOrNull()
+        assumeTrue("server has no Live TV channels", lineup != null && lineup.contains("\"enabled\":true") && lineup.contains("\"number\":1"))
+        val first = Regex("\"name\":\"([^\"]+)\"[^}]*\"number\":1[,}]").find(lineup!!)?.groupValues?.get(1)
+            ?: error("no channel 1 in $lineup")
+        val second = Regex("\"name\":\"([^\"]+)\"[^}]*\"number\":2[,}]").find(lineup)?.groupValues?.get(1)
+            ?: error("no channel 2")
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        pump(3_000)
+        ServerConfig.setLocal(ctx, base!!)
+        java.io.File(ctx.filesDir, "feed_v5_home.json").delete()
+        ActivityScenario.launch(MainActivity::class.java).use {
+            check(waitForText("Inception")) { "home never loaded" }
+            check(waitForText("Live TV")) { "no Live TV on the menu / Home" }
+            dump("home-with-live")
+            val feedFile = java.io.File(ctx.filesDir, "feed_v5_home.json")
+            var waited = 0
+            while ((!feedFile.exists() || !feedFile.readText().contains("\"livetv\"")) && waited++ < 40) pump(250)
+            val feedJson = feedFile.readText()
+            check(feedJson.contains("\"livetv\"") && feedJson.contains("live-entry") && feedJson.contains(first)) {
+                "Home has no Live TV row (entry + channels)"
+            }
+            press(Key.DirectionUp)                      // nav: Home
+            var guard = 0
+            while (!focused().contains("Live TV") && guard++ < 8) press(Key.DirectionRight)
+            check(focused().contains("Live TV")) { "focus=${focused()}" }
+            press(Key.Enter)
+            check(waitForText(first)) { "Live TV didn't open on channel 1 ($first)" }
+            check(waitForText("LIVE")) { "no banner" }
+            dump("live-banner")
+            press(Key.DirectionDown)                    // next channel: banner at once
+            check(waitForText(second, 3_000)) { "▼ didn't zap to $second" }
+            pump(1_000)
+            press(Key.DirectionCenter)                  // mini guide
+            check(waitForText("NOW", 3_000)) { "mini guide didn't open" }
+            dump("mini-guide")
+            press(Key.Back)                             // closes the guide
+            pump(2_000)
+            press(Key.Back)                             // back to the last channel
+            check(waitForText(first, 3_000)) { "Back didn't return to $first" }
+            press(Key.Back)                             // twice quickly: leave
+            check(waitForText("Inception")) { "didn't leave Live TV" }
         }
     }
 }

@@ -16,8 +16,8 @@ android {
         applicationId = "com.homeflix.tv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 23
-        versionName = "5.12.0"
+        versionCode = 24
+        versionName = "5.13.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -116,6 +116,8 @@ dependencies {
     // TV home screen row (channels + Watch Next) and its background refresh.
     implementation("androidx.tvprovider:tvprovider:1.0.0")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // Live TV favorites / last channel.
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.gif)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.dash)
@@ -124,6 +126,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation(libs.androidx.test.core)
     testImplementation(platform(libs.androidx.compose.bom))
     testImplementation(libs.androidx.compose.ui.test.junit4)
