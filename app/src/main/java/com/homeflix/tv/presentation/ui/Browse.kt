@@ -65,6 +65,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -124,6 +125,9 @@ private fun tileHeightFor(style: RowStyle): Dp = when (style) {
     else -> Tv.TileHeight
 }
 
+/** How long focus must rest on a tile before it widens and starts its trailer. */
+private const val ExpandDwellMs = 650L
+
 private fun posterWidth(h: Dp): Dp = h * (2f / 3f)
 private fun landscapeWidth(h: Dp): Dp = h * (16f / 9f)
 
@@ -155,7 +159,9 @@ fun BrowseTile(
 
     LaunchedEffect(focused) {
         if (focused) {
-            delay(110)
+            // Only expand once the user rests on a tile: while they move along
+            // the row every tile keeps its size, so each press is one clean slide.
+            delay(ExpandDwellMs)
             settled = true
             delay(Tv.FocusMotionMs.toLong() + 20)
             onSettled()
@@ -165,7 +171,7 @@ fun BrowseTile(
     }
     LaunchedEffect(settled, epoch) {
         val p = preview ?: return@LaunchedEffect
-        if (settled && previewsEnabled && expandable) p.request(tile.key, tile.previewUrl, revealDelayMs = 1_400)
+        if (settled && previewsEnabled && expandable) p.request(tile.key, tile.previewUrl, revealDelayMs = 900)
         else p.cancel(tile.key)
     }
 
@@ -182,6 +188,7 @@ fun BrowseTile(
             .width(width)
             .height(h)
             .registerFocus(registry, focusKey)
+            .testTag("tile:$focusKey")
             .onFocusChanged {
                 if (it.isFocused != focused) {
                     focused = it.isFocused
@@ -335,9 +342,14 @@ fun TileRow(
                         registry = registry,
                         previewsEnabled = previewsEnabled,
                         onFocused = {
+                            val from = focusedIndex
                             focusedIndex = index
                             onTileFocused(focusKey)
-                            scope.launch { state.glideTo(index) }
+                            val basePx = with(density) {
+                                val h = tileHeightFor(row.style)
+                                (if (row.style == RowStyle.LANDSCAPE) landscapeWidth(h) else posterWidth(h)).roundToPx()
+                            }
+                            scope.launch { state.slideTo(index, from, basePx) }
                             // Warm the next tiles' stills + trailers so moving on is instant.
                             val h = tileHeightFor(row.style)
                             val w = with(density) { landscapeWidth(h).roundToPx() }
@@ -354,7 +366,9 @@ fun TileRow(
                                 ))
                             }
                         },
-                        onSettled = { scope.launch { state.glideTo(index) } },
+                        // The tile grows to the right from the keyline; only near the
+                        // end of a row can it run past the screen edge — reveal it then.
+                        onSettled = { scope.launch { state.revealItem(index) } },
                         onClick = {
                             if (row.style == RowStyle.LANDSCAPE) actions.play(tile) else actions.open(tile)
                         }

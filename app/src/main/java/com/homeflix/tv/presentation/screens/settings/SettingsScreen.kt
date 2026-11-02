@@ -41,6 +41,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
@@ -170,39 +174,29 @@ fun SettingsScreen(navigator: com.homeflix.tv.presentation.navigation.AppNavigat
 @Composable
 private fun ServerSection(vm: SettingsViewModel) {
     val check by vm.serverCheck.collectAsState()
-    var text by remember { mutableStateOf(ServerConfig.LOCAL.removeSuffix("/api")) }
-    var focused by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
+    val current = ServerConfig.LOCAL.removeSuffix("/api")
     Text("Server", color = Tv.TextSecondary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(top = 18.dp))
-    Column {
-        Text("Server address (e.g. 192.168.0.109:8252) — press OK on the remote keyboard to save",
-            color = Tv.TextMuted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
-        BasicTextField(
-            value = text,
-            onValueChange = { text = it.take(120) },
-            singleLine = true,
-            textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
-            cursorBrush = SolidColor(Color.White),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done,
-                keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri),
-            keyboardActions = KeyboardActions(onDone = { vm.saveServer(text) }),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .onFocusChanged {
-                    if (focused && !it.isFocused && text.isNotBlank()) vm.saveServer(text)
-                    focused = it.isFocused
-                }
-                .clip(RoundedCornerShape(8.dp))
-                .background(Tv.Surface)
-                .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp))
-                .padding(horizontal = 20.dp, vertical = 14.dp)
-        )
-        check?.let { Text(it, color = Color.White, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp)) }
-    }
+    SettingRow(
+        title = "Server address",
+        value = current.removePrefix("http://").removePrefix("https://"),
+        subtitle = check ?: "Press OK to change (e.g. 192.168.0.109:8252)",
+        onClick = { editing = true }
+    )
     if (ServerConfig.LOCAL != ServerConfig.DEFAULT_LOCAL) {
         SettingRow(title = "Reset to default server", value = ServerConfig.DEFAULT_LOCAL.removeSuffix("/api"),
-            onClick = { text = ServerConfig.DEFAULT_LOCAL.removeSuffix("/api"); vm.saveServer(text) })
+            onClick = { vm.saveServer(ServerConfig.DEFAULT_LOCAL.removeSuffix("/api")) })
+    }
+    if (editing) {
+        EditTextDialog(
+            title = "Server address",
+            hint = "IP and port of your HomeFlix server, e.g. 192.168.0.109:8252",
+            initial = current,
+            uri = true,
+            onSave = { vm.saveServer(it); editing = false },
+            onCancel = { editing = false }
+        )
     }
 }
 
@@ -266,30 +260,78 @@ private fun SettingRow(title: String, value: String, onClick: () -> Unit, modifi
 
 @Composable
 private fun NameField(name: String, onSave: (String) -> Unit) {
-    var text by remember(name) { mutableStateOf(name) }
-    var focused by remember { mutableStateOf(false) }
-    Column {
-        Text("Cast name", color = Tv.TextMuted, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
-        BasicTextField(
-            value = text,
-            onValueChange = { text = it.take(80) },
-            singleLine = true,
-            textStyle = TextStyle(color = Color.White, fontSize = 18.sp),
-            cursorBrush = SolidColor(Color.White),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { onSave(text) }),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .onFocusChanged {
-                    if (focused && !it.isFocused && text != name) onSave(text)
-                    focused = it.isFocused
-                }
-                .clip(RoundedCornerShape(8.dp))
-                .background(Tv.Surface)
-                .border(2.dp, if (focused) Color.White else Color.Transparent, RoundedCornerShape(8.dp))
-                .padding(horizontal = 20.dp, vertical = 14.dp)
+    var editing by remember { mutableStateOf(false) }
+    SettingRow(title = "Cast name", value = name, subtitle = "Shown in the web app's cast menu", onClick = { editing = true })
+    if (editing) {
+        EditTextDialog(
+            title = "Cast name",
+            hint = "The name this TV shows in the HomeFlix web app",
+            initial = name,
+            uri = false,
+            onSave = { if (it.isNotBlank()) onSave(it.trim()); editing = false },
+            onCancel = { editing = false }
         )
+    }
+}
+
+/**
+ * Text entry in its own dialog, so the settings list itself only holds plain
+ * rows and the D-pad can always move through it. Inside, Up/Down move between
+ * the field and the buttons; OK on the remote keyboard saves.
+ */
+@Composable
+private fun EditTextDialog(title: String, hint: String, initial: String, uri: Boolean, onSave: (String) -> Unit, onCancel: () -> Unit) {
+    var text by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(initial, androidx.compose.ui.text.TextRange(initial.length))) }
+    var fieldFocused by remember { mutableStateOf(false) }
+    val field = remember { FocusRequester() }
+    val save = remember { FocusRequester() }
+    LaunchedEffect(Unit) { withFrameNanos { }; runCatching { field.requestFocus() } }
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onCancel,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
+    ) {
+        Box(Modifier.fillMaxSize().background(Color(0xB3000000)), contentAlignment = Alignment.Center) {
+            Column(
+                Modifier.width(620.dp).clip(RoundedCornerShape(12.dp)).background(Tv.Surface).padding(32.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Text(hint, color = Tv.TextSecondary, fontSize = 15.sp)
+                BasicTextField(
+                    value = text,
+                    onValueChange = { text = it.copy(text = it.text.take(120)) },
+                    singleLine = true,
+                    textStyle = TextStyle(color = Color.White, fontSize = 20.sp),
+                    cursorBrush = SolidColor(Color.White),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done,
+                        keyboardType = if (uri) androidx.compose.ui.text.input.KeyboardType.Uri else androidx.compose.ui.text.input.KeyboardType.Text),
+                    keyboardActions = KeyboardActions(onDone = { onSave(text.text) }),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .focusRequester(field)
+                        .focusProperties { down = save }
+                        .onFocusChanged { fieldFocused = it.isFocused }
+                        // A single-line field has no use for Up/Down: hand them to focus.
+                        .onPreviewKeyEvent { e ->
+                            if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when (e.key) {
+                                androidx.compose.ui.input.key.Key.DirectionDown -> { runCatching { save.requestFocus() }; true }
+                                androidx.compose.ui.input.key.Key.DirectionUp -> true
+                                else -> false
+                            }
+                        }
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF2A2A2A))
+                        .border(2.dp, if (fieldFocused) Color.White else Color.Transparent, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 20.dp, vertical = 15.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(top = 8.dp)) {
+                    com.homeflix.tv.presentation.ui.PillButton("Save", { onSave(text.text) }, focusRequester = save)
+                    com.homeflix.tv.presentation.ui.PillButton("Cancel", onCancel)
+                }
+            }
+        }
     }
 }
 

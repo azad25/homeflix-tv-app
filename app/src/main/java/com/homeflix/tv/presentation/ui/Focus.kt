@@ -57,6 +57,29 @@ suspend fun LazyListState.glideTo(index: Int, offsetPx: Int = 0, durationMs: Int
     }
 }
 
+/**
+ * One D-pad step along a row: slide so tile [index] lands on the keyline in a
+ * single eased motion. The tile we're leaving ([from]) may be expanded and
+ * collapses back to [basePx] over the same duration; if it sits before the
+ * target that collapse already moves the target left, so it's subtracted from
+ * the scroll. Without this the row overshoots and then swings back.
+ */
+suspend fun LazyListState.slideTo(index: Int, from: Int, basePx: Int, durationMs: Int = Tv.FocusMotionMs) {
+    val items = layoutInfo.visibleItemsInfo
+    val target = items.firstOrNull { it.index == index } ?: run { animateScrollToItem(index); return }
+    val shrink = if (from < index) items.firstOrNull { it.index == from }?.let { (it.size - basePx).coerceAtLeast(0) } ?: 0 else 0
+    val delta = (target.offset - shrink).toFloat()
+    if (kotlin.math.abs(delta) > 0.5f) animateScrollBy(delta, tween(durationMs, easing = Tv.Ease))
+}
+
+/** Scroll just enough to show item [index] whole (no-op when it already fits). */
+suspend fun LazyListState.revealItem(index: Int, durationMs: Int = Tv.FocusMotionMs) {
+    val info = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } ?: return
+    val end = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding / 4
+    val overflow = info.offset + info.size - end
+    if (overflow > 1) animateScrollBy(overflow.toFloat(), tween(durationMs, easing = Tv.Ease))
+}
+
 /** Remembers FocusRequesters by key so a screen can restore focus to the exact tile it left. */
 @Stable
 class FocusRegistry {

@@ -1,6 +1,5 @@
 package com.homeflix.tv.presentation.shell
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,10 +27,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.homeflix.tv.BuildConfig
@@ -65,9 +67,13 @@ fun UpdatePrompt(updater: AppUpdater) {
 
     val focus = remember { FocusRequester() }
     LaunchedEffect(info.versionCode) { withFrameNanos { }; runCatching { focus.requestFocus() } }
-    BackHandler { dismissedVersion = info.versionCode }
-
-    Box(Modifier.fillMaxSize().background(Color(0xB3000000)), contentAlignment = Alignment.Center) {
+    // A real dialog window: it takes the D-pad focus away from the screen behind
+    // and keeps it until the user picks a button or presses Back.
+    Dialog(
+        onDismissRequest = { dismissedVersion = info.versionCode },
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
+    ) {
+    Box(Modifier.fillMaxSize().background(Color(0xB3000000)).testTag("update_prompt"), contentAlignment = Alignment.Center) {
         Column(
             Modifier.width(560.dp).clip(RoundedCornerShape(12.dp)).background(Tv.Surface).padding(36.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -102,5 +108,6 @@ fun UpdatePrompt(updater: AppUpdater) {
                 PillButton("Later", { dismissedVersion = info.versionCode })
             }
         }
+    }
     }
 }

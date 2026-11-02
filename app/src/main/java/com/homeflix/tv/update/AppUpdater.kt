@@ -76,6 +76,9 @@ class AppUpdater @Inject constructor(
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
 
+    /** Tests only: show the UI for a given state without a server. */
+    internal fun setStateForTest(s: UpdateState) { _state.value = s }
+
     private val gson = Gson()
     private val mutex = Mutex()
     private var loopJob: Job? = null

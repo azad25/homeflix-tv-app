@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.4 (R8 code shrinking is currently off; see app/build.gradle.kts).
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.9.6 (R8 code shrinking is currently off; see app/build.gradle.kts).
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 
@@ -16,16 +16,16 @@ Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release bu
 
 ### Focus and scrolling (the stutter fixes)
 - **No manual key routing.** All per-card arrow handling is gone, including the FocusRequester lists that stopped at item 20, the retry loops, and the 300 ms focus delays.
-- **Rows:** the focused tile is pinned to the left keyline and the row glides underneath it with one eased scroll per press. Pages glide section by section.
+- **Rows:** each Left/Right press is one eased slide that brings the next tile to the left keyline. It never overshoots and swings back, because tiles keep their size while you move and the tile you leave collapses in step with the slide. Pages glide section by section.
 - **Row memory:** entering a row lands on that row's remembered tile.
 - **Held D-pad:** repeats are throttled to a steady cadence, so holding a direction scrolls smoothly instead of queueing up.
 - **Back from Details or the player** returns focus to the exact tile you left.
 - **Tests:** these rules are covered by Robolectric tests that send real D-pad presses (`app/src/test/.../FocusNavigationTest.kt`).
 
 ### Focus content and trailers
-- **Expanding tile:** once focus settles, the tile widens from poster to 16:9 backdrop with the title logo. The meta line (`Movie • Drama • 2025 • 2h 32m • 18+`) and synopsis appear under the row.
+- **Expanding tile:** once focus rests on a tile (about 0.65 s), it widens to the right from poster to 16:9 backdrop with the title logo. The meta line (`Movie • Drama • 2025 • 2h 32m • 18+`) and synopsis appear under the row.
 - **Trailer playback:**
-  - The trailer starts after about 1.4 s on a tile and 2 s on the billboard, through **one shared, muted preview player**.
+  - The trailer starts after about 1.5 s on a tile and 2 s on the billboard, through **one shared, muted preview player**.
   - It fades in only once frames are actually playing. Titles without a preview keep the banner, or the poster if there's no banner.
   - Clips go through a 200 MB on-disk cache, and the neighbouring tiles' clips are prefetched.
 - **Where trailers play:** only boxes with under 1.2 GB of RAM skip tile trailers. 2 GB TVs such as Sony play them everywhere.
@@ -71,7 +71,8 @@ This implements `docs/TV_CAST_PROTOCOL.md` from the homeflix-wifi `release/v5.5`
   - Otherwise the TV shows a full-screen "tap to play" notification. If nothing opens within 10 s, the browser gets `Open HomeFlix on the TV to start playback`.
 - **Always reachable:** `CastReceiverService` is a foreground service with a minimal "Ready to cast" notification, also started on boot.
   - It uses the `specialUse` type rather than `dataSync`, because Android 15 caps `dataSync` at 6 h/day and blocks it from starting at boot.
-- **Settings (profile menu → Settings):** casting on/off, cast name (renames live), connection status, and the overlay-permission button.
+- **Settings (profile menu → Settings):** casting on/off, cast name (renames live), connection status, and the overlay-permission button. Every entry is a plain row the D-pad moves through; the cast name and server address open a small edit dialog when you press OK.
+- **Popups** (update ready, crash notice) are real dialog windows, so they take the remote's focus and keep it until you answer.
 - **Tests:** `CastProtocolTest` plays the server side with MockWebServer: hello, ping/pong, every command and its ack, 404, same-title play, status and reconnect.
 - **Granting overlay on TVs that hide the setting:**
   ```bash

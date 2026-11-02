@@ -1,6 +1,5 @@
 package com.homeflix.tv.presentation.shell
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +26,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.homeflix.tv.core.CrashReporter
 import com.homeflix.tv.presentation.ui.PillButton
 import com.homeflix.tv.presentation.ui.Tv
@@ -40,7 +41,7 @@ fun CrashNotice() {
     val ok = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { ok.requestFocus() } }
     val dismiss = { CrashReporter.clear(context); report = null }
-    BackHandler(onBack = dismiss)
+    Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)) {
     Box(Modifier.fillMaxSize().background(Color(0xCC000000)), contentAlignment = Alignment.Center) {
         Column(
             Modifier.width(760.dp).clip(RoundedCornerShape(12.dp)).background(Tv.Surface).padding(28.dp),
@@ -53,4 +54,5 @@ fun CrashNotice() {
             PillButton("OK", dismiss, focusRequester = ok, modifier = Modifier.padding(top = 6.dp))
         }
     }
+}
 }

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.test.core.app.ActivityScenario
@@ -61,10 +62,14 @@ class AppSmokeTest {
     }
 
     private fun focused(): String {
-        val n = rule.onAllNodes(androidx.compose.ui.test.isFocused()).fetchSemanticsNodes().firstOrNull() ?: return "<none>"
+        // With a dialog open each window keeps its own focus; the dialog's (last root) is the live one.
+        val n = rule.onAllNodes(androidx.compose.ui.test.isFocused()).fetchSemanticsNodes().lastOrNull() ?: return "<none>"
         val c = n.config
         return if (c.contains(androidx.compose.ui.semantics.SemanticsProperties.Text))
-            c[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString() else "node#${n.id}"
+            c[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString()
+        else if (c.contains(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription))
+            c[androidx.compose.ui.semantics.SemanticsProperties.ContentDescription].joinToString()
+        else "node#${n.id}"
     }
 
     private fun press(key: Key, times: Int = 1) = repeat(times) {
@@ -194,6 +199,55 @@ class AppSmokeTest {
             check(rule.onAllNodesWithText("Shaque", substring = true).fetchSemanticsNodes().isEmpty()) {
                 "still on Home instead of the Movies tab"
             }
+        }
+    }
+
+    @Test
+    fun settings_everyRowReachable_checkForUpdates_andEditDialog() {
+        val base = server
+        assumeTrue("set -Dhomeflix.e2e.server", base != null && reachable(base))
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        pump(3_000)
+        ServerConfig.setLocal(ctx, base!!)
+        // Keys go to whatever holds focus, so they also reach dialog windows.
+        fun key(k: Key, times: Int = 1) = repeat(times) {
+            rule.onAllNodes(androidx.compose.ui.test.isFocused()).onLast().performKeyInput { pressKey(k) }
+            pump(350)
+            println("E2E key=$k -> focus=${focused()}")
+        }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            check(waitForText("Inception")) { "home never loaded" }
+            pump(1_000)
+            press(Key.DirectionUp)                 // nav: Home
+            var guard = 0
+            while (!focused().contains("Profile", ignoreCase = true) && guard++ < 8) press(Key.DirectionRight)
+            press(Key.Enter)                        // profile menu: Notifications
+            check(waitForText("About HomeFlix")) { "profile menu didn't open" }
+            press(Key.DirectionDown)                // Settings
+            check(focused() == "Settings") { "focus=${focused()}" }
+            press(Key.Enter)
+            check(waitForText("Check for updates")) { "settings didn't open" }
+            pump(800)
+            val seen = mutableListOf<String>()
+            guard = 0
+            while (!focused().contains("Check for updates") && guard++ < 14) { key(Key.DirectionDown); seen += focused() }
+            println("E2E settings rows: $seen")
+            check(focused().contains("Check for updates")) { "couldn't reach Check for updates: $seen" }
+            key(Key.Enter)
+            check(waitForText("up to date") || waitForText("Couldn't") || waitForText("ready to install")) { "check didn't run" }
+            // Back up to the server address and edit it in the dialog.
+            guard = 0
+            while (!focused().contains("Server address") && guard++ < 10) key(Key.DirectionUp)
+            check(focused().contains("Server address")) { "focus=${focused()}" }
+            key(Key.Enter)
+            pump(600)
+            key(Key.DirectionDown)                  // field -> Save
+            check(focused() == "Save") { "▼ in the edit dialog should reach Save (focus=${focused()})" }
+            key(Key.DirectionRight)
+            check(focused() == "Cancel") { "focus=${focused()}" }
+            key(Key.Enter)
+            pump(600)
+            check(focused().contains("Server address")) { "Cancel should return to the row (focus=${focused()})" }
         }
     }
 }
