@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.14.0)
+# HomeFlix TV v5 (5.14.1)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.14.0, versionCode 27, 16.7 MB)
-SHA-256: `eb88d60980b1c27e1fba9d0d7afe851e2d2bd614714d9480edaa51ca46cbd86b`
+**Download:** `homeflix-tv-v5.apk` (5.14.1, versionCode 28, 12.6 MB)
+SHA-256: `decae370213961946abc453307eaf9bd5093eee8a96bd7b8949d76892df9f040`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -150,6 +150,7 @@ SHA-256: `eb88d60980b1c27e1fba9d0d7afe851e2d2bd614714d9480edaa51ca46cbd86b`
 - **Esc** works like Back everywhere in the app.
 
 ### Performance and stability
+- **Smaller app:** about 25 % smaller (12.6 MB instead of 16.7 MB). The code Android has to optimise and map is down from 54 MB to 32 MB, so installs and updates are faster and less storage is used. Only unused icons were removed; nothing else in the app changed.
 - Lighter on 2 GB TVs:
   - Images load at the size they're shown.
   - One shared trailer player.

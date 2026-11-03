@@ -10,7 +10,7 @@ import javax.inject.Singleton
 class ComingSoonHome @Inject constructor(private val repo: ComingSoonRepository) {
 
     suspend fun rows(): Pair<List<Tile>, List<Tile>> {
-        val l = repo.lineup()
+        val l = repo.lineupShared()
         return l.movies.orEmpty().map(::tile) to l.series.orEmpty().map(::tile)
     }
 

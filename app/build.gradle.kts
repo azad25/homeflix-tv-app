@@ -16,8 +16,8 @@ android {
         applicationId = "com.homeflix.tv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 27
-        versionName = "5.14.0"
+        versionCode = 28
+        versionName = "5.14.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -41,15 +41,18 @@ android {
         }
         release {
             signingConfig = signingConfigs.getByName("sideload")
-            // R8 is opt-in (-PwithR8) until a minified build is verified on a TV:
-            // crashes were reported right after 5.6 enabled it, while the same
-            // code without R8 passes the end-to-end run against a real backend.
-            isMinifyEnabled = project.hasProperty("withR8")
-            isShrinkResources = project.hasProperty("withR8")
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // Default: R8 in "safe shrink" mode (proguard-safe.pro) — only unused
+            // Material icons are removed, nothing else is touched (no optimise,
+            // no rename). Full R8 stays opt-in (-PwithR8) until a minified build
+            // is verified on a TV: crashes were reported after 5.6 enabled it.
+            val fullR8 = project.hasProperty("withR8")
+            isMinifyEnabled = true
+            isShrinkResources = fullR8
+            if (fullR8) {
+                proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            } else {
+                proguardFiles("proguard-safe.pro")
+            }
             buildConfigField("String", "BASE_URL", "\"http://192.168.0.109:8252/api/\"")
             buildConfigField("String", "FALLBACK_BASE_URL", "\"https://homeflix.domain.com/api/\"")
         }

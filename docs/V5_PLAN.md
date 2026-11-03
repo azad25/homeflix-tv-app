@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.14.0 (R8 code shrinking is currently off; see app/build.gradle.kts).
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.14.1, with R8 in "safe shrink" mode (see below).
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 
@@ -54,6 +54,13 @@ Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release bu
 - **Memory pressure:** the app frees the preview decoder and the bitmap cache when the system is low on memory.
 - **Player buffers:** sized to the device (40, 64 or 128 MB). Small caches are bounded, and LeakCanary is included in debug builds.
 - **Build:** R8 for library code, bundled Compose baseline profiles via profileinstaller, Kotlin 2.0.21 (strong skipping), a black splash with no white flash, and no verbose HTTP logging in release.
+
+### Safe shrink (5.14.1)
+- **Default release build:** runs R8 with `app/proguard-safe.pro`, with no optimisation and no renaming. It keeps every class except the Material icons library, whose roughly 11,000 unused icon classes are removed.
+- **Result:** dex goes from 54 MB to 32 MB, and the APK from 16.7 MB to 12.6 MB.
+- **Checked by diffing the class lists of both APKs:** only icon classes and renumbered compiler synthetics differ, and every `com.homeflix.tv` class is present.
+- **Full R8** (optimise and shrink everything) stays opt-in with `-PwithR8` until it's verified on a TV.
+- **Coming Soon lineup:** Home and the menu entry share one fetch for 60 s.
 
 ### Coming Soon, full-screen title pages, show previews, Notifications (5.14)
 - **Coming Soon (`comingsoon/`):** this implements homeflix-wifi `docs/TV_APP_COMING_SOON_PROMPT.md`.

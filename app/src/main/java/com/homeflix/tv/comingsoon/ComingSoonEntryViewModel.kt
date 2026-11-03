@@ -17,7 +17,7 @@ class ComingSoonEntryViewModel @Inject constructor(repo: ComingSoonRepository) :
 
     init {
         viewModelScope.launch {
-            val l = repo.lineup()
+            val l = repo.lineupShared()
             _available.value = l.movies.orEmpty().isNotEmpty() || l.series.orEmpty().isNotEmpty()
         }
     }

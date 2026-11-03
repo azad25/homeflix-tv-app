@@ -18,6 +18,17 @@ class ComingSoonRepository @Inject constructor(private val api: HomeFlixApiServi
         Result.failure(e)
     }
 
+    @Volatile private var recent: Pair<Long, ComingSoonList>? = null
+
+    /**
+     * For Home and the menu entry, which both ask when Home opens: one answer
+     * shared for a minute. The Coming Soon screen itself always asks fresh.
+     */
+    suspend fun lineupShared(): ComingSoonList {
+        recent?.let { (at, l) -> if (android.os.SystemClock.elapsedRealtime() - at < SHARED_MS) return l }
+        return lineup().also { recent = android.os.SystemClock.elapsedRealtime() to it }
+    }
+
     /** Movies then series, each in rank order. Empty on any failure (the UI just hides Coming Soon). */
     suspend fun lineup(): ComingSoonList = call {
         val r = api.getComingSoon()
@@ -41,6 +52,8 @@ class ComingSoonRepository @Inject constructor(private val api: HomeFlixApiServi
     }
 
     companion object {
+        const val SHARED_MS = 60_000L
+
         /** Absolute trailer URL, or null when the MP4 isn't ready yet. */
         fun trailerUrl(item: ComingSoonItem): String? =
             item.trailer?.takeIf { it.state == "ready" }?.videoUrl?.takeIf { it.isNotBlank() }?.let { u ->
