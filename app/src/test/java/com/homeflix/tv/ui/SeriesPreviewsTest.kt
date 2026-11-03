@@ -21,4 +21,12 @@ class SeriesPreviewsTest {
         assertEquals("no previews at all: the newest upload", 8, SeriesPreviews.pick(eps.map { it.copy(previewClipPath = null) }))
         assertNull(SeriesPreviews.pick(emptyList()))
     }
+
+    @Test
+    fun anotherShowsEpisodeIsNeverPicked() {
+        // Older servers return the episode whose media id equals the series id, even from another show.
+        val stray = ep(10, "2026-12-01T00:00:00Z", 1, 1, clip = "/c/10.mp4").copy(seriesId = 99)
+        val own = ep(20, "2026-01-01T00:00:00Z", 1, 1, clip = "/c/20.mp4").copy(seriesId = 10)
+        assertEquals(20, SeriesPreviews.pick(listOf(stray, own).filter { it.seriesId == null || it.seriesId == 10 }))
+    }
 }

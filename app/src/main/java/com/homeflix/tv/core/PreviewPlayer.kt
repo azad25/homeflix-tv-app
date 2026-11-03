@@ -175,11 +175,15 @@ class PreviewPlayer @Inject constructor(
      * @param revealDelayMs time from the request until video may appear.
      */
     fun request(key: String, url: String?, revealDelayMs: Long = 1_200, dwellMs: Long = 400) {
-        if (key == _activeKey.value || key == pendingKey) return
+        // Same title, same clip: nothing to do. Same title with a different clip
+        // (e.g. a show's preview resolved late) restarts, so a title never keeps
+        // showing another title's video.
+        if ((key == _activeKey.value && url == currentUrl) || (key == pendingKey && url == pendingUrl)) return
         requestJob?.cancel()
         stopInternal()
         if (!started || url.isNullOrBlank() || url in failedUrls) return
         pendingKey = key
+        pendingUrl = url
         _endedKey.value = null
         requestJob = scope.launch {
             delay(dwellMs)
@@ -196,6 +200,7 @@ class PreviewPlayer @Inject constructor(
     }
 
     private var pendingKey: String? = null
+    private var pendingUrl: String? = null
 
     /** Focus left [key]: stop its preview (player stays warm for the next title). */
     fun cancel(key: String) {
@@ -212,6 +217,7 @@ class PreviewPlayer @Inject constructor(
 
     private fun stopInternal() {
         pendingKey = null
+        pendingUrl = null
         _visibleKey.value = null
         _activeKey.value = null
         firstFrameRendered = false

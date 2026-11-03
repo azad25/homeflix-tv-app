@@ -525,7 +525,8 @@ class MediaRepository @Inject constructor(
         return try {
             val response = apiService.getTvSeriesEpisodes(seriesId, seasonNumber)
             if (response.isSuccessful) {
-                val episodes = response.body() ?: emptyList()
+                // Only this show's episodes (older servers add one whose media id equals the series id).
+                val episodes = (response.body() ?: emptyList()).filter { it.seriesId == null || it.seriesId == seriesId }
                 episodes.mapIndexed { index, dto ->
                     com.homeflix.tv.presentation.screens.tvshows.Episode(
                         id = dto.id,

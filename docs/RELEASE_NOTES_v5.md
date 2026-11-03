@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.15.0)
+# HomeFlix TV v5 (5.15.1)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.15.0, versionCode 29, 12.6 MB)
-SHA-256: `470a360b528c3b7cbc25496538db79e64ff997bf678d9808e29bd18d9a8436c8`
+**Download:** `homeflix-tv-v5.apk` (5.15.1, versionCode 30, 12.6 MB)
+SHA-256: `14d14048bbe7c3417165d8c33e991e3407c9c206b7483a82d68b1998860f164b`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -55,6 +55,7 @@ SHA-256: `470a360b528c3b7cbc25496538db79e64ff997bf678d9808e29bd18d9a8436c8`
 - **Movie pages fill the screen:** the trailer plays behind the title, and More Like This is one ▼ away.
   - After a few seconds without a key press, the text and menu fade so only the trailer shows. Any key brings them back.
 - **Show previews:** show pages, show tiles and the Shows billboard preview the show's newest uploaded episode.
+  - **Fixed:** shows no longer play another show's video. The server was mixing in an unrelated episode, and a late-arriving preview could keep the previous clip.
 - A trailer billboard with Resume, Play from beginning, **My List** and **Rate**.
 - Shows also get season chips, an episode row with progress, and "Resume S1:E3".
 - More Like This on movie pages.

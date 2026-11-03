@@ -54,7 +54,8 @@ class SeriesPreviews @Inject constructor(private val api: HomeFlixApiService) {
         val episodes = seasons.take(MAX_SEASONS).map { season ->
             async { runCatching { api.getTvSeriesEpisodes(seriesId, season).body().orEmpty() }.getOrDefault(emptyList()) }
         }.awaitAll().flatten()
-        pick(episodes)
+        // Older servers also return an unrelated episode whose media id equals the series id.
+        pick(episodes.filter { it.seriesId == null || it.seriesId == seriesId })
     }
 
     companion object {
