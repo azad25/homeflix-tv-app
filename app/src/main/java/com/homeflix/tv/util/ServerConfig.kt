@@ -85,7 +85,7 @@ object ServerConfig {
      * Call from Application.onCreate on a background thread.
      */
     fun probe() {
-        val client = OkHttpClient.Builder()
+        val client = Http.shared.newBuilder()
             .connectTimeout(2500, TimeUnit.MILLISECONDS)
             .readTimeout(2500, TimeUnit.MILLISECONDS)
             .build()

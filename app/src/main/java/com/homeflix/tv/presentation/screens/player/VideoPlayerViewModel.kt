@@ -209,27 +209,32 @@ class VideoPlayerViewModel @Inject constructor(
         previewPlayer.hardStop()
         _ui.value = PlayerUiState(phase = PlayerPhase.Loading)
         viewModelScope.launch {
-            val media = runCatching {
-                withTimeoutOrNull(8_000) { mediaRepository.getMediaById(id.toString()).first().getOrNull() }
-            }.getOrNull()
-            if (media == null) {
-                _ui.update { it.copy(phase = PlayerPhase.Error("Couldn't load this title. Check the connection to your HomeFlix server.")) }
-                return@launch
+            // Time to first frame: every request starts at once. The stream
+            // decision only needs the resume point, not the title's details, so
+            // the wait is the slowest chain instead of all requests in a row.
+            val mediaDeferred = async {
+                runCatching {
+                    withTimeoutOrNull(8_000) { mediaRepository.getMediaById(id.toString()).first().getOrNull() }
+                }.getOrNull()
             }
-            _ui.update { it.withMedia(media) }
-
-            // Resolve everything that playback needs in parallel.
-            val resumeDeferred = async {
-                when {
+            val subsDeferred = async { fetchSubtitles(id) }
+            val decisionDeferred = async {
+                val resumeMs = when {
                     forceFromStart -> 0L
                     exactStart -> startMs.coerceAtLeast(0)
                     else -> progressStore.resolveResumeMs(id, startMs)
                 }
+                resumeMs to resolveStream(id, resumeMs / 1000, transcode = false)
             }
-            val subsDeferred = async { fetchSubtitles(id) }
-            val resumeMs = resumeDeferred.await()
-            val decisionDeferred = async { resolveStream(id, resumeMs / 1000, transcode = false) }
-            val (url, hls) = decisionDeferred.await()
+            val media = mediaDeferred.await()
+            if (media == null) {
+                decisionDeferred.cancel(); subsDeferred.cancel()
+                _ui.update { it.copy(phase = PlayerPhase.Error("Couldn't load this title. Check the connection to your HomeFlix server.")) }
+                return@launch
+            }
+            _ui.update { it.withMedia(media) }
+            val (resumeMs, decision) = decisionDeferred.await()
+            val (url, hls) = decision
             subtitleConfigs = subsDeferred.await()
             streamUrl = url
             isHls = hls

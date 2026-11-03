@@ -39,7 +39,7 @@ object NetworkModule {
     fun provideOkHttpClient(
         loggingInterceptor: HttpLoggingInterceptor
     ): OkHttpClient {
-        return OkHttpClient.Builder()
+        return com.homeflix.tv.util.Http.shared.newBuilder()
             // LOCAL-first, domain-fallback server selection (must run first)
             .addInterceptor(com.homeflix.tv.util.ServerFailoverInterceptor())
             // The backend keys playback progress / my-list / recently-watched

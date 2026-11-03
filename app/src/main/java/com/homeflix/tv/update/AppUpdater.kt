@@ -89,7 +89,7 @@ class AppUpdater @Inject constructor(
     internal var currentVersionCode: Long = BuildConfig.VERSION_CODE.toLong()
     internal var archiveVerifier: (File, UpdateInfo) -> String? = ::verifyArchive
 
-    private val client = OkHttpClient.Builder()
+    private val client = com.homeflix.tv.util.Http.shared.newBuilder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()

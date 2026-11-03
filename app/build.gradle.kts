@@ -16,8 +16,8 @@ android {
         applicationId = "com.homeflix.tv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 32
-        versionName = "5.15.3"
+        versionCode = 33
+        versionName = "5.16.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -82,6 +82,8 @@ android {
 
 // `./gradlew assembleRelease -PcomposeReports` writes Compose stability reports.
 composeCompiler {
+    // Immutable models and read-only lists count as stable: rows skip redraws when nothing changed.
+    stabilityConfigurationFile = rootProject.layout.projectDirectory.file("compose_stability.conf")
     if (project.hasProperty("composeReports")) {
         reportsDestination = layout.buildDirectory.dir("compose_reports")
         metricsDestination = layout.buildDirectory.dir("compose_reports")

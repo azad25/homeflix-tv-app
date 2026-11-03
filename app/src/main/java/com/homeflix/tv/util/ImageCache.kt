@@ -38,7 +38,7 @@ object ImageCache {
                     .build()
             }
             .okHttpClient {
-                OkHttpClient.Builder()
+                Http.images().newBuilder()
                     .connectTimeout(8, TimeUnit.SECONDS)
                     .readTimeout(15, TimeUnit.SECONDS)
                     .writeTimeout(30, TimeUnit.SECONDS)

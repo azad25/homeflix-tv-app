@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.15.3)
+# HomeFlix TV v5 (5.16.0)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.15.3, versionCode 32, 12.0 MB)
-SHA-256: `9f2826ea0436b2b745071c4595389131c13000c770bd33a402b936ed0309defd`
+**Download:** `homeflix-tv-v5.apk` (5.16.0, versionCode 33, 12.0 MB)
+SHA-256: `87cba5a9f7de173abf0889fef5d7581d30fb36ff16512a343dc2956d9782dca3`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -13,6 +13,7 @@ SHA-256: `9f2826ea0436b2b745071c4595389131c13000c770bd33a402b936ed0309defd`
 
 ## New since v5.11.0
 
+- **5.16.0 (performance):** pressing Play starts the video sooner, because the title, resume point, subtitles and stream are fetched together instead of one after another; every network client shares one set of connections, so the first Home request reuses the startup probe's connection and posters never hold up API calls; home-screen sync setup is off the main thread at launch; and rows skip redrawing when their titles haven't changed.
 - **5.15.3:** the Home billboard plays each title's own preview clip (it used to repeat the first one for every title).
 
 - **Live TV, like a cable box:** channel numbers, ▲▼ zapping, an info banner, a mini guide (OK) and a full guide with live preview (◀), favorites, and Back to your last channel. YouTube-only and offline channels are hidden. It's light on 2 GB TVs.

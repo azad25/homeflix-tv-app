@@ -57,7 +57,7 @@ class CastConnection @Inject constructor(
         if (attempt % 4 == 3) ServerConfig.other(active) else active
     }
 
-    private val client: OkHttpClient = OkHttpClient.Builder()
+    private val client: OkHttpClient = com.homeflix.tv.util.Http.shared.newBuilder()
         .pingInterval(20, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .connectTimeout(8, TimeUnit.SECONDS)

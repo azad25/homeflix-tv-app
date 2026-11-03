@@ -89,7 +89,7 @@ class SettingsViewModel @Inject constructor(
 
     private fun checkServer(base: String) {
         val ok = runCatching {
-            okhttp3.OkHttpClient.Builder().connectTimeout(4, java.util.concurrent.TimeUnit.SECONDS)
+            com.homeflix.tv.util.Http.shared.newBuilder().connectTimeout(4, java.util.concurrent.TimeUnit.SECONDS)
                 .readTimeout(6, java.util.concurrent.TimeUnit.SECONDS).build()
                 .newCall(okhttp3.Request.Builder().url("$base/genres").build()).execute().use { it.code }
         }

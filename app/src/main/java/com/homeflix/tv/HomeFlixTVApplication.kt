@@ -48,7 +48,8 @@ class HomeFlixTVApplication : Application(), ImageLoaderFactory {
         updater.start()
 
         // HomeFlix's row on the TV home screen stays fresh in the background.
-        com.homeflix.tv.launcher.HomeScreenSync.schedule(this)
+        // WorkManager's first getInstance() opens its database: keep that off the main thread.
+        Thread { com.homeflix.tv.launcher.HomeScreenSync.schedule(this) }.start()
         dagger.hilt.android.EntryPointAccessors
             .fromApplication(this, com.homeflix.tv.cast.CastEntryPoint::class.java)
             .castConnection().onUpdateAvailable = updater::checkNow
