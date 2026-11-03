@@ -578,7 +578,8 @@ fun HeroBillboard(
     val tile = tiles[index.mod(tiles.size)]
     val heroKey = "hero:${tile.key}"
 
-    val heroPreview by com.homeflix.tv.core.rememberPreviewUrl(tile, active = active)
+    // One slot per title, so a title can never inherit the previous one's clip.
+    val heroPreview by androidx.compose.runtime.key(tile.key) { com.homeflix.tv.core.rememberPreviewUrl(tile, active = active) }
     LaunchedEffect(active, heroKey, epoch, heroPreview) {
         val p = preview ?: return@LaunchedEffect
         if (active) p.request(heroKey, heroPreview, revealDelayMs = 1_800, dwellMs = 600) else p.cancel(heroKey)

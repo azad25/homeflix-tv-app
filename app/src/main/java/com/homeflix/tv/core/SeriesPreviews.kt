@@ -83,6 +83,9 @@ val LocalSeriesPreviews = staticCompositionLocalOf<SeriesPreviews?> { null }
 fun rememberPreviewUrl(tile: Tile, active: Boolean): State<String?> {
     val resolver = LocalSeriesPreviews.current
     return produceState(initialValue = tile.previewUrl, tile.key, active) {
+        // produceState keeps its value when the keys change; the billboard reuses one
+        // slot for every title, so start from this tile's own clip each time.
+        value = tile.previewUrl
         if (value != null || !active) return@produceState
         if (tile.kind == TileKind.SERIES && resolver != null) value = resolver.previewUrl(tile.seriesId ?: tile.id)
     }
