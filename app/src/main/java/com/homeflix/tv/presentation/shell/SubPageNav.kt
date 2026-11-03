@@ -68,7 +68,7 @@ fun SubPageTopBar(navigator: AppNavigator, visible: Boolean = true) {
                 .focusProperties { enter = { requesters.getValue(ShellTab.HOME) } }
                 .focusGroup()
         ) {
-            Text("HOMEFLIX", color = Tv.Red, fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+            com.homeflix.tv.presentation.ui.BrandWordmark()
             Spacer(Modifier.weight(1f))
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                 ShellTab.entries.forEach { tab ->

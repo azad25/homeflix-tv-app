@@ -16,8 +16,8 @@ android {
         applicationId = "com.homeflix.tv"
         minSdk = 23
         targetSdk = 36
-        versionCode = 28
-        versionName = "5.14.1"
+        versionCode = 29
+        versionName = "5.15.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -70,6 +70,8 @@ android {
             it.maxHeapSize = "2g"
             // End-to-end smoke test against a real backend: -Phomeflix.e2e.server=host:port
             project.findProperty("homeflix.e2e.server")?.let { v -> it.systemProperty("homeflix.e2e.server", v) }
+            // README screenshots: -Phomeflix.screenshots=/path/to/dir (tests in com.homeflix.tv.screenshots)
+            project.findProperty("homeflix.screenshots")?.let { v -> it.systemProperty("homeflix.screenshots", v) }
         }
     }
     buildFeatures {

@@ -158,8 +158,9 @@ class AppSmokeTest {
             back()                                   // nav again
             steps = 0
             while (focused() != "Profile" && steps++ < 9) press(Key.DirectionRight)
-            press(Key.Enter); pump(800)              // menu: Notifications, Settings, About…
-            press(Key.DirectionDown, 2)
+            press(Key.Enter); pump(800)              // menu: Notifications, Settings, (Live TV), About…
+            steps = 0
+            while (focused() != "About HomeFlix" && steps++ < 6) press(Key.DirectionDown)
             press(Key.Enter); pump(1_500)
             dump("about")
             check(waitForText("Ferdous Azad")) { "About screen didn't show the developer credit" }
@@ -386,7 +387,7 @@ class AppSmokeTest {
         java.io.File(ctx.filesDir, "feed_v5_home.json").delete()
         ActivityScenario.launch(MainActivity::class.java).use {
             check(waitForText("Inception")) { "home never loaded" }
-            check(waitForText("Live TV")) { "no Live TV on the menu / Home" }
+            // Live TV is in the profile menu and a Home row (checked in the saved feed below).
             dump("home-with-live")
             val feedFile = java.io.File(ctx.filesDir, "feed_v5_home.json")
             var waited = 0
@@ -397,8 +398,12 @@ class AppSmokeTest {
             }
             press(Key.DirectionUp)                      // nav: Home
             var guard = 0
-            while (!focused().contains("Live TV") && guard++ < 8) press(Key.DirectionRight)
-            check(focused().contains("Live TV")) { "focus=${focused()}" }
+            // Live TV lives in the profile dropdown.
+            while (!focused().contains("Profile") && guard++ < 9) press(Key.DirectionRight)
+            press(Key.Enter); pump(800)
+            guard = 0
+            while (focused() != "Live TV" && guard++ < 6) press(Key.DirectionDown)
+            check(focused() == "Live TV") { "focus=${focused()}" }
             press(Key.Enter)
             check(waitForText(first)) { "Live TV didn't open on channel 1 ($first)" }
             check(waitForText("LIVE")) { "no banner" }

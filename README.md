@@ -1,6 +1,6 @@
 # 🎬 HomeFlix TV — Android TV Streaming Client
 
-**Version 5.14.1** — A Netflix/Prime‑grade Android TV client for the HomeFlix media server. Full‑bleed cinematic UI with auto‑playing background previews, a red‑and‑black HomeFlix theme, D‑pad‑first navigation, and an ExoPlayer video pipeline that buffers ahead for smooth playback. Built with Jetpack Compose and deliberately tuned to stay light on low‑RAM TVs (e.g. a 2 GB Sony Android TV).
+**Version 5.15.0** — A Netflix/Prime‑grade Android TV client for the HomeFlix media server. Full‑bleed cinematic UI with auto‑playing background previews, a red‑and‑black HomeFlix theme, D‑pad‑first navigation, and an ExoPlayer video pipeline that buffers ahead for smooth playback. Built with Jetpack Compose and deliberately tuned to stay light on low‑RAM TVs (e.g. a 2 GB Sony Android TV).
 
 ![Android TV](https://img.shields.io/badge/Android-TV-3DDC84?style=flat&logo=android) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=flat&logo=kotlin) ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=jetpack-compose) ![Media3 ExoPlayer](https://img.shields.io/badge/Media3-ExoPlayer-FF0000?style=flat) ![Hilt](https://img.shields.io/badge/Hilt-DI-2196F3?style=flat)
 
@@ -8,6 +8,21 @@
 ## 📱 App Preview
 
 ![HomeFlix TV Preview](preview-app.gif)
+
+### The TV interface (v5)
+
+A tour of the current app, rendered from the real Compose screens (every title, channel and image is made up):
+
+![HomeFlix TV v5 tour](screenshots/v5/tv-tour.gif)
+
+| | |
+|---|---|
+| ![Home](screenshots/v5/home.jpg) **Home**: billboard, top menu, Continue Watching | ![Movie page](screenshots/v5/movie.jpg) **Title page**: full screen, Resume, My List, Rate |
+| ![Live TV](screenshots/v5/live-tv.jpg) **Live TV**: channel banner with number, LIVE, clock | ![Mini guide](screenshots/v5/live-tv-mini-guide.jpg) **Mini guide** (OK) over the playing channel |
+| ![Full guide](screenshots/v5/live-tv-guide.jpg) **Full guide** (◀): groups, channels, live preview | ![Coming Soon](screenshots/v5/coming-soon.jpg) **Coming Soon**: trailers, Notify Me |
+| ![Search](screenshots/v5/search.jpg) **Search**: compact QWERTY keyboard, results grid | ![Notifications](screenshots/v5/notifications.jpg) **Notifications**: filters, day groups, artwork |
+
+To regenerate them: `./gradlew testDebugUnitTest --tests '*ReadmeScreenshots*' -Phomeflix.screenshots=<dir>`.
 
 ## 1. Overview
 

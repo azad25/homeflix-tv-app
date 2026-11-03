@@ -1,20 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- HomeFlix mark: a rounded play button (white on black), same as the web app's icon.svg.
+     The 64-unit mark is scaled into the adaptive icon's 72 dp safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- HomeFlix mark: bold red "H" with a play triangle in the gap -->
-    <!-- Left leg -->
-    <path
-        android:fillColor="#E50914"
-        android:pathData="M37,33 h9 v42 h-9 z" />
-    <!-- Right leg -->
-    <path
-        android:fillColor="#E50914"
-        android:pathData="M62,33 h9 v42 h-9 z" />
-    <!-- Play triangle (crossbar) -->
-    <path
-        android:fillColor="#E50914"
-        android:pathData="M48,43 L48,65 L64,54 Z" />
+    <group android:translateX="20" android:translateY="20" android:scaleX="1.0625" android:scaleY="1.0625">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M24,17.6v28.8c0,2.4 2.6,3.9 4.7,2.7l24,-14.4c2,-1.2 2,-4.1 0,-5.3l-24,-14.4c-2.1,-1.3 -4.7,0.2 -4.7,2.6Z" />
+    </group>
 </vector>

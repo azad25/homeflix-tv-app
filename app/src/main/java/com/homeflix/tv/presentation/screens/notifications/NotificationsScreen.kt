@@ -130,7 +130,7 @@ private fun dayGroup(seconds: Long): String {
  * right, over a dim wash of the same artwork.
  */
 @Composable
-private fun NotificationsContent(items: List<Notification>, navigator: AppNavigator) {
+internal fun NotificationsContent(items: List<Notification>, navigator: AppNavigator) {
     var filter by rememberSaveable { mutableStateOf(NotifFilter.ALL) }
     val shown = remember(items, filter) { items.filter { filter.matches(it) }.sortedByDescending { it.timestampSeconds } }
     var focusedId by rememberSaveable { mutableStateOf<String?>(null) }

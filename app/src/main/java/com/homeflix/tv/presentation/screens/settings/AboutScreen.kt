@@ -62,7 +62,7 @@ fun AboutScreen(navigator: com.homeflix.tv.presentation.navigation.AppNavigator?
             .background(Brush.radialGradient(listOf(Color(0xFF3A0A0C), Tv.Background), radius = 1400f))
     ) {
         Column(Modifier.align(Alignment.CenterStart).padding(start = 96.dp).width(560.dp)) {
-            Text("HOMEFLIX", color = Tv.Red, fontSize = 40.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+            com.homeflix.tv.presentation.ui.BrandWordmark(fontSize = 44.sp, markSize = 34.dp)
             Text("Your movies and shows, on your own server.", color = Tv.TextSecondary, fontSize = 15.sp,
                 modifier = Modifier.padding(top = 4.dp))
             Spacer(Modifier.height(30.dp))

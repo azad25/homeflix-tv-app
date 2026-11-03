@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.14.1)
+# HomeFlix TV v5 (5.15.0)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.14.1, versionCode 28, 12.6 MB)
-SHA-256: `decae370213961946abc453307eaf9bd5093eee8a96bd7b8949d76892df9f040`
+**Download:** `homeflix-tv-v5.apk` (5.15.0, versionCode 29, 12.6 MB)
+SHA-256: `470a360b528c3b7cbc25496538db79e64ff997bf678d9808e29bd18d9a8436c8`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -34,6 +34,8 @@ SHA-256: `decae370213961946abc453307eaf9bd5093eee8a96bd7b8949d76892df9f040`
 ## What's new
 
 ### Browsing
+- **New logo:** the HomeFlix rounded play button (white on black), matching the web app. It's used on the launcher icon, the TV banner and the **Home**Flix wordmark in the top menu.
+- **Coming Soon** is on the top menu, and **Live TV** is in the profile menu.
 - A new top menu that hides while you browse rows, plus a notification bell and a profile menu (Notifications, Settings, About, Refresh, Exit).
 - Movie, show, notification, settings and about pages also show the top menu.
 - Each tab remembers where you were. Back goes from the page to the menu, then to Home, then exits.

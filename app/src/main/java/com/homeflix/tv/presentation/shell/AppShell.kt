@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -160,7 +161,7 @@ fun AppShell(
                 unread = unreadNotifications,
                 onNotifications = onOpenNotifications,
                 onToggleMenu = { menuOpen = !menuOpen },
-                onLiveTv = onOpenLiveTv
+                onComingSoon = onOpenComingSoon
             )
             if (!menuOpen && updater != null) UpdatePrompt(updater)
             CrashNotice()
@@ -170,7 +171,7 @@ fun AppShell(
                     onNotifications = { menuOpen = false; onOpenNotifications() },
                     onSettings = { menuOpen = false; onOpenSettings() },
                     onAbout = { menuOpen = false; onOpenAbout() },
-                    onComingSoon = onOpenComingSoon?.let { open -> { menuOpen = false; open() } },
+                    onLiveTv = onOpenLiveTv?.let { open -> { menuOpen = false; open() } },
                     onRefresh = { menuOpen = false; activity?.recreate() },
                     onExit = { activity?.finish() }
                 )
@@ -187,7 +188,7 @@ private fun TopNav(
     unread: Int,
     onNotifications: () -> Unit,
     onToggleMenu: () -> Unit,
-    onLiveTv: (() -> Unit)? = null
+    onComingSoon: (() -> Unit)? = null
 ) {
     val visible = shell.navVisible || menuOpen
     val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(200), label = "navAlpha")
@@ -235,7 +236,7 @@ private fun TopNav(
                 .focusProperties { enter = { requesters.getValue(shell.selected) } }
                 .focusGroup()
         ) {
-            Text("HOMEFLIX", color = Tv.Red, fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+            com.homeflix.tv.presentation.ui.BrandWordmark()
             Spacer(Modifier.weight(1f))
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                 ShellTab.entries.forEach { tab ->
@@ -254,8 +255,8 @@ private fun TopNav(
                         }
                     )
                 }
-                // Live TV opens full screen on OK (it isn't a browse page, so resting on it does nothing).
-                if (onLiveTv != null) NavLiveTv(canFocus = visible, down = shell.pageEntry, onClick = onLiveTv)
+                // Coming Soon opens full screen on OK (it isn't a browse page, so resting on it does nothing).
+                if (onComingSoon != null) NavLiveTv(label = "Coming Soon", canFocus = visible, down = shell.pageEntry, onClick = onComingSoon)
             }
             Spacer(Modifier.weight(1f))
             // Notifications stay on the nav: bell with a red dot while anything is unread.
@@ -313,7 +314,7 @@ internal fun NavItem(
 }
 
 @Composable
-internal fun NavLiveTv(canFocus: Boolean, down: FocusRequester?, onClick: () -> Unit) {
+internal fun NavLiveTv(label: String, canFocus: Boolean, down: FocusRequester?, onClick: () -> Unit) {
     var focused by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -329,7 +330,7 @@ internal fun NavLiveTv(canFocus: Boolean, down: FocusRequester?, onClick: () -> 
             .padding(horizontal = 12.dp, vertical = 5.dp)
     ) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(Tv.Red))
-        Text("  Live TV", color = if (focused) Color.Black else Color(0xCCFFFFFF), fontSize = 14.sp,
+        Text("  $label", color = if (focused) Color.Black else Color(0xCCFFFFFF), fontSize = 14.sp,
             fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
@@ -380,7 +381,7 @@ internal fun NavIconButton(icon: ImageVector, description: String, canFocus: Boo
 }
 
 @Composable
-internal fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onSettings: () -> Unit, onAbout: () -> Unit, onRefresh: () -> Unit, onExit: () -> Unit, onComingSoon: (() -> Unit)? = null) {
+internal fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onSettings: () -> Unit, onAbout: () -> Unit, onRefresh: () -> Unit, onExit: () -> Unit, onLiveTv: (() -> Unit)? = null) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { first.requestFocus() } }
     BackHandler(onBack = onDismiss)
@@ -397,7 +398,7 @@ internal fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onS
         ) {
             MenuItem(Icons.Filled.Notifications, "Notifications", onNotifications, Modifier.focusRequester(first))
             MenuItem(Icons.Filled.Settings, "Settings", onSettings)
-            if (onComingSoon != null) MenuItem(Icons.Filled.NotificationsActive, "Coming Soon", onComingSoon)
+            if (onLiveTv != null) MenuItem(Icons.Filled.Tv, "Live TV", onLiveTv)
             MenuItem(Icons.Filled.Info, "About HomeFlix", onAbout)
             MenuItem(Icons.Filled.Refresh, "Refresh", onRefresh)
             MenuItem(Icons.AutoMirrored.Filled.ExitToApp, "Exit HomeFlix", onExit)
