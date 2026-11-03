@@ -11,6 +11,19 @@ SHA-256: `ad9320ae363eb7409d8482e02982cb994f1c6fc8f3bd3153ff3ad4146ce723c6`
 
 ---
 
+## New since v5.11.0
+
+- **Live TV, like a cable box:** channel numbers, ▲▼ zapping, an info banner, a mini guide (OK) and a full guide with live preview (◀), favorites, and Back to your last channel. YouTube-only and offline channels are hidden. It's light on 2 GB TVs.
+- **Coming Soon:** the most anticipated upcoming movies and series with their trailers, on the top menu and as Home rows. **Notify Me** has your server download a title on release day. The full-screen screen has a premiere-calendar design.
+- **HomeFlix on your TV's home screen:** a HomeFlix row with Continue Watching, new arrivals and picks for you.
+- **Smarter pages:** no title appears twice on a page. Top 10 is ranked by real plays. New rows: Top Picks, Because You Liked/Watched, New for You and Hidden Gems. Genres are ordered by your taste.
+- **Full-screen movie pages:** the trailer fills the TV and the text fades while it plays.
+- **Show previews:** each show previews its own newest uploaded episode.
+- **Redesigned Notifications:** All / Movies / Shows filters, day groups and a large artwork card.
+- **New logo:** the HomeFlix rounded play button, matching the web app.
+- **Keyboard:** Esc works like Back everywhere.
+- **Smaller app:** about 25 % smaller download (12.6 MB).
+
 ## Highlights
 
 - **New Netflix-style design:** a top menu (Search, Home, Shows, Movies, My HomeFlix), a full-screen billboard, and rows of titles.
