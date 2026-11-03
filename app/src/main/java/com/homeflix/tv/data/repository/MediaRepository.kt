@@ -324,7 +324,8 @@ class MediaRepository @Inject constructor(
                         genres = dto.genres?.map { it.name } ?: dto.genreNames ?: emptyList(),
                         posterPath = dto.posterPath,
                         bannerPath = dto.bannerPath,
-                        createdAt = dto.createdAt
+                        createdAt = dto.createdAt,
+                        tmdbId = dto.tmdbId
                     )
                     Log.d("MediaRepository", "Series: ${series.title}, ID: ${series.id}, PosterPath: ${series.posterPath}")
                     series
@@ -402,7 +403,8 @@ class MediaRepository @Inject constructor(
                     totalEpisodes = 0, // Will be calculated from episodes
                     genres = dto.genres?.map { it.name } ?: dto.genreNames ?: emptyList(),
                     posterPath = dto.posterPath,
-                    bannerPath = dto.bannerPath
+                    bannerPath = dto.bannerPath,
+                    tmdbId = dto.tmdbId
                 )
             } else {
                 // Fallback to default

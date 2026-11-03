@@ -35,6 +35,8 @@ data class SeriesState(
     val resume: SeriesResume? = null,
     val firstEpisodeId: Int? = null,
     val inMyList: Boolean? = null,
+    /** The newest uploaded episode: its preview clip is the show's trailer. */
+    val previewEpisodeId: Int? = null,
     /** Thumbs rating of the whole show (see Thumbs); null while loading. */
     val rating: Int? = null
 )
@@ -43,7 +45,8 @@ data class SeriesState(
 class TvSeriesDetailsViewModel @Inject constructor(
     private val repo: MediaRepository,
     private val progressStore: PlaybackProgressStore,
-    private val personal: com.homeflix.tv.data.repository.PersonalRepository
+    private val personal: com.homeflix.tv.data.repository.PersonalRepository,
+    private val previews: com.homeflix.tv.core.SeriesPreviews
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SeriesState())
@@ -71,6 +74,7 @@ class TvSeriesDetailsViewModel @Inject constructor(
                 it.copy(loading = false, series = series, seasons = seasons, resume = resume, selectedSeason = initialSeason)
             }
             selectSeason(initialSeason)
+            launch { previews.latestEpisodeId(seriesId)?.let { id -> _state.update { it.copy(previewEpisodeId = id) } } }
             launch {
                 val inList = async { personal.inMyList(seriesId, series = true).getOrNull() }
                 val rating = async { personal.rating(seriesId, series = true).getOrNull() }

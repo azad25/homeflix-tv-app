@@ -309,10 +309,11 @@ class HomeFeedViewModel @Inject constructor(
     personal: com.homeflix.tv.data.repository.PersonalRepository,
     cache: FeedCache,
     private val homeScreen: com.homeflix.tv.launcher.HomeScreenPublisher,
-    liveTv: com.homeflix.tv.livetv.LiveTvHome
+    liveTv: com.homeflix.tv.livetv.LiveTvHome,
+    comingSoon: com.homeflix.tv.comingsoon.ComingSoonHome
 ) : FeedViewModel(cache) {
     override val cacheName = "home"
-    private val builder = HomeFeedBuilder(repo, personal, liveTv)
+    private val builder = HomeFeedBuilder(repo, personal, liveTv, comingSoon)
     override val lastError: Throwable? get() = builder.lastError
 
     init { start() }
@@ -327,7 +328,8 @@ class HomeFeedViewModel @Inject constructor(
 class HomeFeedBuilder(
     repo: MediaRepository,
     private val personal: com.homeflix.tv.data.repository.PersonalRepository,
-    private val liveTv: com.homeflix.tv.livetv.LiveTvHome? = null
+    private val liveTv: com.homeflix.tv.livetv.LiveTvHome? = null,
+    private val comingSoon: com.homeflix.tv.comingsoon.ComingSoonHome? = null
 ) {
     private val load = Loaders(repo)
     val lastError: Throwable? get() = load.lastError
@@ -344,6 +346,7 @@ class HomeFeedBuilder(
         val forYouD = async { personal.forYou(20).getOrNull() }
         val chartD = async { personal.top10("all").getOrNull() }
         val liveD = async { runCatching { liveTv?.tiles() }.getOrNull() }
+        val comingD = async { runCatching { comingSoon?.rows() }.getOrNull() }
         val movies = moviesD.await()
         val series = seriesD.await()
         if (movies.isEmpty() && series.isEmpty()) error("no content")
@@ -374,6 +377,11 @@ class HomeFeedBuilder(
         val newest = (movies.filter { it.type == MediaType.MOVIE }.map { (it.createdAt?.time ?: 0L) to Tiles.movie(it, "n") } +
             series.map { Rows.addedAt(it) to Tiles.series(it, "ns") }).sortedByDescending { it.first }.map { it.second }
         p.add(4, "new", "New on HomeFlix", newest)
+        // Coming Soon (not in the library, so never a duplicate): right after what's new.
+        comingD.await()?.let { (movies, series) ->
+            p.add(4, "coming-movies", "Coming Soon: Movies", movies, RowStyle.COMING, min = 1, exclusive = false)
+            p.add(4, "coming-series", "Coming Soon: Series", series, RowStyle.COMING, min = 1, exclusive = false)
+        }
         themed["because"].orEmpty().take(3).forEachIndexed { i, r -> p.add(5 + i, "because$i", r.title ?: "Because You Watched", lib.tiles(r, "by$i"), min = 3) }
         themed["collection"].orEmpty().take(1).forEach { r -> p.add(8, "collection", r.title ?: "Continue the Collection", lib.tiles(r, "co"), min = 2) }
         themed["new-for-you"]?.firstOrNull()?.let { r -> p.add(9, "new-for-you", r.title ?: "New for You", lib.tiles(r, "nf"), min = 3) }

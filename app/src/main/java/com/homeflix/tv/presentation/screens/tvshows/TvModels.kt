@@ -14,7 +14,8 @@ data class TvSeries(
     val bannerPath: String?,
     val tmdbPosterUrl: String? = null,
     val tmdbBackdropUrl: String? = null,
-    val createdAt: String? = null
+    val createdAt: String? = null,
+    val tmdbId: Int? = null
 )
 
 /** One episode of a season. */

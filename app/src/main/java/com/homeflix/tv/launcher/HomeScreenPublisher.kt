@@ -201,6 +201,7 @@ class HomeScreenPublisher @Inject constructor(
         TileKind.SERIES -> TvContractCompat.PreviewProgramColumns.TYPE_TV_SERIES
         TileKind.EPISODE -> TvContractCompat.PreviewProgramColumns.TYPE_TV_EPISODE
         TileKind.CHANNEL -> TvContractCompat.PreviewProgramColumns.TYPE_CHANNEL
+        TileKind.COMING -> TvContractCompat.PreviewProgramColumns.TYPE_MOVIE
     }
 
     private fun appLink(link: HomeLink): Uri = Uri.parse(

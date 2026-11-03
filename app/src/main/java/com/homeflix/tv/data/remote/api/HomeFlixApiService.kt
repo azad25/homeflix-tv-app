@@ -162,6 +162,19 @@ interface HomeFlixApiService {
         @Query("unique") unique: Int? = 1      // no title in two rows
     ): Response<TasteResultDto>
 
+    // ------------------------------------------------------------ Coming Soon
+    @GET("comingsoon")
+    suspend fun getComingSoon(@Query("type") type: String? = null): Response<com.homeflix.tv.comingsoon.ComingSoonList>
+
+    @GET("comingsoon/title/{type}/{id}")
+    suspend fun getComingSoonTitle(@Path("type") type: String, @Path("id") id: Int): Response<com.homeflix.tv.comingsoon.ComingSoonItem>
+
+    @POST("comingsoon/notify")
+    suspend fun comingSoonNotify(@Body body: com.homeflix.tv.comingsoon.NotifyBody): Response<com.homeflix.tv.comingsoon.NotifyResult>
+
+    @DELETE("comingsoon/notify/{type}/{id}")
+    suspend fun comingSoonUnnotify(@Path("type") type: String, @Path("id") id: Int): Response<com.homeflix.tv.comingsoon.NotifyResult>
+
     // ---------------------------------------------------------------- Live TV
     @GET("livetv/channels")
     suspend fun liveChannels(

@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.13.2 (R8 code shrinking is currently off; see app/build.gradle.kts).
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.14.0 (R8 code shrinking is currently off; see app/build.gradle.kts).
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 
@@ -54,6 +54,24 @@ Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release bu
 - **Memory pressure:** the app frees the preview decoder and the bitmap cache when the system is low on memory.
 - **Player buffers:** sized to the device (40, 64 or 128 MB). Small caches are bounded, and LeakCanary is included in debug builds.
 - **Build:** R8 for library code, bundled Compose baseline profiles via profileinstaller, Kotlin 2.0.21 (strong skipping), a black splash with no white flash, and no verbose HTTP logging in release.
+
+### Coming Soon, full-screen title pages, show previews, Notifications (5.14)
+- **Coming Soon (`comingsoon/`):** this implements homeflix-wifi `docs/TV_APP_COMING_SOON_PROMPT.md`.
+  - `ComingSoonController` is pure Kotlin:
+    - Title switching and auto-advance when a trailer ends.
+    - The overlay fades after 4 s.
+    - Zones: Notify, Details, strip.
+    - Notify Me is optimistic, rolls back on failure, then refreshes `/title`.
+  - `ComingSoonViewModel`: one progressive-MP4 ExoPlayer on a SurfaceView, never recreated.
+  - Home rows use `RowStyle.COMING`: a muted trailer in the card after 700 ms on the shared preview player, with no prefetch of the large MP4s.
+  - Profile menu entry and the title-page buttons (`ComingSoonPanelViewModel`).
+  - No YouTube fallback: titles without an MP4 show their backdrop.
+- **Movie details:** the header is full screen (`peek = 0`) with a cinematic idle fade (`DetailHeader(cinematic = true)`).
+- **Show previews:** `core/SeriesPreviews` picks the newest uploaded episode that has a preview clip (else the newest upload) from the newest 3 seasons.
+  - It's resolved lazily when a show is focused or opened, and cached for 30 min.
+  - Used by show tiles, the billboard and the show page.
+- **Notifications:** filter chips, day groups, a white focused card, and a large artwork detail card.
+- **Tests:** `ComingSoonControllerTest`, `ComingSoonScreenTest` and `SeriesPreviewsTest`.
 
 ### Live TV (5.13)
 This implements `docs/LIVE_TV.md` from homeflix-wifi `release/v5.5`. The code is in `app/src/main/java/com/homeflix/tv/livetv/`.

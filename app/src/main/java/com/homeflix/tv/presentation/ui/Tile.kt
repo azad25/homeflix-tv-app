@@ -8,7 +8,7 @@ import com.homeflix.tv.presentation.screens.tvshows.TvSeries
 import com.homeflix.tv.util.ApiUtils
 
 /** CHANNEL = a Live TV channel ([Tile.channelId]); id 0 = "Live TV" (last channel). */
-enum class TileKind { MOVIE, SERIES, EPISODE, CHANNEL }
+enum class TileKind { MOVIE, SERIES, EPISODE, CHANNEL, COMING }
 
 /**
  * Everything a browse tile, the hero billboard and the info block under a row
@@ -35,10 +35,14 @@ data class Tile(
     val badge: String? = null,
     /** Live TV channel id for [TileKind.CHANNEL]. */
     val channelId: String? = null,
+    /** Coming Soon title ("movie:123" / "tv:456") for [TileKind.COMING]. */
+    val comingKey: String? = null,
+    /** Coming Soon: Notify Me is on (bell badge). */
+    val bell: Boolean = false,
     val rank: Int? = null
 )
 
-enum class RowStyle { POSTER, LANDSCAPE, TOP10, CHANNEL }
+enum class RowStyle { POSTER, LANDSCAPE, TOP10, CHANNEL, COMING }
 
 @Immutable
 data class ContentRow(

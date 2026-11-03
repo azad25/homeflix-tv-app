@@ -59,6 +59,13 @@ class AppNavigator(private val nav: NavHostController, private val preview: Prev
         nav.navigate(Screen.LiveTv.createRoute(channelId)) { launchSingleTop = true }
     }
 
+    /** Full-screen Coming Soon trailers, starting at [key] ("movie:123" / "tv:456"). */
+    fun comingSoon(key: String? = null) {
+        if (!canNavigate()) return
+        preview.hardStop()
+        nav.navigate(Screen.ComingSoon.createRoute(key)) { launchSingleTop = true }
+    }
+
     fun details(mediaId: Int) = go(Screen.Details.createRoute(mediaId.toString()))
     fun series(seriesId: Int) = go(Screen.TvSeriesDetails.createRoute(seriesId.toString()))
 
@@ -73,11 +80,13 @@ class AppNavigator(private val nav: NavHostController, private val preview: Prev
         TileKind.SERIES -> series(tile.id)
         TileKind.EPISODE -> tile.seriesId?.let { series(it) } ?: details(tile.id)
         TileKind.CHANNEL -> liveTv(tile.channelId)
+        TileKind.COMING -> comingSoon(tile.comingKey)
     }
 
     override fun play(tile: Tile) = when (tile.kind) {
         TileKind.SERIES -> series(tile.id)
         TileKind.CHANNEL -> liveTv(tile.channelId)
+        TileKind.COMING -> comingSoon(tile.comingKey)
         else -> player(tile.id, tile.resumeMs)
     }
 }
@@ -150,6 +159,13 @@ fun HomeFlixNavigation(
             )
         }
 
+        composable(Screen.ComingSoon.route, arguments = Screen.ComingSoon.arguments) { entry ->
+            com.homeflix.tv.comingsoon.ComingSoonScreen(
+                startKey = entry.arguments?.getString("start"),
+                onExit = { navigator.back() }
+            )
+        }
+
         composable(Screen.Settings.route) {
             com.homeflix.tv.presentation.screens.settings.SettingsScreen(navigator)
         }
@@ -212,6 +228,8 @@ private fun BrowseShell(
     // "Live TV" on the top menu while the server has Live TV turned on.
     val liveVm: com.homeflix.tv.livetv.LiveTvEntryViewModel = hiltViewModel(entry)
     val liveEnabled by liveVm.enabled.collectAsState()
+    val comingVm: com.homeflix.tv.comingsoon.ComingSoonEntryViewModel = hiltViewModel(entry)
+    val comingAvailable by comingVm.available.collectAsState()
     AppShell(
         previewPlayer = previewPlayer,
         actions = navigator,
@@ -220,7 +238,8 @@ private fun BrowseShell(
         onOpenAbout = { navigator.go(Screen.About.route) },
         unreadNotifications = unread,
         updater = updater,
-        onOpenLiveTv = if (liveEnabled) ({ navigator.liveTv() }) else null
+        onOpenLiveTv = if (liveEnabled) ({ navigator.liveTv() }) else null,
+        onOpenComingSoon = if (comingAvailable) ({ navigator.comingSoon() }) else null
     ) { tab, shell ->
         when (tab) {
             ShellTab.HOME -> {
@@ -265,6 +284,10 @@ sealed class Screen(val route: String) {
         val arguments = listOf(navArgument("mediaId") { type = NavType.StringType })
     }
     object Settings : Screen("settings")
+    object ComingSoon : Screen("comingsoon?start={start}") {
+        fun createRoute(key: String?) = if (key.isNullOrBlank()) "comingsoon" else "comingsoon?start=" + android.net.Uri.encode(key)
+        val arguments = listOf(navArgument("start") { type = NavType.StringType; nullable = true; defaultValue = null })
+    }
     object LiveTv : Screen("livetv?channel={channel}") {
         fun createRoute(channelId: String?) =
             if (channelId.isNullOrBlank()) "livetv" else "livetv?channel=" + android.net.Uri.encode(channelId)

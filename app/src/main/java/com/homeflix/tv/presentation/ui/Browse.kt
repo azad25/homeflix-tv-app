@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -123,6 +124,7 @@ fun PillButton(
 private fun tileHeightFor(style: RowStyle): Dp = when (style) {
     RowStyle.LANDSCAPE -> 150.dp
     RowStyle.CHANNEL -> 112.dp
+    RowStyle.COMING -> 150.dp
     else -> Tv.TileHeight
 }
 
@@ -131,6 +133,64 @@ private const val ExpandDwellMs = 650L
 
 private fun posterWidth(h: Dp): Dp = h * (2f / 3f)
 private fun landscapeWidth(h: Dp): Dp = h * (16f / 9f)
+
+/**
+ * A Coming Soon title: backdrop card with the date line, a "Season 3" /
+ * "New Series" chip and a bell when Notify Me is on. Resting on it ~700 ms
+ * plays its trailer muted inside the card (the shared preview player).
+ */
+@UnstableApi
+@Composable
+fun ComingSoonTile(tile: Tile, focusKey: String, registry: FocusRegistry, onFocused: () -> Unit, onClick: () -> Unit) {
+    val preview = LocalPreviewPlayer.current
+    var focused by remember { mutableStateOf(false) }
+    val h = tileHeightFor(RowStyle.COMING)
+    val w = landscapeWidth(h)
+    LaunchedEffect(focused) {
+        val p = preview ?: return@LaunchedEffect
+        if (focused && tile.previewUrl != null) p.request(tile.key, tile.previewUrl, revealDelayMs = 0, dwellMs = 700)
+        else p.cancel(tile.key)
+    }
+    val scale by animateFloatAsState(if (focused) 1.05f else 1f, tween(Tv.FocusMotionMs, easing = Tv.Ease), label = "csScale")
+    Box(
+        modifier = Modifier
+            .width(w)
+            .height(h)
+            .registerFocus(registry, focusKey)
+            .testTag("tile:$focusKey")
+            .onFocusChanged {
+                if (it.isFocused != focused) {
+                    focused = it.isFocused
+                    if (it.isFocused) onFocused()
+                }
+            }
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .clip(TileShape)
+            .background(Tv.Surface)
+    ) {
+        SizedImage(tile.backdropUrl, w, h, Modifier.fillMaxSize())
+        if (focused) PreviewVideo(tile.key, Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().background(Tv.BottomScrim))
+        Column(Modifier.align(Alignment.BottomStart).padding(start = 10.dp, end = 10.dp, bottom = 10.dp)) {
+            Text(tile.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            tile.subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(it, color = Color(0xFFFFC94D), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            }
+        }
+        tile.badge?.let {
+            Text(it, color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(3.dp))
+                    .background(Color.White).padding(horizontal = 5.dp, vertical = 1.dp))
+        }
+        if (tile.bell) {
+            Icon(androidx.compose.material.icons.Icons.Filled.NotificationsActive, "Notify Me is on", tint = Color.White,
+                modifier = Modifier.align(Alignment.TopEnd).padding(7.dp).size(20.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape).background(Color(0x99000000)).padding(3.dp))
+        }
+        if (focused) Box(Modifier.fillMaxSize().border(3.dp, Tv.FocusRing, TileShape))
+    }
+}
 
 /**
  * A Live TV channel: the logo on a dark card, the channel number and a red
@@ -221,9 +281,11 @@ fun BrowseTile(
             settled = false
         }
     }
-    LaunchedEffect(settled, epoch) {
+    // Shows preview their newest uploaded episode (resolved only once focus rests here).
+    val previewUrl by com.homeflix.tv.core.rememberPreviewUrl(tile, active = settled && previewsEnabled && expandable)
+    LaunchedEffect(settled, epoch, previewUrl) {
         val p = preview ?: return@LaunchedEffect
-        if (settled && previewsEnabled && expandable) p.request(tile.key, tile.previewUrl, revealDelayMs = 900)
+        if (settled && previewsEnabled && expandable) p.request(tile.key, previewUrl, revealDelayMs = 900)
         else p.cancel(tile.key)
     }
 
@@ -387,6 +449,22 @@ fun TileRow(
             ) {
                 itemsIndexed(tiles, key = { _, t -> t.key }, contentType = { _, _ -> row.style }) { index, tile ->
                     val focusKey = "${row.id}|${tile.key}"
+                    if (row.style == RowStyle.COMING) {
+                        ComingSoonTile(
+                            tile = tile,
+                            focusKey = focusKey,
+                            registry = registry,
+                            onFocused = {
+                                val from = focusedIndex
+                                focusedIndex = index
+                                onTileFocused(focusKey)
+                                val basePx = with(density) { landscapeWidth(tileHeightFor(row.style)).roundToPx() }
+                                scope.launch { state.slideTo(index, from, basePx) }
+                            },
+                            onClick = { actions.open(tile) }
+                        )
+                        return@itemsIndexed
+                    }
                     if (row.style == RowStyle.CHANNEL) {
                         ChannelTile(
                             tile = tile,
@@ -415,7 +493,7 @@ fun TileRow(
                             onTileFocused(focusKey)
                             val basePx = with(density) {
                                 val h = tileHeightFor(row.style)
-                                (if (row.style == RowStyle.LANDSCAPE || row.style == RowStyle.CHANNEL) landscapeWidth(h) else posterWidth(h)).roundToPx()
+                                (if (row.style == RowStyle.LANDSCAPE || row.style == RowStyle.CHANNEL || row.style == RowStyle.COMING) landscapeWidth(h) else posterWidth(h)).roundToPx()
                             }
                             scope.launch { state.slideTo(index, from, basePx) }
                             // Warm the next tiles' stills + trailers so moving on is instant.
@@ -500,19 +578,21 @@ fun HeroBillboard(
     val tile = tiles[index.mod(tiles.size)]
     val heroKey = "hero:${tile.key}"
 
-    LaunchedEffect(active, heroKey, epoch) {
+    val heroPreview by com.homeflix.tv.core.rememberPreviewUrl(tile, active = active)
+    LaunchedEffect(active, heroKey, epoch, heroPreview) {
         val p = preview ?: return@LaunchedEffect
-        if (active) p.request(heroKey, tile.previewUrl, revealDelayMs = 1_800, dwellMs = 600) else p.cancel(heroKey)
+        if (active) p.request(heroKey, heroPreview, revealDelayMs = 1_800, dwellMs = 600) else p.cancel(heroKey)
     }
     // Rotation: after the trailer finishes, or ~10 s for titles without one.
     LaunchedEffect(active, heroKey, epoch, tiles.size) {
         if (!active || tiles.size < 2) return@LaunchedEffect
         val p = preview
-        val playing = if (p != null && tile.previewUrl != null) {
+        val hasPreview = tile.previewUrl != null || tile.kind == TileKind.SERIES
+        val playing = if (p != null && hasPreview) {
             kotlinx.coroutines.withTimeoutOrNull(7_000) { p.visibleKey.first { it == heroKey } }
         } else null
         if (playing == null) {
-            delay(if (p != null && tile.previewUrl != null) 3_000 else 9_000)
+            delay(if (p != null && hasPreview) 3_000 else 9_000)
         } else {
             kotlinx.coroutines.withTimeoutOrNull(60_000) { p!!.endedKey.first { it == heroKey } }
             delay(1_200) // let the still settle back in before moving on

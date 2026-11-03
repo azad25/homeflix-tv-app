@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.homeflix.tv.comingsoon.ComingSoonActions
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -104,6 +105,9 @@ fun TvSeriesDetailsScreen(
 @UnstableApi
 @Composable
 private fun SeriesContent(series: TvSeries, state: SeriesState, navigator: AppNavigator, onSeason: (Int) -> Unit, onMyList: () -> Unit, onRate: (Int) -> Unit) {
+    val csVm: com.homeflix.tv.comingsoon.ComingSoonPanelViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+    LaunchedEffect(series.tmdbId) { csVm.load("tv", series.tmdbId) }
+    val comingSoon by csVm.item.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val registry = rememberFocusRegistry()
@@ -132,8 +136,8 @@ private fun SeriesContent(series: TvSeries, state: SeriesState, navigator: AppNa
                 val resume = state.resume
                 DetailHeader(
                     previewKey = "series:${series.id}",
-                    // Series have no trailer of their own: preview the episode the viewer would play.
-                    previewUrl = (state.resume?.episodeId ?: state.firstEpisodeId)
+                    // Series have no trailer of their own: preview the newest uploaded episode.
+                    previewUrl = (state.previewEpisodeId ?: state.resume?.episodeId ?: state.firstEpisodeId)
                         ?.let { com.homeflix.tv.util.ApiUtils.getPreviewClipUrl(it) },
                     previewActive = section == 0,
                     backdropUrl = tile.backdropUrl,
@@ -166,6 +170,8 @@ private fun SeriesContent(series: TvSeries, state: SeriesState, navigator: AppNa
                             icon = if (inList) Icons.Filled.Check else Icons.Filled.Add)
                     }
                     com.homeflix.tv.presentation.ui.RateButton(state.rating, onRate)
+                    // A new season on the way: its trailer and Notify Me.
+                    comingSoon?.let { cs -> ComingSoonActions(cs, { navigator.comingSoon(cs.key) }, csVm::toggleNotify) }
                 }
             }
             if (state.seasons.size > 1) {

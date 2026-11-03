@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
@@ -114,6 +115,8 @@ fun AppShell(
     updater: com.homeflix.tv.update.AppUpdater? = null,
     /** Opens full-screen Live TV; null hides the menu item (server has Live TV off). */
     onOpenLiveTv: (() -> Unit)? = null,
+    /** Opens Coming Soon; null hides the menu entry (nothing coming soon). */
+    onOpenComingSoon: (() -> Unit)? = null,
     page: @Composable (ShellTab, ShellController) -> Unit
 ) {
     var savedTab by rememberSaveable { mutableStateOf(ShellTab.HOME) }
@@ -167,6 +170,7 @@ fun AppShell(
                     onNotifications = { menuOpen = false; onOpenNotifications() },
                     onSettings = { menuOpen = false; onOpenSettings() },
                     onAbout = { menuOpen = false; onOpenAbout() },
+                    onComingSoon = onOpenComingSoon?.let { open -> { menuOpen = false; open() } },
                     onRefresh = { menuOpen = false; activity?.recreate() },
                     onExit = { activity?.finish() }
                 )
@@ -376,7 +380,7 @@ internal fun NavIconButton(icon: ImageVector, description: String, canFocus: Boo
 }
 
 @Composable
-internal fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onSettings: () -> Unit, onAbout: () -> Unit, onRefresh: () -> Unit, onExit: () -> Unit) {
+internal fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onSettings: () -> Unit, onAbout: () -> Unit, onRefresh: () -> Unit, onExit: () -> Unit, onComingSoon: (() -> Unit)? = null) {
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { withFrameNanos { }; runCatching { first.requestFocus() } }
     BackHandler(onBack = onDismiss)
@@ -393,6 +397,7 @@ internal fun ProfileMenu(onDismiss: () -> Unit, onNotifications: () -> Unit, onS
         ) {
             MenuItem(Icons.Filled.Notifications, "Notifications", onNotifications, Modifier.focusRequester(first))
             MenuItem(Icons.Filled.Settings, "Settings", onSettings)
+            if (onComingSoon != null) MenuItem(Icons.Filled.NotificationsActive, "Coming Soon", onComingSoon)
             MenuItem(Icons.Filled.Info, "About HomeFlix", onAbout)
             MenuItem(Icons.Filled.Refresh, "Refresh", onRefresh)
             MenuItem(Icons.AutoMirrored.Filled.ExitToApp, "Exit HomeFlix", onExit)

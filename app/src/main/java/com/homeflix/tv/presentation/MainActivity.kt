@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var previewPlayer: PreviewPlayer
     @Inject lateinit var castController: com.homeflix.tv.cast.CastController
     @Inject lateinit var updater: com.homeflix.tv.update.AppUpdater
+    @Inject lateinit var seriesPreviews: com.homeflix.tv.core.SeriesPreviews
 
     override fun onStart() {
         super.onStart()
@@ -70,7 +71,10 @@ class MainActivity : ComponentActivity() {
             // Pin font scale to 1.0 so the TV's accessibility font size can't
             // inflate the 10-foot typography (Netflix/Prime do the same).
             val base = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density = base.density, fontScale = 1f)) {
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = base.density, fontScale = 1f),
+                com.homeflix.tv.core.LocalSeriesPreviews provides seriesPreviews
+            ) {
                 HomeFlixTVTheme {
                     // Lists that follow focus on their own glide smoothly; browse rows
                     // and pages opt into their own keyline scrolling (ManualFocusScroll).

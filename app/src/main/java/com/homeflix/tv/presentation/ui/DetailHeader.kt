@@ -33,6 +33,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import kotlinx.coroutines.delay
+
+private const val CINEMATIC_IDLE_MS = 6_000L
 
 /**
  * Full-bleed title page header shared by movie and series details: backdrop
@@ -55,6 +65,14 @@ fun DetailHeader(
     progressLabel: String? = null,
     credits: List<String> = emptyList(),
     peek: Dp = 120.dp,
+    /**
+     * Full-screen title page: once the trailer plays and nothing is pressed
+     * for a few seconds, the text and scrims fade so the trailer fills the
+     * screen; any key brings them back. Reported through [onImmersive].
+     */
+    cinematic: Boolean = false,
+    onImmersive: (Boolean) -> Unit = {},
+    belowHint: String? = null,
     actions: @Composable RowScope.() -> Unit
 ) {
     val preview = LocalPreviewPlayer.current
@@ -63,17 +81,39 @@ fun DetailHeader(
         val p = preview ?: return@LaunchedEffect
         if (previewActive) p.request(previewKey, previewUrl, revealDelayMs = 1_800, dwellMs = 600) else p.cancel(previewKey)
     }
+    val visibleKey by (preview?.visibleKey ?: remember { kotlinx.coroutines.flow.MutableStateFlow<String?>(null) }).collectAsState()
+    val trailerOn = visibleKey == previewKey
+    var keyTick by remember { mutableIntStateOf(0) }
+    var immersive by remember { mutableStateOf(false) }
+    LaunchedEffect(cinematic, trailerOn, keyTick, previewActive) {
+        immersive = false
+        onImmersive(false)
+        if (!cinematic || !trailerOn || !previewActive) return@LaunchedEffect
+        delay(CINEMATIC_IDLE_MS)
+        immersive = true
+        onImmersive(true)
+    }
+    val infoAlpha by animateFloatAsState(if (immersive) 0f else 1f, tween(if (immersive) 900 else 250), label = "info")
     val screenH = LocalConfiguration.current.screenHeightDp.dp
-    Box(modifier.fillMaxWidth().height(screenH - peek).clipToBounds()) {
+    Box(
+        modifier.fillMaxWidth().height(screenH - peek).clipToBounds()
+            // Any key while immersed brings the info back (and still does its job).
+            .onPreviewKeyEvent { keyTick++; false }
+    ) {
         SizedImage(backdropUrl, 960.dp, 540.dp, Modifier.fillMaxSize(), alignment = Alignment.TopCenter, crossfadeMs = 300)
         PreviewVideo(previewKey, Modifier.fillMaxSize())
-        Box(Modifier.fillMaxSize().background(Tv.LeftScrim))
-        Box(Modifier.fillMaxSize().background(Tv.HeroBottomScrim))
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = infoAlpha }.background(Tv.LeftScrim))
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = infoAlpha }.background(Tv.HeroBottomScrim))
+        if (belowHint != null) {
+            Text("▼  $belowHint", color = Tv.TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Medium,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp).graphicsLayer { alpha = infoAlpha })
+        }
         Column(
             Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = Tv.Keyline + 8.dp, bottom = 24.dp)
+                .padding(start = Tv.Keyline + 8.dp, bottom = if (belowHint != null) 52.dp else 24.dp)
                 .fillMaxWidth(0.52f)
+                .graphicsLayer { alpha = infoAlpha }
         ) {
             TitleLogo(
                 logoUrl = logoUrl,

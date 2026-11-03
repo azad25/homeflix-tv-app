@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.13.2)
+# HomeFlix TV v5 (5.14.0)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.13.2, versionCode 26, 16.7 MB)
-SHA-256: `d2732e94b9dab688f358694b80e6ff0af323c6342be4487ccbc2369c97b1495f`
+**Download:** `homeflix-tv-v5.apk` (5.14.0, versionCode 27, 16.7 MB)
+SHA-256: `eb88d60980b1c27e1fba9d0d7afe851e2d2bd614714d9480edaa51ca46cbd86b`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -26,6 +26,8 @@ SHA-256: `d2732e94b9dab688f358694b80e6ff0af323c6342be4487ccbc2369c97b1495f`
   - Channel numbers, ▲▼ zapping in about a second, and an info banner on every change.
   - OK opens a mini guide; ◀ opens a full guide with live previews.
   - Favorites, and Back to your last channel.
+- **Coming Soon:** the most anticipated upcoming movies and series, with their trailers.
+  - **Notify Me** has your server download the title on release day.
 - **Cast from the web app:** play any title on the TV from the HomeFlix website.
 - **Automatic updates:** the app updates itself from your HomeFlix server. This is the last APK you need to install by hand.
 
@@ -48,6 +50,9 @@ SHA-256: `d2732e94b9dab688f358694b80e6ff0af323c6342be4487ccbc2369c97b1495f`
 - Pages open instantly from the last saved copy, then refresh quietly in the background.
 
 ### Movie and show pages
+- **Movie pages fill the screen:** the trailer plays behind the title, and More Like This is one ▼ away.
+  - After a few seconds without a key press, the text and menu fade so only the trailer shows. Any key brings them back.
+- **Show previews:** show pages, show tiles and the Shows billboard preview the show's newest uploaded episode.
 - A trailer billboard with Resume, Play from beginning, **My List** and **Rate**.
 - Shows also get season chips, an episode row with progress, and "Resume S1:E3".
 - More Like This on movie pages.
@@ -79,6 +84,23 @@ SHA-256: `d2732e94b9dab688f358694b80e6ff0af323c6342be4487ccbc2369c97b1495f`
 - A compact QWERTY keyboard with a number row, plus space, delete and clear keys.
 - You can also type with a Bluetooth or USB keyboard, or the remote's number keys.
 - A genre list and a results grid.
+
+### Coming Soon
+- **Home rows:** "Coming Soon: Movies" and "Coming Soon: Series" show wide cards.
+  - Each card has the title, the date ("In 12 days" / "Dec 18" / "Feb 2027"), a "Season 3" / "New Series" chip, and a bell when Notify Me is on.
+  - Resting on a card plays its trailer muted inside the card.
+- **Full screen:** open a card, or **Coming Soon** in the profile menu.
+  - Trailers play with sound, one after another.
+  - An info overlay fades after a few seconds: title, release label, full date and countdown, studio · genres, cast and overview. Any key brings it back.
+- **Remote:**
+  - **◀ ▶** previous / next title.
+  - **▲ ▼** move between Notify Me, Details and the strip of titles.
+  - **OK** presses the focused button.
+  - **Play/Pause** pauses.
+  - **Back** closes the overlay, then the screen.
+- **Notify Me:** shows "We'll Notify You ✓" right away. If the server can't be reached it goes back, and afterwards it shows the server's status (scheduled, queued, downloading).
+- **Title pages:** a show getting a new season gets "Season 3 · In 20 days Trailer" and Notify Me buttons.
+- **No trailer yet:** the backdrop shows for a few seconds before the next title, so there's no YouTube fallback.
 
 ### Live TV
 - **Opening it:** use **Live TV** on the top menu, or the **Live TV** row on Home (favorites, then channels you watched recently). It opens full screen on your last channel, or channel 1.
@@ -117,7 +139,10 @@ SHA-256: `d2732e94b9dab688f358694b80e6ff0af323c6342be4487ccbc2369c97b1495f`
 - An **Update available** dialog appears; one press installs it. Settings has **Check for updates** too.
 
 ### Notifications, Settings and About
-- Redesigned notifications with artwork, and a red dot on the bell for unread items.
+- **Notifications:**
+  - **All / Movies / Shows** filters.
+  - A list grouped by Today, Yesterday, This Week and Earlier, with movie/show badges and NEW tags.
+  - A large artwork card with the focused item's details, and a red dot on the bell for unread items.
 - Settings covers casting, the **server address** (editable, with a connection check), app updates and app info. Every row is reachable with the remote.
 - About HomeFlix credits Ferdous Azad, developer of HomeFlix. It includes contact details, GitHub, and a Buy Me a Coffee link: https://buymeacoffee.com/ferdousazad
 

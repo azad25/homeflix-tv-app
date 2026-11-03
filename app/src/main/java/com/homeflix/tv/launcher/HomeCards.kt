@@ -41,6 +41,7 @@ object HomeCards {
             TileKind.EPISODE -> "series:${t.seriesId ?: "e${t.id}"}"
             TileKind.MOVIE -> "movie:${t.id}"
             TileKind.CHANNEL -> "channel:${t.channelId}"
+            TileKind.COMING -> "coming:${t.comingKey}"
         }
         fun add(t: Tile, card: HomeCard) { if (out.size < MAX_CARDS && seen.add(identity(t))) out += card }
 

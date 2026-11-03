@@ -13,11 +13,13 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.runtime.Composable
+import com.homeflix.tv.comingsoon.ComingSoonActions
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -89,6 +91,11 @@ private fun DetailsContent(media: Media, state: DetailsState, navigator: AppNavi
     val registry = rememberFocusRegistry()
     val play = remember { FocusRequester() }
     var section by rememberSaveable { mutableIntStateOf(0) }
+    var immersive by remember { mutableStateOf(false) }
+    // A Coming Soon panel only for titles the server lists as coming soon.
+    val csVm: com.homeflix.tv.comingsoon.ComingSoonPanelViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+    LaunchedEffect(media.tmdbId) { csVm.load("movie", media.tmdbId) }
+    val comingSoon by csVm.item.collectAsState()
     LaunchedEffect(media.id) {
         withFrameNanos { }
         runCatching { play.requestFocus() }
@@ -117,6 +124,11 @@ private fun DetailsContent(media: Media, state: DetailsState, navigator: AppNavi
                     progress = state.progress,
                     progressLabel = state.progressLabel,
                     credits = credits,
+                    // Full screen: the title page fills the TV; More Like This is one ▼ away.
+                    peek = 0.dp,
+                    cinematic = true,
+                    onImmersive = { immersive = it },
+                    belowHint = if (state.similar != null) "More Like This" else null,
                     modifier = Modifier.onFocusChanged {
                         if (it.hasFocus) { section = 0; scope.launch { listState.glideTo(0) } }
                     }
@@ -132,6 +144,9 @@ private fun DetailsContent(media: Media, state: DetailsState, navigator: AppNavi
                             icon = if (inList) Icons.Filled.Check else Icons.Filled.Add)
                     }
                     com.homeflix.tv.presentation.ui.RateButton(state.rating, onRate)
+                    comingSoon?.let { cs ->
+                        ComingSoonActions(cs, { navigator.comingSoon(cs.key) }, csVm::toggleNotify)
+                    }
                 }
             }
             state.similar?.let { row ->
@@ -151,6 +166,6 @@ private fun DetailsContent(media: Media, state: DetailsState, navigator: AppNavi
             item(key = "pad") { Spacer(Modifier.height(220.dp)) }
         }
     }
-    SubPageTopBar(navigator, visible = section == 0)
+    SubPageTopBar(navigator, visible = section == 0 && !immersive)
     }
 }
