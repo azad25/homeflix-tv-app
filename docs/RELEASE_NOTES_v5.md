@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.15.1)
+# HomeFlix TV v5 (5.15.2)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.15.1, versionCode 30, 12.6 MB)
-SHA-256: `14d14048bbe7c3417165d8c33e991e3407c9c206b7483a82d68b1998860f164b`
+**Download:** `homeflix-tv-v5.apk` (5.15.2, versionCode 31, 12.6 MB)
+SHA-256: `ad9320ae363eb7409d8482e02982cb994f1c6fc8f3bd3153ff3ad4146ce723c6`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -92,7 +92,10 @@ SHA-256: `14d14048bbe7c3417165d8c33e991e3407c9c206b7483a82d68b1998860f164b`
 - **Home rows:** "Coming Soon: Movies" and "Coming Soon: Series" show wide cards.
   - Each card has the title, the date ("In 12 days" / "Dec 18" / "Feb 2027"), a "Season 3" / "New Series" chip, and a bell when Notify Me is on.
   - Resting on a card plays its trailer muted inside the card.
-- **Full screen:** open a card, or **Coming Soon** in the profile menu.
+- **Full screen:** open a card, or **Coming Soon** on the top menu.
+  - The layout reads like a premiere calendar: a "FEB 12" date tile, a MOVIE/SERIES chip and a "Season 2" chip, a gold countdown, and genre chips.
+  - The top row shows "#1 in Movies", "Up next" and "1 / 16".
+  - The title strip is larger, with each title's date.
   - Trailers play with sound, one after another.
   - An info overlay fades after a few seconds: title, release label, full date and countdown, studio · genres, cast and overview. Any key brings it back.
 - **Remote:**

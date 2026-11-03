@@ -49,6 +49,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -139,46 +141,106 @@ fun ComingSoonContent(state: ComingSoonState, c: ComingSoonController, onExit: (
 
 @Composable
 private fun Overlay(state: ComingSoonState, item: ComingSoonItem) {
-    Column(
-        Modifier.fillMaxWidth()
-            .background(Brush.verticalGradient(0f to Color.Transparent, 0.3f to Color(0xA6000000), 1f to Color(0xF2000000)))
-            .padding(start = Safe, end = Safe, top = 80.dp, bottom = 28.dp)
-            .testTag("cs_overlay")
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("COMING SOON", color = Tv.Red, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp)
-            item.releaseLabel?.takeIf { it.isNotBlank() }?.let {
-                Text(it, color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 10.dp).clip(RoundedCornerShape(4.dp)).background(Color.White).padding(horizontal = 6.dp, vertical = 1.dp))
+    Box(Modifier.fillMaxSize().testTag("cs_overlay")) {
+        // Legibility over any trailer: a wash from the left and from the bottom.
+        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(0f to Color(0xD9000000), 0.55f to Color(0x66000000), 1f to Color.Transparent)))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color(0xF2000000))))
+        Box(Modifier.fillMaxWidth().height(120.dp).background(Brush.verticalGradient(0f to Color(0xB3000000), 1f to Color.Transparent)))
+
+        // Top: what this is, where we are, what's next.
+        Row(Modifier.fillMaxWidth().padding(start = Safe, end = Safe, top = 30.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(com.homeflix.tv.presentation.ui.HomeFlixMark, null, tint = Color.White, modifier = Modifier.size(14.dp, 16.dp))
+            Text("  COMING SOON", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            if (item.rank > 0) {
+                Text("   ·   #${item.rank} in ${if (item.isSeries) "Series" else "Movies"}", color = Tv.TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             }
-            if (state.noTrailer) Text("   Trailer coming soon", color = Tv.TextMuted, fontSize = 12.sp)
+            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+            val next = state.items.getOrNull((state.index + 1) % state.items.size.coerceAtLeast(1))
+            if (next != null && state.items.size > 1) {
+                Text("Up next  ", color = Tv.TextMuted, fontSize = 13.sp)
+                Text(next.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 260.dp))
+                Text("    ", fontSize = 13.sp)
+            }
+            Text("${state.index + 1} / ${state.items.size}", color = Tv.TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x33FFFFFF)).padding(horizontal = 10.dp, vertical = 3.dp))
         }
-        Text(item.title, color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.Black, maxLines = 1,
-            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-            Text(ComingSoonDates.fullDate(item), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text("   ${ComingSoonDates.countdown(item.daysUntil)}", color = Color(0xFFFFC94D), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+
+        Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = Safe, end = Safe, bottom = 26.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                DateTile(item)
+                Column(Modifier.padding(start = 20.dp).weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Chip(if (item.isSeries) "SERIES" else "MOVIE", Color(0x33FFFFFF), Color.White)
+                        item.releaseLabel?.takeIf { it.isNotBlank() }?.let { Chip(it.uppercase(), Color.White, Color.Black) }
+                        if (state.noTrailer) Text("Trailer coming soon", color = Tv.TextMuted, fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp))
+                    }
+                    Text(item.title, color = Color.White, fontSize = 44.sp, fontWeight = FontWeight.Black, lineHeight = 46.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                        Text(ComingSoonDates.countdown(item.daysUntil), color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFFFC94D)).padding(horizontal = 10.dp, vertical = 3.dp))
+                        Text("   ${ComingSoonDates.fullDate(item)}", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        item.studio?.takeIf { it.isNotBlank() }?.let { Text("   ·   $it", color = Tv.TextSecondary, fontSize = 15.sp) }
+                    }
+                }
+            }
+            val genres = item.genres.orEmpty().take(3)
+            if (genres.isNotEmpty()) {
+                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    genres.forEach { g ->
+                        Text(g, color = Tv.TextPrimary, fontSize = 12.sp, modifier = Modifier.clip(RoundedCornerShape(50))
+                            .border(1.dp, Color(0x4DFFFFFF), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 3.dp))
+                    }
+                }
+            }
+            item.overview?.takeIf { it.isNotBlank() }?.let {
+                Text(it, color = Tv.TextPrimary, fontSize = 15.sp, lineHeight = 21.sp, maxLines = if (state.details) 8 else 2,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(0.58f).padding(top = 10.dp))
+            }
+            item.cast.orEmpty().takeIf { it.isNotEmpty() }?.let {
+                Text("Starring  ${it.take(if (state.details) 4 else 3).joinToString(" · ")}", color = Tv.TextSecondary, fontSize = 13.sp,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+            }
+            Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                val on = item.notifyOn
+                CsButton(if (on) "We'll Notify You" else "Notify Me", if (on) Icons.Filled.Check else Icons.Filled.NotificationsNone,
+                    focused = state.zone == CsZone.NOTIFY)
+                item.notify?.status?.takeIf { on && it.isNotBlank() }?.let {
+                    Text(it.replaceFirstChar { c -> c.uppercase() }, color = Tv.TextMuted, fontSize = 12.sp)
+                }
+                CsButton(if (state.details) "Less" else "Details", Icons.Filled.Info, focused = state.zone == CsZone.DETAILS)
+                androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                Text("◀ ▶  browse    ▲ ▼  buttons / titles", color = Tv.TextMuted, fontSize = 12.sp)
+            }
+            Strip(state)
         }
-        val meta = (listOfNotNull(item.studio?.takeIf { it.isNotBlank() }) + item.genres.orEmpty().take(3)).joinToString("  ·  ")
-        if (meta.isNotBlank()) Text(meta, color = Tv.TextSecondary, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
-        item.cast.orEmpty().takeIf { it.isNotEmpty() }?.let {
-            Text("Starring ${it.take(if (state.details) 4 else 3).joinToString(", ")}", color = Tv.TextSecondary, fontSize = 14.sp, maxLines = 1,
-                overflow = TextOverflow.Ellipsis)
-        }
-        item.overview?.takeIf { it.isNotBlank() }?.let {
-            Text(it, color = Tv.TextPrimary, fontSize = 14.sp, lineHeight = 20.sp, maxLines = if (state.details) 8 else 2,
-                overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(0.62f).padding(top = 8.dp))
-        }
-        Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            val on = item.notifyOn
-            CsButton(if (on) "We'll Notify You" else "Notify Me", if (on) Icons.Filled.Check else Icons.Filled.NotificationsNone,
-                focused = state.zone == CsZone.NOTIFY)
-            item.notify?.status?.takeIf { on && it.isNotBlank() }?.let { Text(it, color = Tv.TextMuted, fontSize = 12.sp) }
-            CsButton(if (state.details) "Less" else "Details", Icons.Filled.Info, focused = state.zone == CsZone.DETAILS)
-            Text("◀ ▶  previous / next", color = Tv.TextMuted, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
-        }
-        Strip(state)
     }
+}
+
+/** Calendar tile: "FEB" over a big "12" (or the year for far-off dates). */
+@Composable
+private fun DateTile(item: ComingSoonItem) {
+    val (month, day) = remember(item.releaseDate) {
+        runCatching {
+            val d = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(item.releaseDate!!)!!
+            java.text.SimpleDateFormat("MMM", java.util.Locale.ENGLISH).format(d).uppercase() to java.text.SimpleDateFormat("d", java.util.Locale.ENGLISH).format(d)
+        }.getOrDefault("SOON" to "—")
+    }
+    Column(
+        Modifier.width(86.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xE6FFFFFF)),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(month, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
+            modifier = Modifier.fillMaxWidth().background(Tv.Red).padding(vertical = 4.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(day, color = Color.Black, fontSize = 38.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(vertical = 4.dp))
+    }
+}
+
+@Composable
+private fun Chip(text: String, bg: Color, fg: Color) {
+    Text(text, color = fg, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+        modifier = Modifier.padding(end = 8.dp).clip(RoundedCornerShape(4.dp)).background(bg).padding(horizontal = 7.dp, vertical = 2.dp))
 }
 
 @Composable
@@ -193,26 +255,28 @@ private fun CsButton(text: String, icon: ImageVector, focused: Boolean) {
     }
 }
 
-/** The upcoming titles along the bottom; the playing one is outlined (white when the strip has focus). */
+/** The upcoming titles along the bottom; the playing one is lifted and outlined (white when the strip has focus). */
 @Composable
 private fun Strip(state: ComingSoonState) {
     val list = rememberLazyListState()
     LaunchedEffect(state.index) { list.animateScrollToItem((state.index - 2).coerceAtLeast(0)) }
-    LazyRow(state = list, horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(top = 16.dp)) {
+    LazyRow(state = list, horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(top = 18.dp, start = 6.dp, end = 6.dp)) {
         itemsIndexed(state.items, key = { _, it -> it.key }) { i, it ->
             val current = i == state.index
-            Box(
-                Modifier.width(150.dp).height(84.dp).clip(RoundedCornerShape(8.dp)).background(Tv.Surface)
-                    .border(if (current) 3.dp else 0.dp,
-                        if (current && state.zone == CsZone.STRIP) Color.White else if (current) Color(0x99FFFFFF) else Color.Transparent,
-                        RoundedCornerShape(8.dp))
-            ) {
-                SizedImage(it.backdropUrl ?: it.posterUrl, 150.dp, 84.dp, Modifier.fillMaxSize())
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color(0xCC000000))))
-                Text(it.title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart).padding(6.dp))
-                if (it.notifyOn) Icon(Icons.Filled.Notifications, null, tint = Color.White,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(14.dp))
+            Column(Modifier.width(176.dp).graphicsLayer { val sc = if (current) 1.04f else 1f; scaleX = sc; scaleY = sc; alpha = if (current) 1f else 0.72f }) {
+                Box(
+                    Modifier.fillMaxWidth().height(99.dp).clip(RoundedCornerShape(8.dp)).background(Tv.Surface)
+                        .border(if (current) 3.dp else 0.dp,
+                            if (current && state.zone == CsZone.STRIP) Color.White else if (current) Color(0xB3FFFFFF) else Color.Transparent,
+                            RoundedCornerShape(8.dp))
+                ) {
+                    SizedImage(it.backdropUrl ?: it.posterUrl, 176.dp, 99.dp, Modifier.fillMaxSize())
+                    if (it.notifyOn) Icon(Icons.Filled.Notifications, null, tint = Color.White,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(5.dp).size(18.dp).clip(RoundedCornerShape(50)).background(Color(0x99000000)).padding(3.dp))
+                }
+                Text(it.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                Text(ComingSoonDates.cardLine(it), color = if (current) Color(0xFFFFC94D) else Tv.TextMuted, fontSize = 11.sp, maxLines = 1)
             }
         }
     }
