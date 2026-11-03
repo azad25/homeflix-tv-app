@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.15.2)
+# HomeFlix TV v5 (5.15.3)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.15.2, versionCode 31, 12.6 MB)
-SHA-256: `ad9320ae363eb7409d8482e02982cb994f1c6fc8f3bd3153ff3ad4146ce723c6`
+**Download:** `homeflix-tv-v5.apk` (5.15.3, versionCode 32, 12.0 MB)
+SHA-256: `9f2826ea0436b2b745071c4595389131c13000c770bd33a402b936ed0309defd`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -12,6 +12,8 @@ SHA-256: `ad9320ae363eb7409d8482e02982cb994f1c6fc8f3bd3153ff3ad4146ce723c6`
 ---
 
 ## New since v5.11.0
+
+- **5.15.3:** the Home billboard plays each title's own preview clip (it used to repeat the first one for every title).
 
 - **Live TV, like a cable box:** channel numbers, ▲▼ zapping, an info banner, a mini guide (OK) and a full guide with live preview (◀), favorites, and Back to your last channel. YouTube-only and offline channels are hidden. It's light on 2 GB TVs.
 - **Coming Soon:** the most anticipated upcoming movies and series with their trailers, on the top menu and as Home rows. **Notify Me** has your server download a title on release day. The full-screen screen has a premiere-calendar design.
