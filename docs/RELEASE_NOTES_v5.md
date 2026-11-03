@@ -1,9 +1,9 @@
-# HomeFlix TV v5 (5.13.1)
+# HomeFlix TV v5 (5.13.2)
 
 HomeFlix TV is rebuilt from the ground up as a Netflix-style living-room app. It brings a new look, smooth D-pad navigation, trailers on focus, a new player, casting from the web app, automatic updates, a HomeFlix row on your TV's home screen, and recommendations that learn from what you watch and rate.
 
-**Download:** `homeflix-tv-v5.apk` (5.13.1, versionCode 25, 16.7 MB)
-SHA-256: `ed4a9f26dba635be6d2cabe80da71f9686b0e720bfd0b4ab2b26aa4646712865`
+**Download:** `homeflix-tv-v5.apk` (5.13.2, versionCode 26, 16.7 MB)
+SHA-256: `d2732e94b9dab688f358694b80e6ff0af323c6342be4487ccbc2369c97b1495f`
 
 **Requires:**
 - Android TV or Google TV, Android 6.0 or newer. The home-screen row needs Android 8.0 or newer.
@@ -94,11 +94,13 @@ SHA-256: `ed4a9f26dba635be6d2cabe80da71f9686b0e720bfd0b4ab2b26aa4646712865`
     - The focused channel plays muted in a preview window.
   - **▶ / INFO / MENU** shows channel info with **Add to Favorites**.
   - **Back** closes a guide, or returns to your last channel. **Back twice** leaves Live TV.
-- **When a channel won't play:**
-  - The app tries the server's next stream.
-  - Then it plays the broadcaster's official YouTube live stream inside HomeFlix, and ▲▼ still zap.
-  - Then it shows "isn't available right now". It never jumps to another channel by itself.
-- **YouTube channels:** if the broadcaster blocks embedding (or the TV can't play it), the screen offers **Press OK to watch it in the YouTube app**. On any YouTube channel, ▶ (info) then ▶ also opens it in the YouTube app.
+- **When a channel won't play:** the app tries the server's next stream, then shows "isn't available right now". It never jumps to another channel by itself.
+- **Only channels that play:** channels the server can only offer as a YouTube stream, and channels its health check found offline, are left out of the lineup. Channel numbers stay the same as on the server.
+- **Light on 2 GB TVs:**
+  - Live buffers are capped at about 15 s and 12 MB.
+  - Video is capped at 1080p, so 4K variants are never decoded.
+  - The picture is drawn by the display hardware.
+  - The channel list is loaded once and shared, refreshed every 10 minutes.
 - **Under the hood:**
   - One player for the whole session.
   - A small start buffer, with live playback about 12 s behind the live edge.
@@ -118,6 +120,9 @@ SHA-256: `ed4a9f26dba635be6d2cabe80da71f9686b0e720bfd0b4ab2b26aa4646712865`
 - Redesigned notifications with artwork, and a red dot on the bell for unread items.
 - Settings covers casting, the **server address** (editable, with a connection check), app updates and app info. Every row is reachable with the remote.
 - About HomeFlix credits Ferdous Azad, developer of HomeFlix. It includes contact details, GitHub, and a Buy Me a Coffee link: https://buymeacoffee.com/ferdousazad
+
+### Keyboard
+- **Esc** works like Back everywhere in the app.
 
 ### Performance and stability
 - Lighter on 2 GB TVs:

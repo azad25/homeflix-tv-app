@@ -18,6 +18,6 @@ class LiveTvEntryViewModel @Inject constructor(private val repo: LiveTvRepositor
         .stateIn(viewModelScope, SharingStarted.Eagerly, repo.lineup.value?.let { it.enabled && !it.channels.isNullOrEmpty() } ?: false)
 
     init {
-        if (repo.lineup.value == null) viewModelScope.launch { repo.refresh() }
+        viewModelScope.launch { repo.lineupFresh() }
     }
 }

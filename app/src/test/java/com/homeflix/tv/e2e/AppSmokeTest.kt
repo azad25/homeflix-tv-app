@@ -267,9 +267,12 @@ class AppSmokeTest {
         ActivityScenario.launch<MainActivity>(intent).use { scenario ->
             check(waitForText("More Like This")) { "card didn't open the movie page" }
             check(waitForText("Heat")) { "opened the wrong title" }
-            // Back goes to Home, not out of the app.
-            scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-            check(waitForText("Inception")) { "Back from a home-screen card should land on Home" }
+            // Esc on a keyboard works like Back: to Home, not out of the app.
+            scenario.onActivity {
+                it.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_ESCAPE))
+                it.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_ESCAPE))
+            }
+            check(waitForText("Inception")) { "Esc from a home-screen card should land on Home" }
         }
     }
 

@@ -1,6 +1,6 @@
 # HomeFlix TV v5: Netflix-style redesign
 
-Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.13.1 (R8 code shrinking is currently off; see app/build.gradle.kts).
+Branch `v5`. Installable APK: `apk/homeflix-tv-v5.apk`. It's a signed release build: version 5.13.2 (R8 code shrinking is currently off; see app/build.gradle.kts).
 
 > **First install:** the APK is signed with the repo's sideload key (`app/keystore`). If an older build signed with a different key is on the TV, uninstall it once. After that, every v5 build installs as an update.
 
@@ -68,9 +68,12 @@ This implements `docs/LIVE_TV.md` from homeflix-wifi `release/v5.5`. The code is
   - HLS with a 1.5 s / 3 s start/rebuffer buffer and a 12 s live offset.
   - `BehindLiveWindow` seeks to the live edge.
   - A TextureView moves between full screen and the guide's preview window.
-- **YouTube channels (5.13.1):** an IFrame-API embed in a non-focusable WebView.
-  - It reports playing and errors, so the logo stays up until there's a picture.
-  - If embedding fails or nothing plays within 12 s, OK hands the video to the YouTube app (`ACTION_VIEW`, TV edition first). Info ▶ does too.
+- **5.13.2: lighter and simpler.**
+  - YouTube channels are removed: the lineup drops `quality: "YouTube"` channels and offline ones (`LiveTvRepository.playable`), and the WebView path is gone.
+  - Player: 6–15 s / 12 MB (low-RAM) buffers, no back buffer, 1080p cap. Video on a SurfaceView instead of a TextureView.
+  - The guide backdrop is drawn under the video, so the preview window shows. Held keys are throttled to 70 ms.
+  - The lineup is cached for 10 min and shared by Home, the top menu and the player.
+  - Esc is mapped to Back app-wide in `MainActivity.dispatchKeyEvent`.
 - **`LiveTvRepository`:** loads the lineup (sorted by number) and `/play`. It prefetches the neighbours' `/play` (trusted for 45 s, used once).
 - **`LiveTvStore`:** keeps favorites, last and previous channel, and the last 10 channels in DataStore.
 - **Entry points:** a "Live TV" item on the top menu (opens on OK), and a "Live TV" row on Home: an entry tile, then favorites, then recents.

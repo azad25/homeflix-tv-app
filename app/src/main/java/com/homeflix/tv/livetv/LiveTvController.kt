@@ -19,7 +19,7 @@ interface LivePlayback {
     fun setMuted(muted: Boolean)
 }
 
-enum class LivePhase { IDLE, TUNING, PLAYING, UNAVAILABLE, YOUTUBE }
+enum class LivePhase { IDLE, TUNING, PLAYING, UNAVAILABLE }
 
 enum class LiveOverlay { NONE, MINI_GUIDE, GUIDE, INFO }
 
@@ -39,11 +39,6 @@ data class LiveState(
     /** The channel actually in the player (differs from [current] while the guide previews). */
     val playing: LiveChannel? = null,
     val phase: LivePhase = LivePhase.IDLE,
-    val youtubeId: String? = null,
-    /** The YouTube embed is showing a picture. */
-    val youtubePlaying: Boolean = false,
-    /** The embed failed (embedding blocked / WebView can't play): offer the YouTube app. */
-    val youtubeFailed: Boolean = false,
     val bannerVisible: Boolean = false,
     val digits: String = "",
     val message: String? = null,
@@ -74,9 +69,7 @@ class LiveTvController(
     private val source: LiveSource,
     private val memory: LiveMemory,
     private val playback: LivePlayback,
-    private val now: () -> Long = System::currentTimeMillis,
-    /** Hand a YouTube live stream to the YouTube app; false if there's none. */
-    private val openYouTubeApp: (String) -> Boolean = { false }
+    private val now: () -> Long = System::currentTimeMillis
 ) {
     private val _state = MutableStateFlow(LiveState())
     val state: StateFlow<LiveState> = _state.asStateFlow()
@@ -91,7 +84,6 @@ class LiveTvController(
     private var hintJob: Job? = null
     private var urls: List<String> = emptyList()
     private var urlIndex = 0
-    private var youtube: String? = null
     private var lastBackAt = 0L
     private var previousId: String? = null
 
@@ -121,31 +113,25 @@ class LiveTvController(
         load(channel)
     }
 
-    /** Point the player at [channel]: fresh URLs, best first, then YouTube, then "not available". */
+    /** Point the player at [channel]: fresh URLs, best first, then "not available". */
     private fun load(channel: LiveChannel) {
         tuneJob?.cancel()
         playback.stop()
-        _state.update { it.copy(playing = channel, phase = LivePhase.TUNING, youtubeId = null, youtubePlaying = false, youtubeFailed = false) }
+        _state.update { it.copy(playing = channel, phase = LivePhase.TUNING) }
         tuneJob = scope.launch {
             val play = source.play(channel.id)
             if (s.playing?.id != channel.id) return@launch
             urls = play?.urls.orEmpty()
             urlIndex = 0
-            youtube = play?.youtubeId?.takeIf { it.isNotBlank() }
-            when {
-                urls.isNotEmpty() -> playback.play(urls[0])
-                youtube != null -> { showYouTube(); return@launch }
-                else -> { unavailable(); return@launch }
-            }
+            if (urls.isEmpty()) { unavailable(); return@launch }
+            playback.play(urls[0])
             // Neighbours' URLs, so the next zap skips a round trip.
             val l = s.list
             val i = l.indexOfFirst { it.id == channel.id }
             if (i >= 0 && l.size > 1) source.prefetch(listOf(l[(i + 1) % l.size].id, l[(i - 1 + l.size) % l.size].id))
             // No picture in 10 s: say so (never skip to another channel by ourselves).
             delay(NO_SIGNAL_MS)
-            if (s.playing?.id == channel.id && s.phase == LivePhase.TUNING) {
-                if (youtube != null) showYouTube() else unavailable()
-            }
+            if (s.playing?.id == channel.id && s.phase == LivePhase.TUNING) unavailable()
         }
     }
 
@@ -158,40 +144,10 @@ class LiveTvController(
         if (s.phase != LivePhase.TUNING && s.phase != LivePhase.PLAYING) return
         if (behindLiveWindow) { playback.restartAtLiveEdge(); return }
         urlIndex++
-        when {
-            urlIndex < urls.size -> { _state.update { it.copy(phase = LivePhase.TUNING) }; playback.play(urls[urlIndex]) }
-            youtube != null -> showYouTube()
-            else -> unavailable()
-        }
-    }
-
-    private var youtubeJob: Job? = null
-
-    private fun showYouTube() {
-        playback.stop()
-        _state.update { it.copy(phase = LivePhase.YOUTUBE, youtubeId = youtube, youtubePlaying = false, youtubeFailed = false) }
-        val id = youtube
-        youtubeJob?.cancel()
-        youtubeJob = scope.launch {
-            delay(YOUTUBE_START_MS)
-            if (s.phase == LivePhase.YOUTUBE && s.youtubeId == id && !s.youtubePlaying) onYouTubeError()
-        }
-    }
-
-    /** The embed reports a picture. */
-    fun onYouTubePlaying() {
-        if (s.phase == LivePhase.YOUTUBE) _state.update { it.copy(youtubePlaying = true, youtubeFailed = false) }
-    }
-
-    /** The embed can't play (e.g. the broadcaster blocks embedding): offer the YouTube app instead. */
-    fun onYouTubeError() {
-        if (s.phase == LivePhase.YOUTUBE) _state.update { it.copy(youtubePlaying = false, youtubeFailed = true) }
-    }
-
-    /** Hand this channel's YouTube live stream to the YouTube app (its own Back returns here). */
-    fun openInYouTube() {
-        val id = s.youtubeId ?: return
-        if (!openYouTubeApp(id)) flash("The YouTube app isn't installed")
+        if (urlIndex < urls.size) {
+            _state.update { it.copy(phase = LivePhase.TUNING) }
+            playback.play(urls[urlIndex])
+        } else unavailable()
     }
 
     private fun unavailable() {
@@ -273,8 +229,6 @@ class LiveTvController(
             }
             s.overlay == LiveOverlay.GUIDE -> guideOk()
             s.overlay == LiveOverlay.INFO -> toggleFavorite()
-            // The embed failed: OK hands the stream to the YouTube app.
-            s.phase == LivePhase.YOUTUBE && s.youtubeFailed -> openInYouTube()
             else -> {
                 val l = s.list
                 val i = l.indexOfFirst { it.id == (s.shown ?: s.current)?.id }.coerceAtLeast(0)
@@ -314,8 +268,7 @@ class LiveTvController(
                 _state.update { it.copy(guideColumn = GuideColumn.CHANNELS) }
                 schedulePreview()
             }
-            // On a YouTube channel the info panel's ▶ opens the YouTube app.
-            LiveOverlay.INFO -> if (s.phase == LivePhase.YOUTUBE) { closeOverlay(); openInYouTube() } else closeOverlay()
+            LiveOverlay.INFO -> closeOverlay()
             else -> info()
         }
     }
@@ -412,7 +365,7 @@ class LiveTvController(
         val ch = group.channels.getOrNull(s.guideIndex) ?: return
         previewJob?.cancel()
         playback.setMuted(false)
-        val alreadyOn = s.playing?.id == ch.id && (s.phase == LivePhase.PLAYING || s.phase == LivePhase.TUNING || s.phase == LivePhase.YOUTUBE)
+        val alreadyOn = s.playing?.id == ch.id && (s.phase == LivePhase.PLAYING || s.phase == LivePhase.TUNING)
         _state.update { it.copy(overlay = LiveOverlay.NONE, muted = false) }
         if (alreadyOn) {
             // The preview is already this channel: keep it, just make it current.
@@ -445,8 +398,6 @@ class LiveTvController(
         const val DIGIT_COMMIT_MS = 1_200L
         const val PREVIEW_DELAY_MS = 600L
         const val NO_SIGNAL_MS = 10_000L
-        /** A YouTube embed that shows nothing for this long counts as failed. */
-        const val YOUTUBE_START_MS = 12_000L
         const val DOUBLE_BACK_MS = 1_500L
         const val MAX_DIGITS = 4
 

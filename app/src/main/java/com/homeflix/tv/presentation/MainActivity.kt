@@ -38,6 +38,23 @@ class MainActivity : ComponentActivity() {
         com.homeflix.tv.launcher.HomeScreenSync.refreshSoon(this)
     }
 
+    /**
+     * Esc on a keyboard (or a remote that sends it) behaves exactly like Back,
+     * everywhere: it's re-sent as a BACK key event, so screens that handle
+     * Back themselves (player, Live TV, dialogs) and the system back stack
+     * all see the same thing.
+     */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.keyCode == android.view.KeyEvent.KEYCODE_ESCAPE) {
+            val back = android.view.KeyEvent(
+                event.downTime, event.eventTime, event.action, android.view.KeyEvent.KEYCODE_BACK,
+                event.repeatCount, event.metaState, event.deviceId, event.scanCode, event.flags, event.source
+            )
+            return super.dispatchKeyEvent(back)
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

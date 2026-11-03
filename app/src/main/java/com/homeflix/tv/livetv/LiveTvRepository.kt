@@ -40,13 +40,28 @@ class LiveTvRepository @Inject constructor(
     /** Prefetched /play answers, used once and only while fresh. */
     private val prefetched = ConcurrentHashMap<String, Pair<Long, LivePlay>>()
 
+    private var loadedAt = 0L
+
+    /**
+     * The lineup, from memory if it's younger than [maxAgeMs]. Home, the top
+     * menu and the player share one copy instead of each downloading the
+     * full list (thousands of channels on some servers).
+     */
+    suspend fun lineupFresh(maxAgeMs: Long = LINEUP_TTL_MS): LiveLineup? {
+        val cached = _lineup.value
+        if (cached != null && SystemClock.elapsedRealtime() - loadedAt < maxAgeMs) return cached
+        return refresh() ?: cached
+    }
+
     suspend fun refresh(): LiveLineup? = try {
         val r = withTimeout(8_000) { api.liveChannels() }
         val body = if (r.isSuccessful) r.body() else if (r.code() == 404) LiveLineup(enabled = false) else null
         body?.let { l ->
-            // Sorted by number so ▲▼ walk the lineup like a cable box.
-            l.copy(channels = l.channels.orEmpty().filter { it.id.isNotBlank() }.sortedBy { it.number })
-        }?.also { _lineup.value = it }
+            // Only channels that can actually play here: no YouTube-only sources,
+            // nothing the server's health check found offline. Sorted by number
+            // so ▲▼ walk the lineup like a cable box (numbers stay the server's).
+            l.copy(channels = playable(l.channels.orEmpty()))
+        }?.also { _lineup.value = it; loadedAt = SystemClock.elapsedRealtime() }
     } catch (e: Exception) {
         if (e is CancellationException && e !is kotlinx.coroutines.TimeoutCancellationException) throw e
         null
@@ -82,5 +97,11 @@ class LiveTvRepository @Inject constructor(
     companion object {
         /** A prefetched URL set is only trusted briefly: the order follows the latest health check. */
         const val PREFETCH_TTL_MS = 45_000L
+        const val LINEUP_TTL_MS = 10 * 60_000L
+
+        /** Channels the TV can play: no YouTube-only sources, nothing offline; by number. */
+        fun playable(channels: List<LiveChannel>): List<LiveChannel> = channels
+            .filter { it.id.isNotBlank() && !it.isYouTubeOnly && !it.status.equals("offline", ignoreCase = true) }
+            .sortedBy { it.number }
     }
 }

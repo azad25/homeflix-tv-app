@@ -11,7 +11,7 @@ class LiveTvHome @Inject constructor(private val repo: LiveTvRepository, private
 
     /** Null when the server has no Live TV (the row is hidden). */
     suspend fun tiles(): List<Tile>? {
-        val lineup = repo.refresh() ?: repo.lineup.value
+        val lineup = repo.lineupFresh()
         val channels = lineup?.takeIf { it.enabled }?.channels.orEmpty()
         if (channels.isEmpty()) return null
         return build(channels, store.favoritesNow(), store.recents(), store.lastAndPrevious().first)

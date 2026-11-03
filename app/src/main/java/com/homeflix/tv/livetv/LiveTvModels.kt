@@ -1,6 +1,5 @@
 package com.homeflix.tv.livetv
 
-import com.google.gson.annotations.SerializedName
 import java.util.Locale
 
 /** A Live TV channel from GET /api/livetv/channels. */
@@ -16,6 +15,9 @@ data class LiveChannel(
     /** Stable channel number for the remote (position in the full lineup). */
     val number: Int = 0
 ) {
+    /** Channels the server can only offer as a YouTube live stream: they don't play on the TV. */
+    val isYouTubeOnly: Boolean get() = quality.equals("YouTube", ignoreCase = true)
+
     val category: String? get() = categories?.firstOrNull()?.takeIf { it.isNotBlank() }
 
     /** "News · 720p · Bangladesh" */
@@ -39,10 +41,8 @@ data class LiveLineup(
 /** GET /api/livetv/channels/{id}/play */
 data class LivePlay(
     val channel: LiveChannel? = null,
-    /** HLS playlists, best first; relative to the server. */
-    val urls: List<String>? = null,
-    /** Broadcaster's official YouTube live stream (fallback, or the only source). */
-    @SerializedName("youtube_id") val youtubeId: String? = null
+    /** HLS playlists, best first; relative to the server. (YouTube-only sources are not used on the TV.) */
+    val urls: List<String>? = null
 )
 
 object LiveCountries {

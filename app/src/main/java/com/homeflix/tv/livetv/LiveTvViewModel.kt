@@ -1,7 +1,7 @@
 package com.homeflix.tv.livetv
 
 import android.content.Context
-import android.view.TextureView
+import android.view.SurfaceView
 import androidx.annotation.OptIn
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -34,13 +34,25 @@ class LiveTvViewModel @Inject constructor(
     store: LiveTvStore
 ) : ViewModel(), LivePlayback {
 
+    private val lowRam = com.homeflix.tv.util.DeviceCapabilities.isLowRam(context)
+
     val player: ExoPlayer = ExoPlayer.Builder(context)
         .setLoadControl(
             DefaultLoadControl.Builder()
-                // Start as soon as ~1.5 s is buffered; rebuffer a little longer.
-                .setBufferDurationsMs(15_000, 30_000, 1_500, 3_000)
-                .setPrioritizeTimeOverSizeThresholds(true)
+                // Live needs little read-ahead: start at ~1.5 s, rebuffer at 3 s,
+                // keep at most ~15 s (the live offset is 12 s anyway) and, on
+                // low-RAM TVs, never more than 12 MB of media in memory.
+                .setBufferDurationsMs(6_000, 15_000, 1_500, 3_000)
+                .setTargetBufferBytes(if (lowRam) 12 * 1024 * 1024 else 24 * 1024 * 1024)
+                .setPrioritizeTimeOverSizeThresholds(false)
+                .setBackBuffer(0, false)
                 .build()
+        )
+        .setTrackSelector(
+            androidx.media3.exoplayer.trackselection.DefaultTrackSelector(context).apply {
+                // 4K live variants cost a lot of memory and decoder bandwidth: 1080p is plenty.
+                setParameters(buildUponParameters().setMaxVideoSize(1920, 1080).setExceedVideoConstraintsIfNecessary(true))
+            }
         )
         .setMediaSourceFactory(
             HlsMediaSource.Factory(
@@ -53,19 +65,7 @@ class LiveTvViewModel @Inject constructor(
         .build()
         .apply { playWhenReady = true }
 
-    val controller = LiveTvController(viewModelScope, repo, store, this, openYouTubeApp = ::openYouTubeApp)
-
-    /** ACTION_VIEW to the YouTube app (the TV edition first); its Back returns to HomeFlix. */
-    private fun openYouTubeApp(videoId: String): Boolean {
-        val uri = android.net.Uri.parse("https://www.youtube.com/watch?v=$videoId")
-        for (pkg in listOf("com.google.android.youtube.tv", "com.google.android.youtube", null)) {
-            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
-                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                .apply { if (pkg != null) setPackage(pkg) }
-            if (runCatching { context.startActivity(intent) }.isSuccess) return true
-        }
-        return false
-    }
+    val controller = LiveTvController(viewModelScope, repo, store, this)
     val state get() = controller.state
 
     private val _loadFailed = MutableStateFlow(false)
@@ -86,15 +86,16 @@ class LiveTvViewModel @Inject constructor(
         if (started) return
         started = true
         viewModelScope.launch {
-            val lineup = repo.lineup.value?.takeIf { it.enabled && !it.channels.isNullOrEmpty() } ?: repo.refresh()
+            val lineup = repo.lineupFresh()
             val channels = lineup?.takeIf { it.enabled }?.channels.orEmpty()
             if (channels.isEmpty()) { _loadFailed.value = true; return@launch }
             controller.start(channels, channelId)
         }
     }
 
-    fun attach(view: TextureView) = player.setVideoTextureView(view)
-    fun detach(view: TextureView) = player.clearVideoTextureView(view)
+    // SurfaceView: composited by the display hardware, no per-frame GPU copy (lighter than TextureView).
+    fun attach(view: SurfaceView) = player.setVideoSurfaceView(view)
+    fun detach(view: SurfaceView) = player.clearVideoSurfaceView(view)
 
     // ------------------------------------------------------------ LivePlayback
 

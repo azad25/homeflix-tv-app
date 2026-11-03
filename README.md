@@ -1,6 +1,6 @@
 # 🎬 HomeFlix TV — Android TV Streaming Client
 
-**Version 5.13.1** — A Netflix/Prime‑grade Android TV client for the HomeFlix media server. Full‑bleed cinematic UI with auto‑playing background previews, a red‑and‑black HomeFlix theme, D‑pad‑first navigation, and an ExoPlayer video pipeline that buffers ahead for smooth playback. Built with Jetpack Compose and deliberately tuned to stay light on low‑RAM TVs (e.g. a 2 GB Sony Android TV).
+**Version 5.13.2** — A Netflix/Prime‑grade Android TV client for the HomeFlix media server. Full‑bleed cinematic UI with auto‑playing background previews, a red‑and‑black HomeFlix theme, D‑pad‑first navigation, and an ExoPlayer video pipeline that buffers ahead for smooth playback. Built with Jetpack Compose and deliberately tuned to stay light on low‑RAM TVs (e.g. a 2 GB Sony Android TV).
 
 ![Android TV](https://img.shields.io/badge/Android-TV-3DDC84?style=flat&logo=android) ![Kotlin](https://img.shields.io/badge/Kotlin-0095D5?style=flat&logo=kotlin) ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=flat&logo=jetpack-compose) ![Media3 ExoPlayer](https://img.shields.io/badge/Media3-ExoPlayer-FF0000?style=flat) ![Hilt](https://img.shields.io/badge/Hilt-DI-2196F3?style=flat)
 
@@ -223,7 +223,7 @@ To keep it running in the background, the server README describes a systemd serv
 | Thumbs ratings | `/api/ratings/{movie\|series}/{id}` | `docs/PERSONALISATION.md` |
 | Personalised rows ("Top Picks", "Because You Liked …", "New for You", "Hidden Gems") | `/api/recommendations/for-you?unique=1[&kind=movie\|series]` | `docs/PERSONALISATION.md` |
 | Top 10 charts from real plays | `/api/charts/top10?kind=movie\|series\|all` | `docs/PERSONALISATION.md` |
-| Live TV (channel lineup, signed HLS proxy, YouTube fallback) | `/api/livetv/channels`, `/api/livetv/channels/{id}/play` | `docs/LIVE_TV.md` |
+| Live TV (channel lineup, signed HLS proxy) | `/api/livetv/channels`, `/api/livetv/channels/{id}/play` | `docs/LIVE_TV.md` |
 | Cast from the web app | `ws://…/api/cast/tv/ws` | `docs/TV_CAST_PROTOCOL.md` |
 | TV app self-updates | `/api/app/tv/latest`, `backend/app-updates/tv/` | `docs/TV_APP_UPDATES.md` |
 | Pull the newest TV build from this repo | web **Settings → Dashboard → HomeFlix TV App**, `/api/admin/app/tv/fetch` | `docs/TV_APP_UPDATES.md` |

@@ -1,11 +1,8 @@
 package com.homeflix.tv.livetv
 
-import android.annotation.SuppressLint
 import android.view.KeyEvent as AKeyEvent
-import android.view.TextureView
-import android.webkit.WebChromeClient
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.view.SurfaceView
+import com.homeflix.tv.presentation.ui.throttleKeyRepeat
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -55,7 +52,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.nativeKeyCode
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -79,6 +75,7 @@ import java.util.Date
 import java.util.Locale
 
 private val Safe = 48.dp
+private val GuideBackdrop = Color(0xF20B0B0B)
 private val LiveRed = Color(0xFFE50914)
 
 /** Full-screen Live TV. [channelId] = channel to start on (else the last one, else channel 1). */
@@ -121,34 +118,30 @@ fun LiveTvContent(
             .testTag("livetv")
             .focusRequester(focus)
             .focusable()
+            // Held keys move the guides at a steady pace instead of flooding recomposition.
+            .throttleKeyRepeat(70L)
             .onPreviewKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 handleKey(e.key.nativeKeyCode, controller, onExit)
             }
     ) {
         val inGuide = state.overlay == LiveOverlay.GUIDE
-        val videoVisible = state.phase == LivePhase.PLAYING
+        // The guide's backdrop goes *under* the video so its preview window shows through.
+        if (inGuide) Box(Modifier.fillMaxSize().background(GuideBackdrop))
         // One surface for everything: full screen, or the guide's preview window.
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val pw = maxWidth * 0.36f
-            val videoModifier = if (inGuide) {
-                Modifier.padding(top = 56.dp, end = Safe).align(Alignment.TopEnd).width(pw).height(pw * 9f / 16f)
-                    .clip(RoundedCornerShape(10.dp))
-            } else Modifier.fillMaxSize()
-            video(videoModifier.graphicsLayer { alpha = if (videoVisible) 1f else 0f })
+            video(
+                if (inGuide) Modifier.padding(top = 56.dp, end = Safe).align(Alignment.TopEnd).width(pw).height(pw * 9f / 16f)
+                else Modifier.fillMaxSize()
+            )
         }
 
+        // Until the first frame the surface is covered, so the old picture never shows under a new name.
         if (!inGuide) {
             when (state.phase) {
                 LivePhase.TUNING, LivePhase.IDLE -> TuningScreen(state.shown ?: state.current, state.loading)
                 LivePhase.UNAVAILABLE -> NoSignal(state.shown ?: state.current)
-                LivePhase.YOUTUBE -> state.youtubeId?.let { id ->
-                    if (!state.youtubeFailed) YouTubeLive(id, onPlaying = controller::onYouTubePlaying, onError = controller::onYouTubeError)
-                    when {
-                        state.youtubeFailed -> YouTubeHandoff(state.shown ?: state.current)
-                        !state.youtubePlaying -> TuningScreen(state.shown ?: state.current, false)
-                    }
-                }
                 LivePhase.PLAYING -> Unit
             }
         }
@@ -160,9 +153,7 @@ fun LiveTvContent(
             exit = fadeOut(tween(250)),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            (state.shown ?: state.current)?.let {
-                InfoBanner(it, state.overlay == LiveOverlay.INFO, state.isFavorite, youtube = state.phase == LivePhase.YOUTUBE)
-            }
+            (state.shown ?: state.current)?.let { InfoBanner(it, state.overlay == LiveOverlay.INFO, state.isFavorite) }
         }
 
         if (state.digits.isNotEmpty()) NumberEntry(state.digits, Modifier.align(Alignment.TopEnd))
@@ -189,7 +180,8 @@ private fun handleKey(code: Int, c: LiveTvController, onExit: () -> Unit): Boole
         AKeyEvent.KEYCODE_DPAD_RIGHT -> c.right()
         AKeyEvent.KEYCODE_INFO, AKeyEvent.KEYCODE_MENU, AKeyEvent.KEYCODE_GUIDE ->
             if (code == AKeyEvent.KEYCODE_GUIDE) c.left() else c.info()
-        AKeyEvent.KEYCODE_BACK, AKeyEvent.KEYCODE_ESCAPE -> if (c.back()) onExit()
+        // Esc arrives as Back (MainActivity maps it app-wide).
+        AKeyEvent.KEYCODE_BACK -> if (c.back()) onExit()
         in AKeyEvent.KEYCODE_0..AKeyEvent.KEYCODE_9 -> c.digit(code - AKeyEvent.KEYCODE_0)
         in AKeyEvent.KEYCODE_NUMPAD_0..AKeyEvent.KEYCODE_NUMPAD_9 -> c.digit(code - AKeyEvent.KEYCODE_NUMPAD_0)
         AKeyEvent.KEYCODE_LAST_CHANNEL -> if (c.back()) onExit()
@@ -200,87 +192,12 @@ private fun handleKey(code: Int, c: LiveTvController, onExit: () -> Unit): Boole
 
 @Composable
 private fun LiveVideo(vm: LiveTvViewModel, modifier: Modifier) {
-    var view by remember { mutableStateOf<TextureView?>(null) }
+    var view by remember { mutableStateOf<SurfaceView?>(null) }
     AndroidView(
-        factory = { ctx -> TextureView(ctx).also { view = it; vm.attach(it) } },
+        factory = { ctx -> SurfaceView(ctx).also { view = it; vm.attach(it) } },
         modifier = modifier
     )
     DisposableEffect(Unit) { onDispose { view?.let(vm::detach) } }
-}
-
-/**
- * Broadcasters' official YouTube live streams, embedded (docs/LIVE_TV.md).
- * The IFrame API reports playing / errors (e.g. embedding blocked), so the
- * logo stays up until there's a picture and a failure offers the YouTube app.
- * The WebView never takes focus: ▲▼ keep zapping.
- */
-@SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
-@Composable
-private fun YouTubeLive(videoId: String, onPlaying: () -> Unit, onError: () -> Unit) {
-    val main = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
-    val bridge = remember(videoId) {
-        object {
-            @android.webkit.JavascriptInterface fun playing() { main.post(onPlaying) }
-            @android.webkit.JavascriptInterface fun failed() { main.post(onError) }
-        }
-    }
-    AndroidView(
-        factory = { ctx ->
-            WebView(ctx).apply {
-                isFocusable = false
-                isFocusableInTouchMode = false
-                settings.javaScriptEnabled = true
-                settings.mediaPlaybackRequiresUserGesture = false
-                settings.domStorageEnabled = true
-                webChromeClient = WebChromeClient()
-                webViewClient = WebViewClient()
-                setBackgroundColor(android.graphics.Color.BLACK)
-            }
-        },
-        update = { web ->
-            if (web.tag != videoId) {
-                web.tag = videoId
-                web.removeJavascriptInterface("HomeFlix")
-                web.addJavascriptInterface(bridge, "HomeFlix")
-                web.loadDataWithBaseURL("https://www.youtube-nocookie.com/", youTubeHtml(videoId), "text/html", "utf-8", null)
-            }
-        },
-        onRelease = { it.destroy() },
-        modifier = Modifier.fillMaxSize()
-    )
-}
-
-private fun youTubeHtml(id: String): String = """
-<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#p{position:absolute;inset:0;width:100%;height:100%}</style>
-</head><body><div id="p"></div>
-<script>
-var tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';
-tag.onerror=function(){HomeFlix.failed()};document.head.appendChild(tag);
-function onYouTubeIframeAPIReady(){
-  new YT.Player('p',{host:'https://www.youtube-nocookie.com',videoId:'$id',
-    playerVars:{autoplay:1,controls:0,rel:0,modestbranding:1,playsinline:1,iv_load_policy:3,disablekb:1},
-    events:{
-      onReady:function(e){e.target.playVideo()},
-      onStateChange:function(e){if(e.data===1)HomeFlix.playing()},
-      onError:function(){HomeFlix.failed()}
-    }});
-}
-</script></body></html>
-""".trimIndent()
-
-@Composable
-private fun YouTubeHandoff(channel: LiveChannel?) {
-    Box(Modifier.fillMaxSize().background(Color.Black).testTag("live_youtube_handoff"), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (channel != null) LogoTile(channel, 140.dp, 78.dp)
-            Text("${channel?.name ?: "This channel"} streams live on YouTube", color = Color.White, fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
-            Text("Press OK to watch it in the YouTube app", color = Color.White, fontSize = 16.sp,
-                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x33FFFFFF)).padding(horizontal = 18.dp, vertical = 8.dp))
-            Text("or ▲ ▼ for another channel", color = Tv.TextSecondary, fontSize = 14.sp)
-        }
-    }
 }
 
 // ------------------------------------------------------------------ screens
@@ -322,7 +239,7 @@ private fun LiveUnavailableLineup(onExit: () -> Unit) {
 }
 
 @Composable
-private fun InfoBanner(ch: LiveChannel, infoMode: Boolean, favorite: Boolean, youtube: Boolean = false) {
+private fun InfoBanner(ch: LiveChannel, infoMode: Boolean, favorite: Boolean) {
     val clock = rememberClock()
     Box(
         Modifier.fillMaxWidth()
@@ -350,10 +267,6 @@ private fun InfoBanner(ch: LiveChannel, infoMode: Boolean, favorite: Boolean, yo
                         Text(if (favorite) "★  In Favorites" else "☆  Add to Favorites", color = Color.Black, fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).padding(horizontal = 16.dp, vertical = 7.dp))
-                        if (youtube) {
-                            Text("▶  Open in YouTube", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x33FFFFFF)).padding(horizontal = 16.dp, vertical = 7.dp))
-                        }
                         Text("OK to ${if (favorite) "remove" else "add"}  ·  ◀ guide  ·  Back to close", color = Tv.TextSecondary, fontSize = 13.sp)
                     }
                 }
@@ -411,7 +324,8 @@ private fun FullGuide(state: LiveState) {
     KeepInView(groupList, state.groupIndex)
     KeepInView(channelList, state.guideIndex)
     val focused = state.guideChannels.getOrNull(state.guideIndex)
-    Box(Modifier.fillMaxSize().background(Color(0xF20B0B0B)).testTag("live_guide")) {
+    // The backdrop is drawn by LiveTvContent under the video (see GuideBackdrop).
+    Box(Modifier.fillMaxSize().testTag("live_guide")) {
         Row(Modifier.fillMaxSize().padding(start = Safe, top = 36.dp)) {
             Column(Modifier.width(260.dp)) {
                 Text("Live TV", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 14.dp))
@@ -460,8 +374,9 @@ private fun FullGuide(state: LiveState) {
                     Text("OK to watch  ·  ◀ ▶ groups / channels  ·  Back to close", color = Tv.TextMuted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
                 }
                 // Tuning / unavailable state for the preview window.
-                if (state.phase != LivePhase.PLAYING && state.playing?.id == focused.id) {
-                    Box(Modifier.align(Alignment.TopEnd).padding(end = Safe, top = 56.dp).width(pw).height(pw * 9f / 16f), contentAlignment = Alignment.Center) {
+                if (state.phase != LivePhase.PLAYING || state.playing?.id != focused.id) {
+                    Box(Modifier.align(Alignment.TopEnd).padding(end = Safe, top = 56.dp).width(pw).height(pw * 9f / 16f)
+                        .background(Color.Black), contentAlignment = Alignment.Center) {
                         if (state.phase == LivePhase.UNAVAILABLE) Text("Not available right now", color = Tv.TextSecondary, fontSize = 14.sp)
                         else LogoTile(focused, 120.dp, 66.dp)
                     }
@@ -525,7 +440,9 @@ private fun KeepInView(list: LazyListState, index: Int) {
         val first = visible.firstOrNull()?.index ?: 0
         val last = visible.lastOrNull()?.index ?: 0
         if (visible.isEmpty() || index <= first || index >= last) {
-            list.animateScrollToItem((index - 3).coerceAtLeast(0))
+            val target = (index - 3).coerceAtLeast(0)
+            // Far jumps (wrap-around, held keys) snap; one-step moves glide.
+            if (kotlin.math.abs(target - first) > 6) list.scrollToItem(target) else list.animateScrollToItem(target)
         }
     }
 }
